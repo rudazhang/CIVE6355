@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maximum Dynamic Load Factor — CIVE 6355</title>
+<!-- CIVE 6355 Structural Dynamics, Chapter 4: how the maximum dynamic load factor (DLF)max of an
+     undamped 1DOF oscillator under a rectangular or a triangular force pulse follows from DLF(t).
+     (DLF)max = max{1° max during the load, 2° max of the free vibration after it}; see Lecture 12.
+     Open this file directly in a browser (internet needed for Plotly and KaTeX).
+     The pulse duration can be set from the URL hash, e.g. Chap04-DLF-max.html#td=0.3 (t_d/T). -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.3/plotly.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #d9d9de;
+    --during: #1f5fbf; --after: #d9621c; --uh: #c8102e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  header { padding: 8px 14px 6px; background: var(--panel); border-bottom: 1px solid var(--line);
+           display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; }
+  .ctl { display: flex; align-items: center; gap: 6px; flex: 1 1 380px; max-width: 620px; }
+  .ctl .sym { font-size: 18px; font-style: italic; font-family: "Times New Roman", serif; white-space: nowrap; }
+  .ctl input[type=range] { flex: 1; min-width: 80px; }
+  .ctl input[type=number] { width: 72px; font: inherit; font-variant-numeric: tabular-nums; padding: 1px 3px; }
+  .play { width: 34px; height: 26px; padding: 0; font-size: 13px; border: 1px solid var(--line);
+          border-radius: 4px; background: #fff; cursor: pointer; }
+  .play.on { background: var(--uh); color: #fff; border-color: var(--uh); }
+  .tools { margin-left: auto; display: flex; gap: 10px; align-items: center; color: var(--muted); }
+  select, .tools button { font: inherit; }
+  .key { display: flex; gap: 14px; color: var(--muted); font-size: 13px; flex-wrap: wrap; }
+  .key b { font-weight: 600; }
+  main {
+    flex: 1; min-height: 0; display: grid; gap: 8px; padding: 8px;
+    grid-template-columns: 3fr 2fr; grid-template-rows: 1fr 1fr;
+  }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+           display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 4px 8px 4px; }
+  .panel h2 { font-size: 15px; margin: 2px 0; display: flex; gap: 12px; align-items: baseline; white-space: nowrap; }
+  .panel h2 .info { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums;
+                    min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .plot { flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+  .eq { min-height: 3.2em; text-align: center; font-size: 14px; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+  .eq .katex-html { white-space: nowrap; }
+  #loaderr { display: none; margin: 20px; padding: 12px; background: #fde; border: 1px solid var(--uh); }
+  @media (max-width: 900px) {
+    body { height: auto; }
+    header { padding: 8px 16px 6px; }
+    .tools { margin-left: 0; }
+    main { grid-template-columns: 1fr; grid-template-rows: auto; }
+    .plot { flex: none; height: 300px; }
+    .panel h2 { flex-wrap: wrap; white-space: normal; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Maximum dynamic load factor</h1>
+  <div class="ctl" title="pulse duration as a fraction of the natural period T">
+    <span class="sym">t<sub>d</sub>/T</span>
+    <button class="play" id="play" title="sweep t_d/T from 0 to 1.2">▶</button>
+    <input type="range" id="tdRange" min="0" max="1.2" step="0.001">
+    <input type="number" id="tdNum" min="0" max="1.2" step="0.01">
+  </div>
+  <div class="tools">
+    <label>speed
+      <select id="speed">
+        <option value="0.25">¼×</option><option value="0.5">½×</option>
+        <option value="1" selected>1×</option><option value="2">2×</option>
+      </select>
+    </label>
+    <button id="reset">Reset</button>
+  </div>
+  <div class="key">
+    <span><b style="color:var(--during)">1° max during the load</b> (t ≤ t<sub>d</sub>)</span>
+    <span><b style="color:var(--after)">2° max after the load</b> (t ≥ t<sub>d</sub>, free vibration)</span>
+    <span><b style="color:var(--uh)">◯ first maximum = (DLF)<sub>max</sub></b></span>
+    <span>undamped, ξ = 0</span>
+  </div>
+</header>
+<div id="loaderr">Plotly/KaTeX could not be loaded from the CDN. This page needs an internet connection.</div>
+<main>
+  <section class="panel">
+    <h2><span>Rectangular force: DLF(t)</span> <span class="info" id="rectInfo"></span></h2>
+    <div class="plot" id="rectDlf"></div>
+    <div class="eq" id="rectDlfEq"></div>
+  </section>
+  <section class="panel">
+    <h2><span>Rectangular force: (DLF)<sub>max</sub></span> <span class="info" id="rectMaxInfo"></span></h2>
+    <div class="plot" id="rectMax"></div>
+    <div class="eq" id="rectMaxEq"></div>
+  </section>
+  <section class="panel">
+    <h2><span>Triangular force: DLF(t)</span> <span class="info" id="triInfo"></span></h2>
+    <div class="plot" id="triDlf"></div>
+    <div class="eq" id="triDlfEq"></div>
+  </section>
+  <section class="panel">
+    <h2><span>Triangular force: (DLF)<sub>max</sub></span> <span class="info" id="triMaxInfo"></span></h2>
+    <div class="plot" id="triMax"></div>
+    <div class="eq" id="triMaxEq"></div>
+  </section>
+</main>
+
+<script>
+// BEGIN-MATH ------------------------------------------------------------------
+// Pure functions; no DOM. Extracted by the test script.
+// Time is in units of the natural period T: tau = t/T, r = t_d/T, theta = omega t = 2 pi tau,
+// theta_d = omega t_d = 2 pi r. DLF = y/y_st with y(0) = y'(0) = 0.
+const TWO_PI = 2 * Math.PI;
+// Root of 2 atan(x) = x: for theta_d >= THETA_D0 the triangular-load peak comes during the load.
+const THETA_D0 = (() => {
+  let x = 2.3;
+  for (let i = 0; i < 30; i++) x -= (2 * Math.atan(x) - x) / (2 / (1 + x * x) - 1);
+  return x;
+})();
+const SMALL = 1e-9;
+
+// Each load: F/F0, DLF(tau), and closed forms of the 1° max (value and time) and the 2° max.
+// dlf1/vel1 are the forced-phase DLF and dDLF/dtheta, used at t_d to start the free vibration.
+const LOADS = {
+  rect: {
+    force: (tau, r) => tau <= r ? 1 : 0,
+    dlf1: th => 1 - Math.cos(th),
+    vel1: th => Math.sin(th),
+    dlf2: (th, thd) => Math.cos(th - thd) - Math.cos(th),
+    max1: thd => thd <= Math.PI ? { th: thd, v: 1 - Math.cos(thd) } : { th: Math.PI, v: 2 },
+    max2: thd => 2 * Math.abs(Math.sin(thd / 2)),
+  },
+  tri: {
+    force: (tau, r) => tau <= r ? 1 - tau / r : 0,
+    dlf1: (th, thd) => 1 - Math.cos(th) + (Math.sin(th) - th) / thd,
+    vel1: (th, thd) => Math.sin(th) + (Math.cos(th) - 1) / thd,
+    dlf2: (th, thd) => (Math.sin(th) - Math.sin(th - thd)) / thd - Math.cos(th),
+    max1: thd => thd >= THETA_D0
+      ? { th: 2 * Math.atan(thd), v: 2 - 2 * Math.atan(thd) / thd }
+      : { th: thd, v: thd < SMALL ? 0 : Math.sin(thd) / thd - Math.cos(thd) },
+    max2: thd => {
+      if (thd < SMALL) return 0;
+      const s = Math.sin(thd / 2), q = 1 - 2 * Math.sin(thd) / thd + 4 * s * s / (thd * thd);
+      return Math.sqrt(Math.max(0, q));
+    },
+  },
+};
+
+function dlf(L, tau, r) {
+  if (r <= 0) return 0;
+  const th = TWO_PI * tau, thd = TWO_PI * r;
+  return tau <= r ? L.dlf1(th, thd) : L.dlf2(th, thd);
+}
+
+// Free vibration after t_d: DLF = y0 cos(theta - theta_d) + v0 sin(theta - theta_d)
+// = A cos(theta - theta_d - phi); its first peak is at theta = theta_d + phi, phi in [0, 2 pi).
+function freePeak(L, r) {
+  const thd = TWO_PI * r;
+  if (thd < SMALL) return { tau: r, v: 0 };
+  const y0 = L.dlf1(thd, thd), v0 = L.vel1(thd, thd), A = Math.hypot(y0, v0);
+  let phi = Math.atan2(v0, y0);
+  if (phi < -1e-12) phi += TWO_PI;
+  return { tau: r + Math.max(phi, 0) / TWO_PI, v: A };
+}
+
+// 1° and 2° maxima and the first maximum of DLF(t), which for xi = 0 is the overall maximum.
+// On a tie the 1° point comes first in time.
+function analyze(L, r) {
+  const thd = TWO_PI * r, m1 = L.max1(thd);
+  const p1 = { tau: m1.th / TWO_PI, v: m1.v }, p2 = freePeak(L, r);
+  const first = p1.v >= p2.v - 1e-12 ? p1 : p2;
+  return { p1, p2, first, during: first === p1 };
+}
+// END-MATH --------------------------------------------------------------------
+
+if (typeof Plotly === 'undefined' || typeof katex === 'undefined') {
+  document.getElementById('loaderr').style.display = 'block';
+}
+
+// ---- state -----------------------------------------------------------------------
+const TD_MAX = 1.2, TAU_MAX = 2.5, TD_DEFAULT = 0.3;
+const KEY_POINTS = [THETA_D0 / TWO_PI, 0.5, 1];   // sweep pauses here: tri switch, rect plateau and cusp
+let td = TD_DEFAULT;
+{
+  const m = location.hash.match(/td=([0-9.eE+-]+)/);
+  if (m && Number.isFinite(+m[1])) td = Math.min(TD_MAX, Math.max(0, +m[1]));
+}
+const writeHash = () => history.replaceState(null, '', '#td=' + fmt(td, 4));
+
+// ---- formatting ----------------------------------------------------------------
+function fmt(v, d = 3) {
+  if (!Number.isFinite(v)) return '—';
+  if (Math.abs(v) < 5e-13) return '0';
+  return String(Number(v.toPrecision(d)));
+}
+const fix = (v, d = 3) => Math.abs(v) < 5e-13 ? (0).toFixed(d) : v.toFixed(d);
+function tex(el, s) {
+  if (typeof katex === 'undefined') { el.textContent = s; return; }
+  katex.render(s, el, { throwOnError: false, displayMode: false });
+}
+
+// ---- plots ---------------------------------------------------------------------
+const PLOT_CFG = { displayModeBar: false, responsive: true };
+const FONT = { family: 'system-ui, sans-serif', size: 14, color: '#1d1d1f' };
+const COL = { during: '#1f5fbf', after: '#d9621c', max: '#c8102e', env: '#1d1d1f', force: '#9a9aa0',
+              shade: 'rgba(31,95,191,0.07)', ref: '#b0b0b6' };
+const baseLayout = (extra) => Object.assign({
+  font: FONT, margin: { l: 50, r: 14, t: 8, b: 40 }, showlegend: false,
+  paper_bgcolor: '#fff', plot_bgcolor: '#fff', uirevision: 'keep',
+}, extra);
+const axis = (extra) => Object.assign({
+  zeroline: true, zerolinecolor: '#888', zerolinewidth: 1.5, gridcolor: '#eee',
+  linecolor: '#bbb', mirror: true, showline: true, fixedrange: true,
+}, extra);
+const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+const line = (x, y, color, width, dash) => ({ x, y, mode: 'lines', line: { color, width, dash }, hoverinfo: 'skip' });
+const dot = (x, y, color, size = 10) => ({ x: [x], y: [y], mode: 'markers', hoverinfo: 'skip',
+                                           marker: { size, color, line: { color: '#fff', width: 1.5 } } });
+const ring = (x, y) => ({ x: [x], y: [y], mode: 'markers', hoverinfo: 'skip',
+                          marker: { size: 22, color: 'rgba(0,0,0,0)', line: { color: COL.max, width: 3 } } });
+const vline = (x, color, dash, width = 1.5) => ({ type: 'line', xref: 'x', yref: 'paper', x0: x, x1: x, y0: 0, y1: 1,
+                                                  line: { color, width, dash } });
+const hseg = (x0, x1, y, color, dash) => ({ type: 'line', xref: 'x', yref: 'y', x0, x1, y0: y, y1: y,
+                                            line: { color, width: 1.2, dash } });
+const label = (x, y, text, color, xanchor = 'left', yanchor = 'bottom') =>
+  ({ x, y, xref: 'x', yref: 'y', text, showarrow: false, xanchor, yanchor, font: { size: 13, color },
+     bgcolor: 'rgba(255,255,255,0.85)' });
+
+const TAU = linspace(0, TAU_MAX, 1001);
+const RS = linspace(0, TD_MAX, 1201);
+// The max curves do not depend on t_d: compute them once.
+const CURVES = {};
+for (const key of Object.keys(LOADS)) {
+  const L = LOADS[key];
+  const c1 = RS.map(r => L.max1(TWO_PI * r).v), c2 = RS.map(r => L.max2(TWO_PI * r));
+  CURVES[key] = { c1, c2, env: c1.map((v, i) => Math.max(v, c2[i])) };
+}
+
+function drawDlf(key, A) {
+  const L = LOADS[key], r = td;
+  const t1 = TAU.filter(t => t < r).concat(r > 0 ? [r] : []);
+  const t2 = (r > 0 ? [r] : []).concat(TAU.filter(t => t > r));
+  const force = key === 'rect'
+    ? (r > 0 ? { x: [0, r, r, TAU_MAX], y: [1, 1, 0, 0] } : { x: [0, TAU_MAX], y: [0, 0] })
+    : (r > 0 ? { x: [0, r, TAU_MAX], y: [1, 0, 0] } : { x: [0, TAU_MAX], y: [0, 0] });
+  const traces = [
+    line(force.x, force.y, COL.force, 2, 'dot'),
+    line(t1, t1.map(t => dlf(L, t, r)), COL.during, 3),
+    line(t2, t2.map(t => dlf(L, t, r)), COL.after, 3),
+  ];
+  const shapes = [{ type: 'rect', xref: 'x', yref: 'paper', x0: 0, x1: r, y0: 0, y1: 1,
+                    fillcolor: COL.shade, line: { width: 0 }, layer: 'below' }];
+  const annotations = [label(r, -2.15, `t<sub>d</sub>/T = ${fix(r, 3)}`, COL.during, r > 1.6 ? 'right' : 'left', 'bottom')];
+  if (r > 0) {
+    shapes.push(vline(r, COL.during, 'dash', 1));
+    if (A.p2.v > 1e-6) {
+      shapes.push(hseg(r, TAU_MAX, A.p2.v, COL.after, 'dash'), hseg(r, TAU_MAX, -A.p2.v, COL.after, 'dash'));
+      traces.push(dot(A.p2.tau, A.p2.v, COL.after));
+    }
+    traces.push(dot(A.p1.tau, A.p1.v, COL.during), ring(A.first.tau, A.first.v));
+    annotations.push(label(A.first.tau, A.first.v + 0.12,
+      `<b>(DLF)<sub>max</sub> = ${fix(A.first.v)}</b>`, COL.max, A.first.tau > 1.8 ? 'right' : 'left', 'bottom'));
+  }
+  annotations.push({ xref: 'paper', yref: 'paper', x: 1, y: 0, xanchor: 'right', yanchor: 'bottom', showarrow: false,
+                     font: { size: 13, color: '#6b6b70' }, bgcolor: 'rgba(255,255,255,0.85)', text: 'F(t)/F₀ dotted' });
+  Plotly.react(key + 'Dlf', traces, baseLayout({
+    xaxis: axis({ range: [0, TAU_MAX], dtick: 0.25, title: { text: 't / T', standoff: 4 } }),
+    yaxis: axis({ range: [-2.3, 2.6], dtick: 1, title: { text: 'DLF', standoff: 2 } }),
+    shapes, annotations,
+  }), PLOT_CFG);
+}
+
+function drawMax(key, A) {
+  const C = CURVES[key], r = td;
+  const traces = [
+    line(RS, C.env, COL.env, 7),
+    line(RS, C.c1, COL.during, 2.5),
+    line(RS, C.c2, COL.after, 2.5),
+  ];
+  const shapes = [vline(r, COL.max, 'dash', 1.2), hseg(0, TD_MAX, 2, COL.ref, 'dash')];
+  const annotations = [];
+  if (key === 'rect') {
+    shapes.push(vline(0.5, COL.ref, 'dot', 1));
+    annotations.push(label(0.5, 0.05, 'T/2', '#6b6b70', 'left', 'bottom'));
+  } else {
+    const r0 = THETA_D0 / TWO_PI;
+    shapes.push(vline(r0, COL.ref, 'dot', 1));
+    annotations.push(label(r0, 0.05, `θ<sub>d,0</sub> = ${fix(THETA_D0)} (t<sub>d</sub>/T = ${fix(r0)})`, '#6b6b70', 'left', 'bottom'));
+  }
+  if (r > 0) traces.push(dot(r, A.p2.v, COL.after), dot(r, A.p1.v, COL.during), ring(r, A.first.v));
+  annotations.push({ xref: 'paper', yref: 'paper', x: 0.01, y: 0.99, xanchor: 'left', yanchor: 'top', showarrow: false,
+                     bgcolor: 'rgba(255,255,255,0.85)', font: { size: 13 }, align: 'left',
+                     text: `<b style="color:${COL.during}">1°</b>  <b style="color:${COL.after}">2°</b>  ` +
+                           `<b style="color:${COL.env}">(DLF)<sub>max</sub> = max(1°, 2°)</b>` });
+  Plotly.react(key + 'Max', traces, baseLayout({
+    xaxis: axis({ range: [0, TD_MAX], dtick: 0.1, title: { text: 't<sub>d</sub> / T', standoff: 4 } }),
+    yaxis: axis({ range: [0, 2.35], dtick: 0.5, title: { text: '(DLF)<sub>max</sub>', standoff: 2 } }),
+    shapes, annotations,
+  }), PLOT_CFG);
+}
+
+function info(key, A) {
+  const governs = td <= 0 ? 'no load'
+    : A.during ? 'peak during the load (1°)' : 'peak after the load (2°)';
+  document.getElementById(key + 'Info').textContent = td <= 0 ? '' :
+    `1° = ${fix(A.p1.v)}, 2° = ${fix(A.p2.v)}; first max at t/T = ${fix(A.first.tau)}, ${governs}`;
+  document.getElementById(key + 'MaxInfo').innerHTML =
+    `θ<sub>d</sub> = ωt<sub>d</sub> = ${fix(TWO_PI * td)} rad, (DLF)<sub>max</sub> = ${fix(A.first.v)}`;
+}
+
+// ---- equations (fixed) -----------------------------------------------------------
+tex(document.getElementById('rectDlfEq'),
+  String.raw`\mathit{DLF}(t) = \begin{cases} 1 - \cos\omega t, & t \le t_d \\
+    \cos\omega(t - t_d) - \cos\omega t = 2\sin\frac{\omega t_d}{2}\,\sin\omega\!\left(t - \frac{t_d}{2}\right), & t \ge t_d \end{cases}`);
+tex(document.getElementById('triDlfEq'),
+  String.raw`\mathit{DLF}(t) = \begin{cases} 1 - \cos\omega t + \dfrac{\sin\omega t}{\omega t_d} - \dfrac{t}{t_d}, & t \le t_d \\[4pt]
+    \dfrac{\sin\omega t - \sin\omega(t - t_d)}{\omega t_d} - \cos\omega t, & t \ge t_d \end{cases}`);
+tex(document.getElementById('rectMaxEq'),
+  String.raw`1^\circ = \begin{cases} 1 - \cos\theta_d, & t_d \le \frac{T}{2} \\ 2, & t_d \ge \frac{T}{2} \end{cases}
+    \quad 2^\circ = 2\left|\sin\frac{\theta_d}{2}\right|
+    \quad (\mathit{DLF})_{\max} = \begin{cases} 2\sin\frac{\pi t_d}{T}, & t_d \le \frac{T}{2} \\ 2, & t_d \ge \frac{T}{2} \end{cases}`);
+tex(document.getElementById('triMaxEq'),
+  String.raw`1^\circ = \begin{cases} \dfrac{\sin\theta_d}{\theta_d} - \cos\theta_d, & \theta_d \le \theta_{d,0} \\[4pt]
+    2 - \dfrac{1}{\theta_d}\cos^{-1}\dfrac{1 - \theta_d^2}{1 + \theta_d^2}, & \theta_d \ge \theta_{d,0} \end{cases}
+    \quad 2^\circ = \sqrt{1 - \frac{2}{\theta_d}\sin\theta_d + \frac{2}{\theta_d^2}(1 - \cos\theta_d)}`);
+
+// ---- refresh ---------------------------------------------------------------------
+const tdRange = document.getElementById('tdRange'), tdNum = document.getElementById('tdNum');
+function refresh() {
+  tdRange.value = td;
+  if (document.activeElement !== tdNum) tdNum.value = fix(td, 3);
+  for (const key of Object.keys(LOADS)) {
+    const A = analyze(LOADS[key], td);
+    drawDlf(key, A); drawMax(key, A); info(key, A);
+  }
+}
+function setTd(v) {
+  if (!Number.isFinite(v)) return;
+  td = Math.min(TD_MAX, Math.max(0, v));
+  refresh();
+}
+tdRange.addEventListener('input', () => { stopSweep(); setTd(parseFloat(tdRange.value)); writeHash(); });
+tdNum.addEventListener('change', () => { stopSweep(); setTd(parseFloat(tdNum.value)); writeHash(); });
+document.getElementById('reset').addEventListener('click', () => { stopSweep(); setTd(TD_DEFAULT); writeHash(); });
+
+// ---- sweep: t_d/T runs 0 -> 1.2, holds, and starts over -------------------------
+let sweep = null;
+const SWEEP_PERIOD = 12, PAUSE_KEY = 700, PAUSE_END = 1200;   // s per pass at 1x; ms
+const playBtn = document.getElementById('play');
+const speed = () => parseFloat(document.getElementById('speed').value);
+function startSweep() {
+  if (td >= TD_MAX) td = 0;
+  sweep = { last: null, pauseUntil: 0 };
+  playBtn.classList.add('on'); playBtn.textContent = '❚❚';
+  requestAnimationFrame(sweepFrame);
+}
+function stopSweep() {
+  if (!sweep) return;
+  sweep = null;
+  playBtn.classList.remove('on'); playBtn.textContent = '▶';
+  writeHash();
+}
+playBtn.addEventListener('click', () => sweep ? stopSweep() : startSweep());
+function sweepFrame(now) {
+  if (!sweep) return;
+  const sw = sweep;
+  if (sw.last === null) sw.last = now;
+  const dt = Math.min(0.1, (now - sw.last) / 1000);
+  sw.last = now;
+  if (now >= sw.pauseUntil) {
+    if (td >= TD_MAX) td = 0;
+    else {
+      const prev = td;
+      td = Math.min(TD_MAX, td + TD_MAX * dt * speed() / SWEEP_PERIOD);
+      const hit = KEY_POINTS.find(k => prev < k && td >= k);
+      if (hit !== undefined) { td = hit; sw.pauseUntil = now + PAUSE_KEY; }
+      if (td >= TD_MAX) sw.pauseUntil = now + PAUSE_END;
+    }
+    refresh();
+  }
+  requestAnimationFrame(sweepFrame);
+}
+
+refresh();
+// Plotly sizes a plot once; follow later changes of its box (KaTeX fonts loading, narrow screens).
+if (typeof Plotly !== 'undefined' && 'ResizeObserver' in window) {
+  const ro = new ResizeObserver(entries => entries.forEach(e => Plotly.Plots.resize(e.target)));
+  document.querySelectorAll('.plot').forEach(el => ro.observe(el));
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1DOF Free Vibration — CIVE 6355</title>
+<!-- CIVE 6355 Structural Dynamics, Chapter 2: damped single-degree-of-freedom systems.
+     Open this file directly in a browser (internet needed for Plotly and KaTeX).
+     State can be set from the URL hash, e.g. 1DOF-free-vibration.html#m=1&omega=2&xi=0.1&x0=1&v0=0&T=20 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.3/plotly.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #d9d9de;
+    --c1: #1f5fbf; --c2: #d9621c; --x: #1d1d1f; --uh: #c8102e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  header { padding: 8px 14px 6px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .titlebar { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  .titlebar h1 { font-size: 17px; margin: 0; }
+  .titlebar .eom { color: var(--muted); }
+  .titlebar .tools { margin-left: auto; display: flex; gap: 10px; align-items: center; color: var(--muted); }
+  .controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(245px, 1fr)); gap: 4px 16px; }
+  .ctl { display: flex; align-items: center; gap: 6px; }
+  .ctl .sym { width: 26px; font-size: 18px; font-style: italic; font-family: "Times New Roman", serif; text-align: right; }
+  .ctl input[type=range] { flex: 1; min-width: 60px; }
+  .ctl input[type=number] { width: 78px; font: inherit; font-variant-numeric: tabular-nums; padding: 1px 3px; }
+  .play { width: 28px; height: 24px; padding: 0; font-size: 12px; border: 1px solid var(--line);
+          border-radius: 4px; background: #fff; cursor: pointer; }
+  .play.on { background: var(--uh); color: #fff; border-color: var(--uh); }
+  .readouts { display: flex; flex-wrap: wrap; gap: 3px 18px; margin-top: 6px; padding-top: 5px;
+              border-top: 1px dashed var(--line); font-variant-numeric: tabular-nums; }
+  .readouts span b { font-weight: 600; }
+  .case { font-weight: 700; padding: 0 8px; border-radius: 4px; color: #fff; }
+  main {
+    flex: 1; min-height: 0; display: grid; gap: 8px; padding: 8px;
+    grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    grid-template-areas: "p1 p2" "p3 p2";
+  }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+           display: flex; flex-direction: column; min-height: 0; padding: 4px 8px 4px; }
+  .panel h2 { font-size: 15px; margin: 2px 0; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .panel h2 .info { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .panel h2 label { margin-left: auto; font-weight: 400; font-size: 13px; color: var(--muted); }
+  .plot { flex: 1; min-height: 0; }
+  .eq { min-height: 2.2em; text-align: center; font-size: 14px; overflow-x: auto; }
+  #p1 { grid-area: p1; } #p2 { grid-area: p2; } #p3 { grid-area: p3; }
+  #p2 .plot { flex: 1; }
+  #loaderr { display: none; margin: 20px; padding: 12px; background: #fde; border: 1px solid var(--uh); }
+  @media (max-width: 900px) {
+    body { height: auto; }
+    main { grid-template-columns: 1fr; grid-template-rows: auto;
+           grid-template-areas: "p1" "p2" "p3"; }
+    .panel { min-height: 380px; }
+    #p2 { min-height: 640px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="titlebar">
+    <h1>Free vibration of a 1DOF system</h1>
+    <span class="eom" id="eomTex"></span>
+    <div class="tools">
+      <label>sweep speed
+        <select id="speed">
+          <option value="0.25">¼×</option><option value="0.5">½×</option>
+          <option value="1" selected>1×</option><option value="2">2×</option>
+        </select>
+      </label>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+  <div class="controls" id="controls"></div>
+  <div class="readouts" id="readouts"></div>
+</header>
+<div id="loaderr">Plotly/KaTeX could not be loaded from the CDN. This page needs an internet connection.</div>
+<main>
+  <section class="panel" id="p1">
+    <h2>1 · Poles <span class="info" id="p1info"></span>
+      <label><input type="checkbox" id="auto1"> scale with ω</label></h2>
+    <div class="plot" id="plot1"></div>
+    <div class="eq" id="eq1"></div>
+  </section>
+  <section class="panel" id="p2">
+    <h2><span>2 · x<sub>1</sub>(t) = e<sup>a<sub>1</sub>t</sup>cos b<sub>1</sub>t, x<sub>2</sub>(t) = e<sup>a<sub>2</sub>t</sup>sin b<sub>2</sub>t</span> <span class="info" id="p2info"></span>
+      <label><input type="checkbox" id="auto2"> autoscale y</label></h2>
+    <div class="plot" id="plot2a"></div>
+    <div class="plot" id="plot2b"></div>
+  </section>
+  <section class="panel" id="p3">
+    <h2>3 · Free vibration x(t) <span class="info" id="p3info"></span>
+      <label><input type="checkbox" id="auto3"> autoscale y</label></h2>
+    <div class="plot" id="plot3"></div>
+    <div class="eq" id="eq3"></div>
+  </section>
+</main>
+
+<script>
+// BEGIN-MATH ------------------------------------------------------------------
+// Pure functions of (omega, xi, x0, v0); no DOM. Extracted by the test script.
+const CRIT_TOL = 1e-12;
+
+function dampingCase(xi) {
+  const a = Math.abs(xi);
+  if (Math.abs(a - 1) < CRIT_TOL) return 'critical';
+  if (a > 1) return 'over';
+  if (xi === 0) return 'undamped';
+  return 'under';                       // includes 0 < |xi| < 1, xi < 0 being negative damping
+}
+
+// Roots s1, s2 of s^2 + 2 xi omega s + omega^2 = 0, as {re, im}.
+function poles(omega, xi) {
+  const cs = dampingCase(xi);
+  if (cs === 'critical') return [{ re: -xi * omega, im: 0 }, { re: -xi * omega, im: 0 }];
+  if (cs === 'over') {
+    const r = Math.sqrt(xi * xi - 1);
+    return [{ re: (-xi + r) * omega, im: 0 }, { re: (-xi - r) * omega, im: 0 }];
+  }
+  const wd = omega * Math.sqrt(1 - xi * xi);
+  return [{ re: -xi * omega, im: wd }, { re: -xi * omega, im: -wd }];
+}
+
+// Plot 2 basis functions x1(t), x2(t).
+function basis(omega, xi) {
+  const cs = dampingCase(xi), [s1, s2] = poles(omega, xi);
+  if (cs === 'critical') {
+    const a = s1.re;
+    return [t => Math.exp(a * t), t => t * Math.exp(a * t)];
+  }
+  // x1 = e^{at} cos(b t); x2 = e^{at} sin(b t) when b != 0, else e^{at}.
+  const x1 = t => Math.exp(s1.re * t) * Math.cos(s1.im * t);
+  const x2 = s2.im !== 0 ? t => Math.exp(s2.re * t) * Math.sin(s2.im * t)
+                         : t => Math.exp(s2.re * t);
+  return [x1, x2];
+}
+
+// Closed-form solution of x'' + 2 xi omega x' + omega^2 x = 0, x(0)=x0, x'(0)=v0.
+// Returns {x(t), v(t), env(t) or null, coef}.
+function freeResponse(omega, xi, x0, v0) {
+  const cs = dampingCase(xi);
+  if (cs === 'under' || cs === 'undamped') {
+    const wd = omega * Math.sqrt(1 - xi * xi), a = -xi * omega;
+    const A = x0, B = (v0 + xi * omega * x0) / wd;
+    const C = Math.hypot(A, B);
+    return {
+      x: t => Math.exp(a * t) * (A * Math.cos(wd * t) + B * Math.sin(wd * t)),
+      v: t => Math.exp(a * t) * ((a * A + wd * B) * Math.cos(wd * t) + (a * B - wd * A) * Math.sin(wd * t)),
+      env: t => C * Math.exp(a * t),
+      coef: { A, B, C, a, wd }
+    };
+  }
+  if (cs === 'critical') {
+    const r = -xi * omega, A = x0, B = v0 - r * x0;
+    return {
+      x: t => (A + B * t) * Math.exp(r * t),
+      v: t => (B + r * (A + B * t)) * Math.exp(r * t),
+      env: null,
+      coef: { A, B, r }
+    };
+  }
+  const [s1, s2] = poles(omega, xi), r1 = s1.re, r2 = s2.re;
+  const C1 = (v0 - r2 * x0) / (r1 - r2), C2 = (r1 * x0 - v0) / (r1 - r2);
+  return {
+    x: t => C1 * Math.exp(r1 * t) + C2 * Math.exp(r2 * t),
+    v: t => C1 * r1 * Math.exp(r1 * t) + C2 * r2 * Math.exp(r2 * t),
+    env: null,
+    coef: { C1, C2, r1, r2 }
+  };
+}
+// END-MATH --------------------------------------------------------------------
+
+if (typeof Plotly === 'undefined' || typeof katex === 'undefined') {
+  document.getElementById('loaderr').style.display = 'block';
+}
+
+// ---- parameter state ---------------------------------------------------------
+// Primary state is (m, omega, xi); k = m omega^2 and c = 2 m xi omega are derived.
+const XI_MIN = -0.3, XI_MAX = 2, W_MIN = 0.5, W_MAX = 5, SNAP = 0.005;
+const DEFAULTS = { m: 1, omega: 2, xi: 0.1, x0: 1, v0: 0, T: 20 };
+const S = { ...DEFAULTS };
+const kOf = () => S.m * S.omega ** 2;
+const cOf = () => 2 * S.m * S.xi * S.omega;
+
+// Slider ranges; k and c ranges follow m (and k) so they span omega in [0.5, 5], xi in [-0.3, 2].
+const RANGES = {
+  m:     () => [0.1, 10, 0.01],
+  k:     () => [S.m * W_MIN ** 2, S.m * W_MAX ** 2, 0.01],
+  c:     () => { const r = 2 * Math.sqrt(S.m * kOf()); return [XI_MIN * r, XI_MAX * r, 0.01]; },
+  omega: () => [W_MIN, W_MAX, 0.01],
+  xi:    () => [XI_MIN, XI_MAX, 0.01],
+  x0:    () => [-2, 2, 0.01],
+  v0:    () => [-2, 2, 0.01],
+  T:     () => [2, 60, 0.5],
+};
+const SYMS = { m: 'm', c: 'c', k: 'k', omega: 'ω', xi: 'ξ', x0: 'x₀', v0: 'v₀', T: 't<sub>max</sub>' };
+const ORDER = ['m', 'c', 'k', 'omega', 'xi', 'x0', 'v0', 'T'];
+
+function getParam(key) {
+  return key === 'k' ? kOf() : key === 'c' ? cOf() : S[key];
+}
+
+// Set one parameter, keeping the others consistent. snapWindow > 0 snaps |xi| to 1.
+function setParam(key, val, snapWindow = SNAP) {
+  if (!Number.isFinite(val)) return;
+  const k = kOf(), c = cOf();
+  switch (key) {
+    case 'm':     if (val <= 0) return; S.m = val; S.omega = Math.sqrt(k / val); S.xi = c / (2 * val * S.omega); break;
+    case 'k':     if (val <= 0) return; S.omega = Math.sqrt(val / S.m); S.xi = c / (2 * S.m * S.omega); break;
+    case 'c':     S.xi = val / (2 * S.m * S.omega); break;
+    case 'omega': if (val <= 0) return; S.omega = val; break;
+    case 'xi':    S.xi = val; break;
+    case 'T':     if (val <= 0) return; S.T = val; break;
+    default:      S[key] = val;
+  }
+  if (snapWindow > 0) {
+    if (Math.abs(S.xi - 1) < snapWindow) S.xi = 1;
+    else if (Math.abs(S.xi + 1) < snapWindow) S.xi = -1;
+    else if (Math.abs(S.xi) < 1e-9) S.xi = 0;
+  }
+}
+
+// ---- formatting ----------------------------------------------------------------
+function fmt(v, d = 3) {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '—';
+  if (Math.abs(v) < 5e-13) return '0';
+  const a = Math.abs(v);
+  if (a >= 1e4 || a < 1e-3) return v.toExponential(2);
+  return String(Number(v.toPrecision(d + (a >= 100 ? 1 : 0))));
+}
+const texNum = v => fmt(v).replace(/e([+-]?\d+)/, '\\times 10^{$1}');
+const texSigned = v => (v < 0 ? '- ' : '+ ') + texNum(Math.abs(v));  // "+ 0.5" / "- 0.5"
+function tex(el, s) {
+  if (typeof katex === 'undefined') { el.textContent = s; return; }
+  katex.render(s, el, { throwOnError: false, displayMode: false });
+}
+
+// ---- controls ------------------------------------------------------------------
+const ui = {};
+const controls = document.getElementById('controls');
+for (const key of ORDER) {
+  const div = document.createElement('div');
+  div.className = 'ctl';
+  div.innerHTML = `<span class="sym">${SYMS[key]}</span>
+    <button class="play" title="sweep ${key} back and forth">▶</button>
+    <input type="range"><input type="number">`;
+  controls.appendChild(div);
+  const [play, range, num] = div.querySelectorAll('button, input');
+  ui[key] = { play, range, num };
+  range.addEventListener('input', () => { stopSweep(); setParam(key, parseFloat(range.value)); refresh(key); });
+  num.addEventListener('change', () => { stopSweep(); setParam(key, parseFloat(num.value), 0); refresh(); });
+  play.addEventListener('click', () => (sweep && sweep.key === key) ? stopSweep() : startSweep(key));
+}
+
+function syncControls(activeKey) {
+  for (const key of ORDER) {
+    const [lo, hi, step] = RANGES[key]();
+    const { range, num } = ui[key];
+    const v = getParam(key);
+    if (key !== activeKey) {  // don't disturb the slider being dragged
+      range.min = lo; range.max = hi; range.step = step;
+      range.value = v;
+    }
+    if (document.activeElement !== num) num.value = fmt(v, 4);
+  }
+}
+
+// ---- sweep (ping-pong animation of one parameter) --------------------------------
+let sweep = null;
+const SWEEP_PERIOD = 8;  // seconds for one pass across the range at 1x
+function startSweep(key) {
+  stopSweep();
+  const [lo, hi] = RANGES[key]();
+  const v = Math.min(hi, Math.max(lo, getParam(key)));
+  sweep = { key, lo, hi, v, dir: 1, last: null, pauseUntil: 0 };
+  ui[key].play.classList.add('on'); ui[key].play.textContent = '❚❚';
+  requestAnimationFrame(sweepFrame);
+}
+function stopSweep() {
+  if (!sweep) return;
+  ui[sweep.key].play.classList.remove('on'); ui[sweep.key].play.textContent = '▶';
+  sweep = null;
+}
+function sweepFrame(now) {
+  if (!sweep) return;
+  const sw = sweep;
+  if (sw.last === null) sw.last = now;
+  const dt = Math.min(0.1, (now - sw.last) / 1000);
+  sw.last = now;
+  if (now >= sw.pauseUntil) {
+    const speed = parseFloat(document.getElementById('speed').value);
+    sw.v += sw.dir * (sw.hi - sw.lo) * dt * speed / SWEEP_PERIOD;
+    if (sw.v >= sw.hi) { sw.v = sw.hi; sw.dir = -1; }
+    if (sw.v <= sw.lo) { sw.v = sw.lo; sw.dir = 1; }
+    const xiPrev = S.xi;
+    setParam(sw.key, sw.v, 0);
+    // Stop briefly at the special cases xi = 0 (undamped) and |xi| = 1 (critical).
+    for (const target of [-1, 0, 1]) {
+      if ((xiPrev - target) * (S.xi - target) < 0 || S.xi === target && xiPrev !== target) {
+        S.xi = target;
+        sw.pauseUntil = now + 700;
+        break;
+      }
+    }
+    refresh();
+  }
+  requestAnimationFrame(sweepFrame);
+}
+
+// ---- plots ---------------------------------------------------------------------
+const PLOT_CFG = { displayModeBar: false, responsive: true };
+const FONT = { family: 'system-ui, sans-serif', size: 14, color: '#1d1d1f' };
+const baseLayout = (extra) => Object.assign({
+  font: FONT, margin: { l: 50, r: 14, t: 8, b: 40 }, showlegend: false,
+  paper_bgcolor: '#fff', plot_bgcolor: '#fff', uirevision: 'keep',
+}, extra);
+const axis = (extra) => Object.assign({
+  zeroline: true, zerolinecolor: '#888', zerolinewidth: 1.5, gridcolor: '#eee',
+  linecolor: '#bbb', mirror: true, showline: true, fixedrange: true,
+}, extra);
+const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+
+function drawPlot1() {
+  const { omega: w, xi } = S, cs = dampingCase(xi), [s1, s2] = poles(w, xi);
+  const auto = document.getElementById('auto1').checked;
+  const L = auto ? w : W_MAX;  // axis scale
+  // Faint locus of the poles as xi runs over [XI_MIN, XI_MAX] at the current omega.
+  const th = linspace(Math.acos(-XI_MIN), Math.PI, 120);
+  const rMax = Math.sqrt(XI_MAX ** 2 - 1);
+  const locX = [...th.map(t => w * Math.cos(t)), null, ...th.map(t => w * Math.cos(t)), null,
+                (-XI_MAX - rMax) * w, (-XI_MAX + rMax) * w];
+  const locY = [...th.map(t => w * Math.sin(t)), null, ...th.map(t => -w * Math.sin(t)), null, 0, 0];
+  const circ = linspace(0, 2 * Math.PI, 200);
+  const traces = [
+    { x: circ.map(t => w * Math.cos(t)), y: circ.map(t => w * Math.sin(t)), mode: 'lines',
+      line: { color: '#bbb', width: 1, dash: 'dot' }, hoverinfo: 'skip' },
+    { x: locX, y: locY, mode: 'lines', line: { color: 'rgba(200,16,46,0.18)', width: 7 }, hoverinfo: 'skip' },
+    { x: [0, s1.re, null, 0, s2.re], y: [0, s1.im, null, 0, s2.im], mode: 'lines',
+      line: { color: '#777', width: 1.5, dash: 'dash' }, hoverinfo: 'skip' },
+  ];
+  const ann = [];
+  let thetaTxt = '—';
+  if (Math.abs(xi) <= 1) {
+    const theta = Math.acos(-xi), rr = 0.28 * w, arc = linspace(0, theta, 60);
+    traces.push({ x: arc.map(t => rr * Math.cos(t)), y: arc.map(t => rr * Math.sin(t)), mode: 'lines',
+                  line: { color: '#2a9d4b', width: 2 }, hoverinfo: 'skip' });
+    const mid = theta / 2;
+    ann.push({ x: 1.55 * rr * Math.cos(mid), y: 1.55 * rr * Math.sin(mid), text: 'θ', showarrow: false,
+               font: { size: 16, color: '#2a9d4b' } });
+    thetaTxt = fmt(theta / (Math.PI / 2));
+  }
+  traces.push(
+    { x: [s2.re], y: [s2.im], mode: 'markers', hoverinfo: 'skip',
+      marker: { size: cs === 'critical' ? 20 : 13, color: cs === 'critical' ? 'rgba(0,0,0,0)' : '#fff',
+                line: { color: '#d9621c', width: 3 } } },
+    { x: [s1.re], y: [s1.im], mode: 'markers', hoverinfo: 'skip',
+      marker: { size: 13, color: '#1f5fbf', line: { color: '#1f5fbf', width: 2 } } });
+  const off = 0.09 * L;
+  if (cs === 'critical') {
+    ann.push({ x: s1.re, y: off * 1.5, text: 's₁ = s₂', showarrow: false, font: { size: 15 } });
+  } else if (cs === 'over') {
+    ann.push({ x: s1.re, y: off * 1.5, text: 's₁', showarrow: false, font: { size: 15, color: '#1f5fbf' } },
+             { x: s2.re, y: -off * 1.5, text: 's₂', showarrow: false, font: { size: 15, color: '#d9621c' } });
+  } else {
+    ann.push({ x: s1.re - off, y: s1.im + off, text: 's₁', showarrow: false, font: { size: 15, color: '#1f5fbf' } },
+             { x: s2.re - off, y: s2.im - off, text: 's₂', showarrow: false, font: { size: 15, color: '#d9621c' } });
+  }
+  Plotly.react('plot1', traces, baseLayout({
+    xaxis: axis({ range: [-3.9 * L, 1.3 * L], title: { text: 'Re s', standoff: 4 }, constrain: 'domain' }),
+    yaxis: axis({ range: [-1.3 * L, 1.3 * L], title: { text: 'Im s', standoff: 4 },
+                  scaleanchor: 'x', scaleratio: 1, constrain: 'domain' }),
+    annotations: ann,
+  }), PLOT_CFG);
+
+  document.getElementById('p1info').textContent = `θ/(π/2) = ${thetaTxt}`;
+  const wr = texNum(w), x = texNum(xi);
+  let s;
+  if (cs === 'undamped') s = `s_{1,2} = \\pm i\\omega = \\pm ${wr}\\,i`;
+  else if (cs === 'under') s = `s_{1,2} = \\omega e^{\\pm i\\theta} = \\left(-\\xi \\pm i\\sqrt{1-\\xi^2}\\right)\\omega = ${texNum(s1.re)} \\pm ${texNum(s1.im)}\\,i`;
+  else if (cs === 'critical') s = `s_{1} = s_{2} = -\\xi\\omega = ${texNum(s1.re)}`;
+  else s = `s_{1,2} = \\left(-\\xi \\pm \\sqrt{\\xi^2-1}\\right)\\omega = ${texNum(s1.re)},\\ ${texNum(s2.re)}`;
+  tex(document.getElementById('eq1'), s);
+}
+
+function drawPlot2() {
+  const { omega: w, xi } = S, cs = dampingCase(xi), [s1, s2] = poles(w, xi);
+  const [f1, f2] = basis(w, xi);
+  const auto = document.getElementById('auto2').checked;
+  const t = linspace(0, 2 * Math.PI, 700);
+  const ticks = { tickvals: [0, Math.PI / 2, Math.PI, 1.5 * Math.PI, 2 * Math.PI],
+                  ticktext: ['0', 'π/2', 'π', '3π/2', '2π'] };
+  const panels = [['plot2a', f1, s1, 'x₁', '#1f5fbf'], ['plot2b', f2, s2, 'x₂', '#d9621c']];
+  for (const [id, f, s, name, color] of panels) {
+    const traces = [{ x: t, y: t.map(f), mode: 'lines', line: { color, width: 3 }, hoverinfo: 'skip' }];
+    const showEnv = cs !== 'critical' && s.re !== 0 && s.im !== 0;
+    if (showEnv) {
+      const e = t.map(tt => Math.exp(s.re * tt));
+      traces.push({ x: t, y: e, mode: 'lines', line: { color: '#888', width: 1.5, dash: 'dash' }, hoverinfo: 'skip' },
+                  { x: t, y: e.map(v => -v), mode: 'lines', line: { color: '#888', width: 1.5, dash: 'dash' }, hoverinfo: 'skip' });
+    }
+    let label;
+    if (cs === 'critical') label = name === 'x₁' ? 'x₁(t) = e<sup>at</sup>' : 'x₂(t) = t·e<sup>at</sup>';
+    else if (name === 'x₂' && s.im !== 0) label = 'x₂(t) = e<sup>at</sup> sin bt';
+    else label = `${name}(t) = e<sup>at</sup> cos bt`;
+    const a = s.re, b = s.im;
+    Plotly.react(id, traces, baseLayout({
+      margin: { l: 50, r: 30, t: 26, b: 26 },
+      xaxis: axis({ range: [0, 2 * Math.PI], ...ticks }),
+      yaxis: axis(auto ? { autorange: true } : { range: [-2, 2] }),
+      annotations: [{ xref: 'paper', yref: 'paper', x: 0, y: 1.0, yanchor: 'bottom', xanchor: 'left', showarrow: false,
+                      text: `<b style="color:${color}">${label}</b>   a = ${fmt(a)}, b = ${fmt(b)}`, font: { size: 14 } }],
+    }), PLOT_CFG);
+  }
+  document.getElementById('p2info').textContent =
+    `a₁ = ${fmt(s1.re)}, b₁ = ${fmt(s1.im)};  a₂ = ${fmt(s2.re)}, b₂ = ${fmt(s2.im)}`;
+}
+
+function drawPlot3() {
+  const { omega: w, xi, x0, v0, T } = S, cs = dampingCase(xi);
+  const R = freeResponse(w, xi, x0, v0);
+  const auto = document.getElementById('auto3').checked;
+  const t = linspace(0, T, 1200);
+  const traces = [{ x: t, y: t.map(R.x), mode: 'lines', line: { color: '#1d1d1f', width: 2.5 }, hoverinfo: 'skip' }];
+  if (R.env && xi !== 0) {
+    const e = t.map(R.env);
+    traces.push({ x: t, y: e, mode: 'lines', line: { color: '#c8102e', width: 1.5, dash: 'dash' }, hoverinfo: 'skip' },
+                { x: t, y: e.map(v => -v), mode: 'lines', line: { color: '#c8102e', width: 1.5, dash: 'dash' }, hoverinfo: 'skip' });
+  }
+  traces.push({ x: [0], y: [x0], mode: 'markers', marker: { size: 9, color: '#c8102e' }, hoverinfo: 'skip' });
+  Plotly.react('plot3', traces, baseLayout({
+    xaxis: axis({ range: [0, T], title: { text: 't', standoff: 4 } }),
+    yaxis: axis(auto ? { autorange: true } : { range: [-3, 3] }),
+  }), PLOT_CFG);
+
+  const cf = R.coef;
+  const expo = a => Math.abs(a) < 5e-13 ? '' : `e^{${texNum(a)}\\,t}`;
+  let s;
+  if (cs === 'under' || cs === 'undamped') {
+    s = `x(t) = e^{-\\xi\\omega t}\\left[x_0\\cos\\omega_D t + \\frac{v_0 + \\xi\\omega x_0}{\\omega_D}\\sin\\omega_D t\\right]`
+      + ` = ${expo(cf.a)}\\left[${texNum(cf.A)}\\cos ${texNum(cf.wd)}t ${texSigned(cf.B)}\\sin ${texNum(cf.wd)}t\\right]`;
+  } else if (cs === 'critical') {
+    s = `x(t) = \\left[x_0 + (v_0 + \\xi\\omega x_0)\\,t\\right] e^{-\\xi\\omega t}`
+      + ` = \\left(${texNum(cf.A)} ${texSigned(cf.B)}\\,t\\right) ${expo(cf.r)}`;
+  } else {
+    s = `x(t) = C_1 e^{s_1 t} + C_2 e^{s_2 t},\\ C_1 = \\frac{v_0 - s_2 x_0}{s_1 - s_2},\\ C_2 = \\frac{s_1 x_0 - v_0}{s_1 - s_2}`
+      + ` \\;\\Rightarrow\\; x(t) = ${texNum(cf.C1)}\\,${expo(cf.r1) || '1'} ${texSigned(cf.C2)}\\,${expo(cf.r2) || '1'}`;
+  }
+  tex(document.getElementById('eq3'), s);
+}
+
+// ---- readouts --------------------------------------------------------------------
+const CASES = {
+  undamped: ['undamped', '#555'], under: ['under-damped', '#1f5fbf'],
+  critical: ['critically damped', '#2a9d4b'], over: ['over-damped', '#d9621c'],
+};
+function drawReadouts() {
+  const { m, omega: w, xi } = S, k = kOf(), c = cOf(), cs = dampingCase(xi);
+  let [label, color] = CASES[cs];
+  if (xi < 0) { label = 'negative damping (' + label + ')'; color = '#c8102e'; }
+  const osc = Math.abs(xi) < 1;
+  const wd = osc ? w * Math.sqrt(1 - xi * xi) : null;
+  const items = [
+    `<span class="case" style="background:${color}">${label}</span>`,
+    `<span><b>ω</b> = √(k/m) = ${fmt(w, 4)} rad/s</span>`,
+    `<span><b>f</b> = ${fmt(w / (2 * Math.PI))} Hz</span>`,
+    `<span><b>T</b> = ${fmt(2 * Math.PI / w)} s</span>`,
+    `<span><b>ξ</b> = c/(2√(mk)) = ${fmt(xi, 4)}</span>`,
+    `<span><b>c<sub>cr</sub></b> = 2√(km) = ${fmt(2 * Math.sqrt(k * m))}</span>`,
+    `<span><b>ω<sub>D</sub></b> = ${fmt(wd, 4)}</span>`,
+    `<span><b>T<sub>D</sub></b> = ${osc ? fmt(2 * Math.PI / wd) : '—'}</span>`,
+    `<span><b>δ</b> = 2πξ/√(1−ξ²) = ${osc ? fmt(2 * Math.PI * xi / Math.sqrt(1 - xi * xi)) : '—'}</span>`,
+  ];
+  document.getElementById('readouts').innerHTML = items.join('');
+  document.getElementById('p3info').textContent = `x₀ = ${fmt(S.x0)}, v₀ = ${fmt(S.v0)}`;
+}
+
+// ---- main refresh (coalesced to one per animation frame) ----------------------------
+let pending = false, pendingKey = null;
+function refresh(activeKey = null) {
+  pendingKey = activeKey;
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => {
+    pending = false;
+    syncControls(pendingKey);
+    drawReadouts();
+    if (typeof Plotly !== 'undefined') { drawPlot1(); drawPlot2(); drawPlot3(); }
+    writeHash();
+  });
+}
+
+// ---- URL hash: bookmarkable states -----------------------------------------------------
+function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  for (const key of Object.keys(DEFAULTS)) {
+    const v = parseFloat(p.get(key));
+    if (Number.isFinite(v)) S[key] = v;
+  }
+  if (S.m <= 0 || S.omega <= 0 || S.T <= 0) Object.assign(S, DEFAULTS);
+}
+let hashTimer = null;
+function writeHash() {
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => {
+    const p = Object.keys(DEFAULTS).map(k => `${k}=${Number(S[k].toPrecision(6))}`).join('&');
+    history.replaceState(null, '', '#' + p);
+  }, 300);
+}
+
+document.getElementById('reset').addEventListener('click', () => { stopSweep(); Object.assign(S, DEFAULTS); refresh(); });
+for (const id of ['auto1', 'auto2', 'auto3']) document.getElementById(id).addEventListener('change', () => refresh());
+tex(document.getElementById('eomTex'),
+    'm\\ddot x + c\\dot x + kx = 0,\\quad x(0)=x_0,\\ \\dot x(0)=v_0,\\quad \\omega=\\sqrt{k/m},\\ \\xi=\\frac{c}{2\\sqrt{mk}}');
+readHash();
+refresh();
+</script>
+</body>
+</html>

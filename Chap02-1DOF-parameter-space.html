@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1DOF Parameter Space — CIVE 6355</title>
+<!-- CIVE 6355 Structural Dynamics, Chapter 2: the space of single-degree-of-freedom systems.
+     (m, c, k) and (sm, sc, sk) describe the same system for any s > 0, so a system is a ray in the
+     first octant of m-c-k space, i.e. a point on the octant of a sphere. (omega, xi) are coordinates
+     on that octant: omega = const is a plane k = omega^2 m, xi = const is a cone c = 2 xi sqrt(mk).
+     Open this file directly in a browser (internet needed for Plotly and KaTeX).
+     State can be set from the URL hash, e.g. Chap02-1DOF-parameter-space.html#m=2&omega=1.2&xi=0.3 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.3/plotly.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #d9d9de;
+    --uh: #c8102e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  header { padding: 8px 14px 6px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .titlebar { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  .titlebar h1 { font-size: 17px; margin: 0; }
+  .titlebar .eom { color: var(--muted); }
+  .titlebar .tools { margin-left: auto; display: flex; gap: 10px; align-items: center; color: var(--muted); }
+  .controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(245px, 1fr)); gap: 4px 16px; }
+  .ctl { display: flex; align-items: center; gap: 6px; }
+  .ctl .sym { width: 26px; font-size: 18px; font-style: italic; font-family: "Times New Roman", serif; text-align: right; }
+  .ctl input[type=range] { flex: 1; min-width: 60px; }
+  .ctl input[type=number] { width: 78px; font: inherit; font-variant-numeric: tabular-nums; padding: 1px 3px; }
+  .play { width: 28px; height: 24px; padding: 0; font-size: 12px; border: 1px solid var(--line);
+          border-radius: 4px; background: #fff; cursor: pointer; }
+  .play.on { background: var(--uh); color: #fff; border-color: var(--uh); }
+  .readouts { display: flex; flex-wrap: wrap; gap: 3px 18px; margin-top: 6px; padding-top: 5px;
+              border-top: 1px dashed var(--line); font-variant-numeric: tabular-nums; }
+  .readouts span b { font-weight: 600; }
+  .case { font-weight: 700; padding: 0 8px; border-radius: 4px; color: #fff; }
+  main {
+    flex: 1; min-height: 0; display: grid; gap: 8px; padding: 8px;
+    grid-template-columns: 2fr 1fr; grid-template-rows: 1fr;
+  }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+           display: flex; flex-direction: column; min-height: 0; padding: 4px 8px 4px; }
+  .panel h2 { font-size: 15px; margin: 2px 0; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .panel h2 .info { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .panel h2 .opts { margin-left: auto; font-weight: 400; font-size: 13px; color: var(--muted);
+                    display: flex; gap: 10px; flex-wrap: wrap; }
+  .plot { flex: 1; min-height: 0; }
+  .eq { min-height: 2.2em; text-align: center; font-size: 14px; overflow-x: auto; }
+  .note { color: var(--muted); font-size: 13px; text-align: center; }
+  #loaderr { display: none; margin: 20px; padding: 12px; background: #fde; border: 1px solid var(--uh); }
+  @media (max-width: 900px) {
+    body { height: auto; }
+    main { grid-template-columns: 1fr; grid-template-rows: auto; }
+    #p1 { min-height: 560px; }
+    #p2 { min-height: 420px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="titlebar">
+    <h1>Parameter space of 1DOF systems</h1>
+    <span class="eom" id="eomTex"></span>
+    <div class="tools">
+      <label>sweep speed
+        <select id="speed">
+          <option value="0.25">¼×</option><option value="0.5">½×</option>
+          <option value="1" selected>1×</option><option value="2">2×</option>
+        </select>
+      </label>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+  <div class="controls" id="controls"></div>
+  <div class="readouts" id="readouts"></div>
+</header>
+<div id="loaderr">Plotly/KaTeX could not be loaded from the CDN. This page needs an internet connection.</div>
+<main>
+  <section class="panel" id="p1">
+    <h2>1 · m–c–k space <span class="info" id="p1info"></span>
+      <span class="opts">
+        <label><input type="checkbox" id="regions" checked> damping regions</label>
+        <label><input type="checkbox" id="grid" checked> ω, ξ grid</label>
+        <label><input type="checkbox" id="autoR"> scale axes with R</label>
+      </span></h2>
+    <div class="plot" id="plot1"></div>
+    <div class="eq" id="eq1"></div>
+  </section>
+  <section class="panel" id="p2">
+    <h2>2 · (ω, ξ) map <span class="info" id="p2info"></span></h2>
+    <div class="plot" id="plot2"></div>
+    <div class="eq" id="eq2"></div>
+    <div class="note">Every point on the ray maps to the same (ω, ξ). Click the map to set ω, ξ (m fixed).</div>
+  </section>
+</main>
+
+<script>
+// BEGIN-MATH ------------------------------------------------------------------
+// Pure functions; no DOM. Extracted by the test script.
+// Spherical coordinates with the c-axis as the pole:
+//   m = R sin(theta) cos(phi),  c = R cos(theta),  k = R sin(theta) sin(phi),  theta, phi in [0, pi/2].
+// Then omega^2 = tan(phi) and xi = cot(theta) / (2 sqrt(sin(phi) cos(phi))).
+function dampingCase(xi) {
+  if (xi === 0) return 'undamped';
+  if (Math.abs(xi - 1) < 1e-12) return 'critical';
+  return xi < 1 ? 'under' : 'over';
+}
+
+// (m, omega, xi) -> [m, c, k]
+function mck(m, omega, xi) {
+  return [m, 2 * m * xi * omega, m * omega * omega];
+}
+
+// [m, c, k] -> {omega, xi}
+function omegaXi(m, c, k) {
+  return { omega: Math.sqrt(k / m), xi: c / (2 * Math.sqrt(m * k)) };
+}
+
+// |(m, c, k)| as a function of (m, omega, xi)
+function radius(m, omega, xi) {
+  return m * Math.sqrt(1 + 4 * xi * xi * omega * omega + omega ** 4);
+}
+
+// Point on the sphere of radius R at (theta, phi), as [m, c, k].
+function spherePt(R, theta, phi) {
+  const s = Math.sin(theta);
+  return [R * s * Math.cos(phi), R * Math.cos(theta), R * s * Math.sin(phi)];
+}
+
+// Longitude of the omega = const plane.
+const phiOfOmega = omega => Math.atan(omega * omega);
+
+// Polar angle where the xi = const cone crosses longitude phi.
+function thetaOfXi(xi, phi) {
+  return Math.atan2(1, 2 * xi * Math.sqrt(Math.sin(phi) * Math.cos(phi)));
+}
+
+// xi at (theta, phi) on the sphere; Infinity on the edges m = 0 or k = 0 (except c = 0).
+function xiAt(theta, phi) {
+  const ct = Math.cos(theta), den = 2 * Math.sin(theta) * Math.sqrt(Math.max(0, Math.sin(phi) * Math.cos(phi)));
+  if (ct < 1e-12) return 0;
+  return den < 1e-15 ? Infinity : ct / den;
+}
+// END-MATH --------------------------------------------------------------------
+
+if (typeof Plotly === 'undefined' || typeof katex === 'undefined') {
+  document.getElementById('loaderr').style.display = 'block';
+}
+
+// ---- parameter state ---------------------------------------------------------
+// Primary state is (m, omega, xi); c, k and R are derived.
+const XI_MAX = 3, W_MAX = 5, P_MAX = 4.5, AX_MIN = 5, SNAP = 0.01;
+const DEFAULTS = { m: 2, omega: 1.2, xi: 0.3 };
+const S = { ...DEFAULTS };
+const cur = () => mck(S.m, S.omega, S.xi);
+const Rof = () => radius(S.m, S.omega, S.xi);
+
+const RANGES = {
+  m:     [0.05, P_MAX, 0.01],
+  c:     [0, P_MAX, 0.01],
+  k:     [0.05, P_MAX, 0.01],
+  omega: [0.1, W_MAX, 0.01],
+  xi:    [0, XI_MAX, 0.01],
+  R:     [0.25, P_MAX, 0.01],
+};
+const SYMS = { m: 'm', c: 'c', k: 'k', omega: 'ω', xi: 'ξ', R: 'R' };
+const TIPS = {
+  m: 'c, k fixed', c: 'm, k fixed', k: 'm, c fixed',
+  omega: 'm, ξ fixed', xi: 'm, ω fixed', R: 'R = |(m,c,k)|; scales m, c, k together (ω, ξ fixed)',
+};
+const ORDER = ['m', 'c', 'k', 'omega', 'xi', 'R'];
+
+function getParam(key) {
+  const [m, c, k] = cur();
+  return { m, c, k, omega: S.omega, xi: S.xi, R: Rof() }[key];
+}
+
+// Set one parameter, keeping the others consistent. snapWindow > 0 snaps xi to 1.
+function setParam(key, val, snapWindow = SNAP) {
+  if (!Number.isFinite(val)) return;
+  const [m, c, k] = cur();
+  switch (key) {
+    case 'm':     if (val <= 0) return; ({ omega: S.omega, xi: S.xi } = omegaXi(val, c, k)); S.m = val; break;
+    case 'k':     if (val <= 0) return; ({ omega: S.omega, xi: S.xi } = omegaXi(m, c, val)); break;
+    case 'c':     if (val < 0) return; S.xi = omegaXi(m, val, k).xi; break;
+    case 'omega': if (val <= 0) return; S.omega = val; break;
+    case 'xi':    if (val < 0) return; S.xi = val; break;
+    case 'R':     if (val <= 0) return; S.m *= val / Rof(); break;
+  }
+  if (snapWindow > 0 && Math.abs(S.xi - 1) < snapWindow) S.xi = 1;
+  if (Math.abs(S.xi) < 1e-12) S.xi = 0;
+}
+
+// ---- formatting ----------------------------------------------------------------
+function fmt(v, d = 3) {
+  if (v === Infinity) return '∞';
+  if (v === null || v === undefined || !Number.isFinite(v)) return '—';
+  if (Math.abs(v) < 5e-13) return '0';
+  const a = Math.abs(v);
+  if (a >= 1e4 || a < 1e-3) return v.toExponential(2);
+  return String(Number(v.toPrecision(d + (a >= 100 ? 1 : 0))));
+}
+const texNum = v => fmt(v).replace(/e([+-]?\d+)/, '\\times 10^{$1}');
+function tex(el, s) {
+  if (typeof katex === 'undefined') { el.textContent = s; return; }
+  katex.render(s, el, { throwOnError: false, displayMode: false });
+}
+
+// ---- controls ------------------------------------------------------------------
+const ui = {};
+const controls = document.getElementById('controls');
+for (const key of ORDER) {
+  const div = document.createElement('div');
+  div.className = 'ctl';
+  div.title = TIPS[key];
+  div.innerHTML = `<span class="sym">${SYMS[key]}</span>
+    <button class="play" title="sweep ${SYMS[key]} back and forth (${TIPS[key]})">▶</button>
+    <input type="range"><input type="number">`;
+  controls.appendChild(div);
+  const [play, range, num] = div.querySelectorAll('button, input');
+  const [lo, hi, step] = RANGES[key];
+  range.min = lo; range.max = hi; range.step = step;
+  num.step = step;
+  ui[key] = { play, range, num };
+  range.addEventListener('input', () => { stopSweep(); setParam(key, parseFloat(range.value)); refresh(key); });
+  num.addEventListener('change', () => { stopSweep(); setParam(key, parseFloat(num.value), 0); refresh(); });
+  play.addEventListener('click', () => (sweep && sweep.key === key) ? stopSweep() : startSweep(key));
+}
+
+function syncControls(activeKey) {
+  for (const key of ORDER) {
+    const { range, num } = ui[key];
+    const v = getParam(key);
+    if (key !== activeKey) range.value = v;  // don't disturb the slider being dragged
+    if (document.activeElement !== num) num.value = fmt(v, 4);
+  }
+}
+
+// ---- sweep (ping-pong animation of one parameter) --------------------------------
+let sweep = null;
+const SWEEP_PERIOD = 8;  // seconds for one pass across the range at 1x
+function startSweep(key) {
+  stopSweep();
+  const [lo, hi] = RANGES[key];
+  const v = Math.min(hi, Math.max(lo, getParam(key)));
+  sweep = { key, lo, hi, v, dir: 1, last: null, pauseUntil: 0 };
+  ui[key].play.classList.add('on'); ui[key].play.textContent = '❚❚';
+  requestAnimationFrame(sweepFrame);
+}
+function stopSweep() {
+  if (!sweep) return;
+  ui[sweep.key].play.classList.remove('on'); ui[sweep.key].play.textContent = '▶';
+  sweep = null;
+}
+function sweepFrame(now) {
+  if (!sweep) return;
+  const sw = sweep;
+  if (sw.last === null) sw.last = now;
+  const dt = Math.min(0.1, (now - sw.last) / 1000);
+  sw.last = now;
+  if (now >= sw.pauseUntil) {
+    const speed = parseFloat(document.getElementById('speed').value);
+    sw.v += sw.dir * (sw.hi - sw.lo) * dt * speed / SWEEP_PERIOD;
+    if (sw.v >= sw.hi) { sw.v = sw.hi; sw.dir = -1; }
+    if (sw.v <= sw.lo) { sw.v = sw.lo; sw.dir = 1; }
+    const xiPrev = S.xi;
+    setParam(sw.key, sw.v, 0);
+    // Stop briefly when crossing critical damping.
+    if ((xiPrev - 1) * (S.xi - 1) < 0) {
+      S.xi = 1;
+      sw.pauseUntil = now + 700;
+    }
+    refresh();
+  }
+  requestAnimationFrame(sweepFrame);
+}
+
+// ---- plots ---------------------------------------------------------------------
+const PLOT_CFG = { displayModeBar: false, responsive: true };
+const FONT = { family: 'system-ui, sans-serif', size: 14, color: '#1d1d1f' };
+const COL = {
+  omega: '#2a9d4b', xi: '#7b3fb5', point: '#c8102e', crit: '#1d1d1f', edge: '#555',
+  under: '#1f5fbf', over: '#d9621c', underTint: '#cfdcf3', overTint: '#f8dcc8',
+};
+const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+const HALF_PI = Math.PI / 2;
+const GRID_OMEGA = [0.5, 1, 1.5, 2, 3];
+const GRID_XI = [0.1, 0.25, 0.5, 2];
+
+// Polyline [m,c,k][] -> {x,y,z}; null entries break the line.
+function xyz(pts) {
+  return { x: pts.map(p => p && p[0]), y: pts.map(p => p && p[1]), z: pts.map(p => p && p[2]) };
+}
+const line3 = (pts, color, width, extra = {}) =>
+  Object.assign({ type: 'scatter3d', mode: 'lines', ...xyz(pts), line: { color, width }, hoverinfo: 'skip' }, extra);
+const omegaCurve = (R, w, n = 50) => linspace(0, HALF_PI, n).map(t => spherePt(R, t, phiOfOmega(w)));
+const xiCurve = (R, xi, n = 90) => linspace(0, HALF_PI, n).map(p => spherePt(R, thetaOfXi(xi, p), p));
+
+// Surface from a generator f(u, v) -> [m,c,k] over grid u x v.
+function surf(us, vs, f, extra) {
+  const x = [], y = [], z = [];
+  for (const u of us) {
+    const rx = [], ry = [], rz = [];
+    for (const v of vs) { const p = f(u, v); rx.push(p[0]); ry.push(p[1]); rz.push(p[2]); }
+    x.push(rx); y.push(ry); z.push(rz);
+  }
+  return Object.assign({ type: 'surface', x, y, z, showscale: false, hoverinfo: 'skip',
+                         contours: { x: { highlight: false }, y: { highlight: false }, z: { highlight: false } } }, extra);
+}
+const flat = c => [[0, c], [1, c]];
+
+function drawPlot1() {
+  const { omega: w, xi } = S, [m, c, k] = cur(), R = Rof();
+  const regions = document.getElementById('regions').checked;
+  const grid = document.getElementById('grid').checked;
+  const L = document.getElementById('autoR').checked ? 1.25 * R : Math.max(AX_MIN, 1.12 * R);
+  const ext = Math.min(L, 1.35 * R);   // plane and cone stick out past the sphere
+  const th = linspace(0, HALF_PI, 46), ph = linspace(0, HALF_PI, 46);
+
+  // Sphere octant, colored by xi (step at xi = 1) or plain.
+  const sphere = surf(th, ph, (t, p) => spherePt(R, t, p), {
+    surfacecolor: th.map(t => ph.map(p => Math.min(xiAt(t, p), 2))),
+    cmin: 0, cmax: 2, opacity: 0.55,
+    colorscale: regions ? [[0, '#e3ebf8'], [0.4999, '#8fb0e2'], [0.5, '#f2b48a'], [1, '#fbe4d3']] : flat('#b9c3cf'),
+    lighting: { ambient: 0.75, diffuse: 0.5, specular: 0.05, roughness: 0.9 },
+  });
+  const rho = linspace(0, ext, 12);
+  const phi0 = phiOfOmega(w);
+  const plane = surf(rho, linspace(0, HALF_PI, 30), (r, t) => spherePt(r, t, phi0),
+                     { colorscale: flat(COL.omega), opacity: 0.3, lighting: { ambient: 1, diffuse: 0 } });
+  const cone = surf(rho, linspace(0, HALF_PI, 60), (r, p) => spherePt(r, thetaOfXi(xi, p), p),
+                    { colorscale: flat(COL.xi), opacity: 0.3, lighting: { ambient: 1, diffuse: 0 } });
+
+  const traces = [sphere, plane, cone];
+  const q = linspace(0, HALF_PI, 50);
+  // Octant edges of the sphere and coordinate axes from the origin.
+  traces.push(line3([...q.map(t => [R * Math.cos(t), 0, R * Math.sin(t)]), null,
+                     ...q.map(t => [R * Math.cos(t), R * Math.sin(t), 0]), null,
+                     ...q.map(t => [0, R * Math.cos(t), R * Math.sin(t)])], COL.edge, 3));
+  traces.push(line3([[0, 0, 0], [L, 0, 0], null, [0, 0, 0], [0, L, 0], null, [0, 0, 0], [0, 0, L]], '#1d1d1f', 4));
+  if (grid) {
+    const pts = [];
+    const r = 1.004 * R;
+    for (const g of GRID_OMEGA) pts.push(...omegaCurve(r, g), null);
+    for (const g of GRID_XI) pts.push(...xiCurve(r, g), null);
+    traces.push(line3(pts, '#8a8a90', 1.5));
+  }
+  traces.push(line3(xiCurve(1.006 * R, 1), COL.crit, 3, { line: { color: COL.crit, width: 3, dash: 'dash' } }));
+  traces.push(line3(omegaCurve(1.01 * R, w), COL.omega, 7));
+  traces.push(line3(xiCurve(1.01 * R, xi), COL.xi, 7));
+  // Ray through the current point.
+  const u = [m / R, c / R, k / R];
+  traces.push(line3([[0, 0, 0], u.map(v => v * ext)], COL.point, 3, { line: { color: COL.point, width: 3, dash: 'dash' } }));
+  traces.push({ type: 'scatter3d', mode: 'markers', x: [m], y: [c], z: [k],
+                marker: { size: 6, color: COL.point, line: { color: '#fff', width: 1 } },
+                hovertemplate: `m = ${fmt(m)}<br>c = ${fmt(c)}<br>k = ${fmt(k)}<br>ω = ${fmt(w)}, ξ = ${fmt(xi)}<extra></extra>` });
+  // Labels: axis names and the limiting values of omega and xi on the octant edges.
+  const lr = 1.1 * R, d = Math.PI / 4;
+  const lab = (x, y, z, text, size, color) => ({ x, y, z, text, showarrow: false, font: { size, color } });
+  const sceneAnn = [
+    lab(L, 0, 0, '<i>m</i>', 22, '#1d1d1f'), lab(0, L, 0, '<i>c</i>', 22, '#1d1d1f'), lab(0, 0, L, '<i>k</i>', 22, '#1d1d1f'),
+    lab(lr * Math.cos(d), lr * Math.sin(d), 0, 'ω = 0<br>ξ = ∞', 14, '#444'),
+    lab(lr * Math.cos(d), 0, lr * Math.sin(d), 'ξ = 0', 14, '#444'),
+    lab(0, lr * Math.sin(d), lr * Math.cos(d), 'ω = ∞<br>ξ = ∞', 14, '#444'),
+  ];
+
+  const ax = () => ({ range: [0, L], title: { text: '' }, showspikes: false, zeroline: false,
+                         gridcolor: '#e6e6ea', backgroundcolor: '#fff', showbackground: true, nticks: 6 });
+  Plotly.react('plot1', traces, {
+    font: FONT, margin: { l: 0, r: 0, t: 0, b: 0 }, showlegend: false,
+    paper_bgcolor: '#fff', uirevision: 'keep',
+    scene: {
+      xaxis: ax(), yaxis: ax(), zaxis: ax(), aspectmode: 'cube',
+      camera: { eye: { x: 1.55, y: 0.95, z: 0.75 }, up: { x: 0, y: 0, z: 1 } },
+      dragmode: 'orbit', annotations: sceneAnn,
+    },
+  }, PLOT_CFG);
+
+  document.getElementById('p1info').textContent =
+    `R = ${fmt(R)},  direction (m, c, k)/R = (${fmt(u[0])}, ${fmt(u[1])}, ${fmt(u[2])})`;
+  tex(document.getElementById('eq1'),
+      `m^2+c^2+k^2 = R^2 = ${texNum(R * R)},\\qquad`
+      + `\\textcolor{${COL.omega}}{k = \\omega^2 m = ${texNum(w * w)}\\,m},\\qquad`
+      + `\\textcolor{${COL.xi}}{c = 2\\xi\\sqrt{mk} = ${texNum(2 * xi)}\\sqrt{mk}}`);
+}
+
+// Heatmap grid for the (omega, xi) map; also the click target.
+const MAP_W = linspace(0.05, W_MAX, 100), MAP_X = linspace(0, XI_MAX, 61);
+const MAP_Z = MAP_X.map(x => MAP_W.map(() => (x < 1 ? 0 : x > 1 ? 1 : 0.5)));
+
+function drawPlot2() {
+  const { omega: w, xi } = S;
+  const grid = document.getElementById('grid').checked;
+  const traces = [{
+    type: 'heatmap', x: MAP_W, y: MAP_X, z: MAP_Z, zmin: 0, zmax: 1, showscale: false,
+    colorscale: [[0, COL.underTint], [0.5, '#ffffff'], [1, COL.overTint]],
+    hovertemplate: 'ω = %{x:.2f}, ξ = %{y:.2f}<extra>click to set</extra>',
+  }];
+  const gx = [], gy = [];
+  if (grid) {
+    for (const g of GRID_OMEGA) gx.push(g, g, null), gy.push(0, XI_MAX, null);
+    for (const g of GRID_XI) gx.push(0, W_MAX, null), gy.push(g, g, null);
+  }
+  traces.push(
+    { x: gx, y: gy, mode: 'lines', line: { color: '#8a8a90', width: 1 }, hoverinfo: 'skip' },
+    { x: [0, W_MAX], y: [1, 1], mode: 'lines', line: { color: COL.crit, width: 2, dash: 'dash' }, hoverinfo: 'skip' },
+    { x: [w, w], y: [0, XI_MAX], mode: 'lines', line: { color: COL.omega, width: 3 }, hoverinfo: 'skip' },
+    { x: [0, W_MAX], y: [xi, xi], mode: 'lines', line: { color: COL.xi, width: 3 }, hoverinfo: 'skip' });
+  const inside = w <= W_MAX && xi <= XI_MAX;
+  traces.push({ x: [Math.min(w, W_MAX)], y: [Math.min(xi, XI_MAX)], mode: 'markers', hoverinfo: 'skip',
+                marker: { size: 13, color: inside ? COL.point : '#fff', line: { color: COL.point, width: 2 } } });
+  const lab = (x, y, text, color) => ({ x, y, text, showarrow: false, font: { size: 14, color } });
+  Plotly.react('plot2', traces, {
+    font: FONT, margin: { l: 50, r: 14, t: 8, b: 42 }, showlegend: false,
+    paper_bgcolor: '#fff', plot_bgcolor: '#fff', uirevision: 'keep', dragmode: false,
+    xaxis: { range: [0, W_MAX], title: { text: 'ω', standoff: 4 }, fixedrange: true, showgrid: false,
+             linecolor: '#bbb', mirror: true, showline: true, zeroline: false },
+    yaxis: { range: [0, XI_MAX], title: { text: 'ξ', standoff: 4 }, fixedrange: true, showgrid: false,
+             linecolor: '#bbb', mirror: true, showline: true, zeroline: false },
+    annotations: [
+      lab(W_MAX * 0.75, 0.5, '<b>under-damped</b>', COL.under),
+      lab(W_MAX * 0.75, 2.0, '<b>over-damped</b>', COL.over),
+      lab(W_MAX * 0.75, 1.0, 'ξ = 1 (critical)', COL.crit),
+    ].map((a, i) => i === 2 ? { ...a, yshift: 10 } : a),
+  }, PLOT_CFG);
+  const gd = document.getElementById('plot2');
+  if (!gd._clickBound) {
+    gd._clickBound = true;
+    gd.on('plotly_click', e => {
+      const pt = e.points.find(p => p.curveNumber === 0) || e.points[0];
+      if (!pt) return;
+      stopSweep();
+      setParam('omega', Math.max(RANGES.omega[0], pt.x));
+      setParam('xi', pt.y);
+      refresh();
+    });
+  }
+
+  document.getElementById('p2info').textContent = `ω = ${fmt(w)}, ξ = ${fmt(xi)}${inside ? '' : ' (off chart)'}`;
+  tex(document.getElementById('eq2'),
+      `(m,c,k) = m\\,(1,\\ 2\\xi\\omega,\\ \\omega^2) = ${texNum(S.m)}\\,(1,\\ ${texNum(2 * xi * w)},\\ ${texNum(w * w)})`);
+}
+
+// ---- readouts --------------------------------------------------------------------
+const CASES = {
+  undamped: ['undamped', '#555'], under: ['under-damped', COL.under],
+  critical: ['critically damped', '#2a9d4b'], over: ['over-damped', COL.over],
+};
+function drawReadouts() {
+  const { omega: w, xi } = S, [m, c, k] = cur();
+  const [label, color] = CASES[dampingCase(xi)];
+  const alpha = Math.atan(k / m);
+  const items = [
+    `<span class="case" style="background:${color}">${label}</span>`,
+    `<span><b>ω</b> = √(k/m) = √(tan α) = ${fmt(w, 4)} rad/s</span>`,
+    `<span><b>α</b> = arctan(k/m) = ${fmt(alpha * 180 / Math.PI)}° = ${fmt(alpha / HALF_PI)}·π/2</span>`,
+    `<span><b>ξ</b> = c/c<sub>cr</sub> = c/(2√(mk)) = ${fmt(xi, 4)}</span>`,
+    `<span><b>c<sub>cr</sub></b> = 2√(km) = ${fmt(2 * Math.sqrt(k * m))}</span>`,
+    `<span><b>R</b> = |(m, c, k)| = ${fmt(Rof())}</span>`,
+  ];
+  document.getElementById('readouts').innerHTML = items.join('');
+}
+
+// ---- main refresh (coalesced to one per animation frame) ----------------------------
+let pending = false, pendingKey = null;
+function refresh(activeKey = null) {
+  pendingKey = activeKey;
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => {
+    pending = false;
+    syncControls(pendingKey);
+    drawReadouts();
+    if (typeof Plotly !== 'undefined') { drawPlot1(); drawPlot2(); }
+    writeHash();
+  });
+}
+
+// ---- URL hash: bookmarkable states -----------------------------------------------------
+function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  for (const key of Object.keys(DEFAULTS)) {
+    const v = parseFloat(p.get(key));
+    if (Number.isFinite(v)) S[key] = v;
+  }
+  if (!(S.m > 0 && S.omega > 0 && S.xi >= 0)) Object.assign(S, DEFAULTS);
+}
+let hashTimer = null;
+function writeHash() {
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => {
+    const p = Object.keys(DEFAULTS).map(k => `${k}=${Number(S[k].toPrecision(6))}`).join('&');
+    history.replaceState(null, '', '#' + p);
+  }, 300);
+}
+
+document.getElementById('reset').addEventListener('click', () => { stopSweep(); Object.assign(S, DEFAULTS); refresh(); });
+for (const id of ['regions', 'grid', 'autoR']) document.getElementById(id).addEventListener('change', () => refresh());
+tex(document.getElementById('eomTex'),
+    'm\\ddot x + c\\dot x + kx = 0,\\quad (m,c,k)\\cong(sm,sc,sk)\\ \\forall s>0,'
+    + '\\quad \\omega=\\sqrt{k/m},\\ \\xi=\\frac{c}{2\\sqrt{mk}}');
+readHash();
+refresh();
+</script>
+</body>
+</html>

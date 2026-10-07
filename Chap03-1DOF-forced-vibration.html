@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1DOF Harmonic Excitation — CIVE 6355</title>
+<!-- CIVE 6355 Structural Dynamics, Chapter 3: response of a damped 1DOF system to harmonic
+     loading (forced vibration) and to harmonic support motion.
+     Open this file directly in a browser (internet needed for Plotly and KaTeX).
+     State can be set from the URL hash, e.g.
+     Chap03-1DOF-forced-vibration.html#mode=f&m=1&omega=2&xi=0.1&wbar=1.6&yst=1&yo=1&yi=0&vi=0&T=30 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.3/plotly.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #d9d9de;
+    --force: #1f5fbf; --support: #2a8a4b; --uh: #c8102e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  header { padding: 8px 14px 6px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .titlebar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  .titlebar h1 { font-size: 17px; margin: 0; }
+  .titlebar .eom { color: var(--muted); }
+  .titlebar .tools { margin-left: auto; display: flex; gap: 10px; align-items: center; color: var(--muted); flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { font: inherit; font-weight: 600; padding: 3px 12px; border: 0; background: #fff; color: var(--muted); cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on[data-mode=force] { background: var(--force); color: #fff; }
+  .seg button.on[data-mode=support] { background: var(--support); color: #fff; }
+  .seg.small button { font-size: 12px; padding: 0 8px; }
+  .seg button.on[data-v] { background: #555; color: #fff; }
+  select, .tools button { font: inherit; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(245px, 1fr)); gap: 4px 16px; }
+  .ctl { display: flex; align-items: center; gap: 6px; }
+  .ctl .sym { width: 40px; font-size: 18px; font-style: italic; font-family: "Times New Roman", serif; text-align: right; white-space: nowrap; }
+  .ctl input[type=range] { flex: 1; min-width: 60px; }
+  .ctl input[type=number] { width: 78px; font: inherit; font-variant-numeric: tabular-nums; padding: 1px 3px; }
+  .play { width: 28px; height: 24px; padding: 0; font-size: 12px; border: 1px solid var(--line);
+          border-radius: 4px; background: #fff; cursor: pointer; }
+  .play.on { background: var(--uh); color: #fff; border-color: var(--uh); }
+  #tplay { width: auto; padding: 0 8px; font-size: 13px; }
+  .readouts { display: flex; flex-wrap: wrap; gap: 3px 18px; margin-top: 6px; padding-top: 5px;
+              border-top: 1px dashed var(--line); font-variant-numeric: tabular-nums; }
+  .readouts span b { font-weight: 600; }
+  .case { font-weight: 700; padding: 0 8px; border-radius: 4px; color: #fff; }
+  main {
+    flex: 1; min-height: 0; display: grid; gap: 8px; padding: 8px;
+    grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    grid-template-areas: "p1 p2" "p3 p4";
+  }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+           display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 4px 8px 4px; }
+  .panel h2 { font-size: 15px; margin: 2px 0; display: flex; gap: 12px; align-items: baseline; white-space: nowrap; }
+  .panel h2 .info { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums;
+                    min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .panel h2 .opts { margin-left: auto; flex-shrink: 0; display: flex; gap: 12px; font-weight: 400; font-size: 13px; color: var(--muted); }
+  .plot { flex: 1; min-height: 0; }
+  .eq { min-height: 2.6em; text-align: center; font-size: 14px; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+  .eq .katex-html { white-space: nowrap; }   /* one line; scroll sideways when too wide */
+  #p1 { grid-area: p1; } #p2 { grid-area: p2; } #p3 { grid-area: p3; } #p4 { grid-area: p4; }
+  #loaderr { display: none; margin: 20px; padding: 12px; background: #fde; border: 1px solid var(--uh); }
+  @media (max-width: 900px) {
+    body { height: auto; }
+    header { padding: 8px 16px 6px; }
+    main { grid-template-columns: 1fr; grid-template-rows: auto;
+           grid-template-areas: "p1" "p2" "p3" "p4"; }
+    .panel { min-height: 380px; }
+    .controls { grid-template-columns: 1fr; }
+    .titlebar .tools { margin-left: 0; width: 100%; }
+    #preset { flex: 1 1 100%; width: 100%; min-width: 0; }
+    .panel h2 { flex-wrap: wrap; white-space: normal; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="titlebar">
+    <h1>Harmonic excitation of a 1DOF system</h1>
+    <div class="seg" id="modeSeg">
+      <button data-mode="force">Forced vibration</button><button data-mode="support">Support motion</button>
+    </div>
+    <span class="eom" id="eomTex"></span>
+    <div class="tools">
+      <select id="preset" title="preset parameter sets"></select>
+      <button class="play" id="tplay" title="run a time cursor across panels 1–3">▶ t</button>
+      <label>speed
+        <select id="speed">
+          <option value="0.25">¼×</option><option value="0.5">½×</option>
+          <option value="1" selected>1×</option><option value="2">2×</option>
+        </select>
+      </label>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+  <div class="controls" id="controls"></div>
+  <div class="readouts" id="readouts"></div>
+</header>
+<div id="loaderr">Plotly/KaTeX could not be loaded from the CDN. This page needs an internet connection.</div>
+<main>
+  <section class="panel" id="p1">
+    <h2><span id="p1title"></span> <span class="info" id="p1info"></span>
+      <span class="opts"><label><input type="checkbox" id="auto1" checked> autoscale y</label></span></h2>
+    <div class="plot" id="plot1"></div>
+    <div class="eq" id="eq1"></div>
+  </section>
+  <section class="panel" id="p2">
+    <h2><span id="p2title"></span> <span class="info" id="p2info"></span>
+      <span class="opts"><label><input type="checkbox" id="auto2" checked> autoscale y</label></span></h2>
+    <div class="plot" id="plot2"></div>
+    <div class="eq" id="eq2"></div>
+  </section>
+  <section class="panel" id="p3">
+    <h2><span id="p3title"></span> <span class="info" id="p3info"></span>
+      <span class="opts"><label><input type="checkbox" id="showp" checked> show y<sub>p</sub></label>
+        <label><input type="checkbox" id="auto3" checked> autoscale y</label></span></h2>
+    <div class="plot" id="plot3"></div>
+    <div class="eq" id="eq3"></div>
+  </section>
+  <section class="panel" id="p4">
+    <h2><span id="p4title"></span> <span class="info" id="p4info"></span>
+      <span class="opts"><span class="seg small" id="p4seg"><button data-v="freq" id="p4freq">D(r)</button><button data-v="loop">Loop</button></span>
+        <label id="auto4lbl"><input type="checkbox" id="auto4"> autoscale y</label></span></h2>
+    <div class="plot" id="plot4"></div>
+    <div class="eq" id="eq4"></div>
+  </section>
+</main>
+
+<script>
+// BEGIN-MATH ------------------------------------------------------------------
+// Pure functions; no DOM. Extracted by the test script.
+const RES_TOL = 1e-9;
+const dmf = (r, xi) => 1 / Math.hypot(1 - r * r, 2 * xi * r);                 // D
+const trans = (r, xi) => Math.hypot(1, 2 * xi * r) / Math.hypot(1 - r * r, 2 * xi * r);  // Tr
+const isResonant = (r, xi) => xi === 0 && Math.abs(r - 1) < RES_TOL;
+
+// Closed-form response for 0 <= xi < 1 with y(0) = yi, y'(0) = vi, of
+//   mode 'force':   m y'' + c y' + k y = F0 sin(wbar t),        amp = y_st = F0/k;
+//   mode 'support': m y'' + c (y' - ys') + k (y - ys) = 0,     ys = amp sin(wbar t), y absolute.
+// Particular solution y_p = Y sin(wbar t + phi), phi = -theta (force) or beta - theta (support);
+// undamped resonance (xi = 0, r = 1): y_p = -(omega amp / 2) t cos(omega t).
+function harmonicResponse(mode, omega, xi, wbar, amp, yi, vi) {
+  const r = wbar / omega, wd = omega * Math.sqrt(1 - xi * xi), a = -xi * omega;
+  const sup = mode === 'support';
+  const resonant = isResonant(r, xi);
+  const theta = resonant ? Math.PI / 2 : Math.atan2(2 * xi * r, 1 - r * r);
+  const beta = sup ? Math.atan(2 * xi * r) : 0;
+  const ratio = resonant ? Infinity : (sup ? trans(r, xi) : dmf(r, xi));
+  let yp, vp, ap, yp0, vp0, Y, phi, Cres = null;
+  if (resonant) {
+    // With xi = 0 the support case is the forced case with F0 = k amp.
+    const C = -omega * amp / 2;
+    Cres = C; Y = Infinity; phi = -Math.PI / 2;
+    yp = t => C * t * Math.cos(omega * t);
+    vp = t => C * (Math.cos(omega * t) - omega * t * Math.sin(omega * t));
+    ap = t => -C * omega * (2 * Math.sin(omega * t) + omega * t * Math.cos(omega * t));
+    yp0 = 0; vp0 = C;
+  } else {
+    Y = amp * ratio; phi = beta - theta;
+    yp = t => Y * Math.sin(wbar * t + phi);
+    vp = t => Y * wbar * Math.cos(wbar * t + phi);
+    ap = t => -Y * wbar * wbar * Math.sin(wbar * t + phi);
+    yp0 = Y * Math.sin(phi); vp0 = Y * wbar * Math.cos(phi);
+  }
+  // Homogeneous part e^{at}(A cos wd t + B sin wd t) takes up the initial conditions.
+  const A = yi - yp0, B = (vi - vp0 - a * A) / wd, C = Math.hypot(A, B);
+  const yh = t => Math.exp(a * t) * (A * Math.cos(wd * t) + B * Math.sin(wd * t));
+  const vh = t => Math.exp(a * t) * ((a * A + wd * B) * Math.cos(wd * t) + (a * B - wd * A) * Math.sin(wd * t));
+  const ah = t => -2 * xi * omega * vh(t) - omega * omega * yh(t);   // y_h solves the free equation
+  return {
+    yp, vp, ap, yh, vh, ah,
+    y: t => yh(t) + yp(t),
+    v: t => vh(t) + vp(t),
+    acc: t => ah(t) + ap(t),
+    excite: t => Math.sin(wbar * t),       // F/F0 or ys/y0
+    env: t => C * Math.exp(a * t),
+    coef: { r, wd, a, A, B, C, theta, beta, phi, Y, ratio, yp0, vp0, resonant, Cres }
+  };
+}
+// Restoring force f_R = k u + c u' on its deformation u, normalized by amp and k amp, where
+// u = y (force) or u = y - ys (support). fRmeas is the "experimental" route: (F - m y'')/(k amp)
+// or -m y''/(k amp), with y'' the absolute acceleration. up, fRp: the same for the steady state.
+function restoring(R, mode, omega, xi, wbar, amp) {
+  const sup = mode === 'support', w2 = omega * omega, c2 = 2 * xi / omega;   // c/k = 2 xi / omega
+  const ys = t => sup ? amp * Math.sin(wbar * t) : 0;
+  const vs = t => sup ? amp * wbar * Math.cos(wbar * t) : 0;
+  return {
+    u:   t => (R.y(t) - ys(t)) / amp,
+    fR:  t => (R.y(t) - ys(t) + c2 * (R.v(t) - vs(t))) / amp,
+    up:  t => (R.yp(t) - ys(t)) / amp,
+    fRp: t => (R.yp(t) - ys(t) + c2 * (R.vp(t) - vs(t))) / amp,
+    fRmeas: t => (sup ? 0 : Math.sin(wbar * t)) - R.acc(t) / (w2 * amp),
+  };
+}
+// END-MATH --------------------------------------------------------------------
+
+if (typeof Plotly === 'undefined' || typeof katex === 'undefined') {
+  document.getElementById('loaderr').style.display = 'block';
+}
+
+// ---- parameter state ---------------------------------------------------------
+// Primary state is (m, omega, xi, wbar); k = m omega^2, c = 2 m xi omega and r = wbar/omega are
+// derived. Changing omega (or m, k) holds the excitation frequency wbar fixed, so r moves.
+const XI_MAX = 0.9, W_MIN = 0.5, W_MAX = 10, R_MIN = 0.05, R_MAX = 3, SNAP = 0.005;
+const DEFAULTS = { mode: 'force', m: 1, omega: 2, xi: 0.1, wbar: 1.6, yst: 1, yo: 1, yi: 0, vi: 0, T: 30 };
+const NUM_KEYS = ['m', 'omega', 'xi', 'wbar', 'yst', 'yo', 'yi', 'vi', 'T'];
+const S = { ...DEFAULTS };
+const kOf = () => S.m * S.omega ** 2;
+const cOf = () => 2 * S.m * S.xi * S.omega;
+const rOf = () => S.wbar / S.omega;
+const isSup = () => S.mode === 'support';
+const ampKey = () => isSup() ? 'yo' : 'yst';
+const amp = () => S[ampKey()];
+
+const RANGES = {
+  m:     () => [0.1, 10],
+  k:     () => [S.m * W_MIN ** 2, S.m * W_MAX ** 2],
+  c:     () => [0, XI_MAX * 2 * Math.sqrt(S.m * kOf())],
+  omega: () => [W_MIN, W_MAX],
+  xi:    () => [0, XI_MAX],
+  wbar:  () => [R_MIN * S.omega, R_MAX * S.omega],
+  r:     () => [R_MIN, R_MAX],
+  yst:   () => [0.01, 2],
+  yo:    () => [0.01, 2],
+  yi:    () => [-3 * amp(), 3 * amp()],
+  vi:    () => [-3 * S.omega * amp(), 3 * S.omega * amp()],
+  T:     () => [2, 60],
+};
+// Slider ranges stretch to include the current value (e.g. textbook presets in lb-in units).
+function rangeOf(key) {
+  const [lo, hi] = RANGES[key](), v = getParam(key);
+  return [Math.min(lo, v), Math.max(hi, v)];
+}
+const SYMS = { m: 'm', c: 'c', k: 'k', omega: 'ω', xi: 'ξ', wbar: 'ω̄', r: 'r',
+               yst: 'y<sub>st</sub>', yo: 'y₀', yi: 'y(0)', vi: 'ẏ(0)', T: 't<sub>max</sub>' };
+const TIPS = { wbar: 'excitation frequency ω̄ (rad/s)', r: 'frequency ratio r = ω̄/ω',
+               yst: 'static deflection y_st = F₀/k', yo: 'support-motion amplitude y₀',
+               yi: 'initial displacement y(0)', vi: 'initial velocity ẏ(0)', T: 'plotted time window' };
+const ORDER = ['m', 'c', 'k', 'omega', 'xi', 'wbar', 'r', 'yst', 'yo', 'yi', 'vi', 'T'];
+
+function getParam(key) {
+  return key === 'k' ? kOf() : key === 'c' ? cOf() : key === 'r' ? rOf() : S[key];
+}
+
+// Set one parameter, keeping the others consistent; rejects values that leave 0 <= xi < 1.
+// snapWindow > 0 snaps r to 1 and xi to 0.
+function setParam(key, val, snapWindow = SNAP) {
+  if (!Number.isFinite(val)) return;
+  const k = kOf(), c = cOf(), N = { ...S };
+  switch (key) {
+    case 'm':     if (val <= 0) return; N.m = val; N.omega = Math.sqrt(k / val); N.xi = c / (2 * val * N.omega); break;
+    case 'k':     if (val <= 0) return; N.omega = Math.sqrt(val / S.m); N.xi = c / (2 * S.m * N.omega); break;
+    case 'c':     N.xi = val / (2 * S.m * S.omega); break;
+    case 'r':     if (val <= 0) return; N.wbar = val * S.omega; break;
+    case 'omega': case 'wbar': case 'yst': case 'yo': case 'T':
+                  if (val <= 0) return; N[key] = val; break;
+    default:      N[key] = val;
+  }
+  if (!(N.xi >= 0 && N.xi < 1)) return;
+  if (snapWindow > 0) {
+    if (Math.abs(N.wbar / N.omega - 1) < snapWindow) N.wbar = N.omega;
+    if (N.xi < snapWindow) N.xi = 0;
+  }
+  Object.assign(S, N);
+}
+
+// ---- presets -------------------------------------------------------------------
+// Illustrative Examples 3.9-3.11 use the frame of Ex. 3.2: W = 15000 lb, k = 2136 lb/in (omega = 7.41 rad/s).
+const EX_M = 15000 / 386, EX_K = 2136;
+const EX = { m: EX_M, omega: Math.sqrt(EX_K / EX_M), xi: 0.05, yi: 0, vi: 0, T: 10 };
+const ND = { m: 1, omega: 2, xi: 0.1, yi: 0, vi: 0, yst: 1, yo: 1 };
+const PRESETS = [
+  { group: 'Forced vibration', label: 'Ex. 3.9: F = 200 sin 2.3t lb, ξ = 5% (r = 0.31)',
+    mode: 'force', ...EX, wbar: 2.3, yst: 200 / EX_K },
+  { group: 'Forced vibration', label: 'Ex. 3.10: F = 200 sin 7.41t lb, ξ = 5% (resonance)',
+    mode: 'force', ...EX, wbar: 7.41, yst: 200 / EX_K },
+  { group: 'Forced vibration', label: 'Quasi-static loading (r = 0.2)', mode: 'force', ...ND, wbar: 0.4, T: 40 },
+  { group: 'Forced vibration', label: 'High-frequency loading (r = 2.5)', mode: 'force', ...ND, wbar: 5, T: 20 },
+  { group: 'Forced vibration', label: 'Undamped, beating (ξ = 0, r = 0.9)', mode: 'force', ...ND, xi: 0, wbar: 1.8, T: 60 },
+  { group: 'Forced vibration', label: 'Undamped resonance (ξ = 0, r = 1)', mode: 'force', ...ND, xi: 0, wbar: 2, T: 30 },
+  { group: 'Forced vibration', label: 'Nonzero initial conditions (y(0) = 2y_st, r = 0.5)',
+    mode: 'force', ...ND, wbar: 1, yi: 2, T: 30 },
+  { group: 'Support motion', label: 'Ex. 3.11: base accel. 0.3 sin 5.3t in/s² → y₀ = 0.3/5.3² in',
+    mode: 'support', ...EX, wbar: 5.3, yo: 0.3 / 5.3 ** 2 },
+  { group: 'Support motion', label: 'Resonance (r = 1, ξ = 0.1)', mode: 'support', ...ND, wbar: 2, T: 30 },
+  { group: 'Support motion', label: 'Crossover r = √2 (Tr = 1)', mode: 'support', ...ND, wbar: 2 * Math.SQRT2, T: 30 },
+  { group: 'Support motion', label: 'Vibration isolation (r = 3, Tr < 1)', mode: 'support', ...ND, wbar: 6, T: 30 },
+];
+const presetSel = document.getElementById('preset');
+{
+  presetSel.innerHTML = '<option value="">Presets…</option>';
+  const groups = {};
+  PRESETS.forEach((p, i) => {
+    if (!groups[p.group]) {
+      groups[p.group] = document.createElement('optgroup');
+      groups[p.group].label = p.group;
+      presetSel.appendChild(groups[p.group]);
+    }
+    const o = document.createElement('option');
+    o.value = i; o.textContent = p.label;
+    groups[p.group].appendChild(o);
+  });
+}
+presetSel.addEventListener('change', () => {
+  if (presetSel.value === '') return;
+  const { group, label, ...p } = PRESETS[+presetSel.value];
+  stopSweep();
+  Object.assign(S, DEFAULTS, p);
+  tcur = null; stopTime();
+  refresh();
+});
+const clearPreset = () => { presetSel.value = ''; };
+
+// ---- formatting ----------------------------------------------------------------
+function fmt(v, d = 3) {
+  if (v === Infinity) return '∞';
+  if (v === null || v === undefined || !Number.isFinite(v)) return '—';
+  if (Math.abs(v) < 5e-13) return '0';
+  const a = Math.abs(v);
+  if (a >= 1e4 || a < 1e-3) return v.toExponential(2);
+  return String(Number(v.toPrecision(d + (a >= 100 ? 1 : 0))));
+}
+// Phase angles as multiples of pi: "0.133π", "π", "−0.5π"; texPhase gives " - 0.133\pi" (or "" for 0).
+function piFmt(rad) {
+  const v = fmt(rad / Math.PI);
+  return v === '0' ? '0' : v === '1' ? 'π' : v === '-1' ? '−π' : v.replace('-', '−') + 'π';
+}
+function texPhase(rad) {
+  const v = fmt(Math.abs(rad) / Math.PI);
+  if (v === '0') return '';
+  return (rad < 0 ? '- ' : '+ ') + (v === '1' ? '' : v.replace(/e([+-]?\d+)/, '\\times 10^{$1}')) + '\\pi';
+}
+const texNum = v => fmt(v).replace(/e([+-]?\d+)/, '\\times 10^{$1}');
+const texSigned = v => (v < 0 ? '- ' : '+ ') + texNum(Math.abs(v));
+function tex(el, s) {
+  if (typeof katex === 'undefined') { el.textContent = s; return; }
+  katex.render(s, el, { throwOnError: false, displayMode: false });
+}
+
+// ---- controls ------------------------------------------------------------------
+const ui = {};
+const controls = document.getElementById('controls');
+for (const key of ORDER) {
+  const div = document.createElement('div');
+  div.className = 'ctl';
+  if (TIPS[key]) div.title = TIPS[key];
+  div.innerHTML = `<span class="sym">${SYMS[key]}</span>
+    <button class="play" title="sweep ${key} back and forth">▶</button>
+    <input type="range" step="any"><input type="number" step="any">`;
+  controls.appendChild(div);
+  const [play, range, num] = div.querySelectorAll('button, input');
+  ui[key] = { div, play, range, num };
+  range.addEventListener('input', () => { stopSweep(); clearPreset(); setParam(key, parseFloat(range.value)); refresh(key); });
+  num.addEventListener('change', () => { stopSweep(); clearPreset(); setParam(key, parseFloat(num.value), 0); refresh(); });
+  play.addEventListener('click', () => (sweep && sweep.key === key) ? stopSweep() : startSweep(key));
+}
+
+function syncControls(activeKey) {
+  ui.yst.div.style.display = isSup() ? 'none' : '';
+  ui.yo.div.style.display = isSup() ? '' : 'none';
+  for (const key of ORDER) {
+    const { range, num } = ui[key];
+    const v = getParam(key);
+    if (key !== activeKey) {  // don't disturb the slider being dragged
+      const [lo, hi] = rangeOf(key);
+      range.min = lo; range.max = hi; range.value = v;
+    }
+    if (document.activeElement !== num) num.value = fmt(v, 4);
+  }
+  for (const b of document.querySelectorAll('#modeSeg button')) b.classList.toggle('on', b.dataset.mode === S.mode);
+}
+
+// ---- sweep (ping-pong animation of one parameter) --------------------------------
+let sweep = null;
+const SWEEP_PERIOD = 8;  // seconds for one pass across the range at 1x
+function startSweep(key) {
+  stopSweep();
+  clearPreset();
+  const [lo, hi] = rangeOf(key);
+  sweep = { key, lo, hi, v: getParam(key), dir: 1, last: null, pauseUntil: 0 };
+  ui[key].play.classList.add('on'); ui[key].play.textContent = '❚❚';
+  requestAnimationFrame(sweepFrame);
+}
+function stopSweep() {
+  if (!sweep) return;
+  ui[sweep.key].play.classList.remove('on'); ui[sweep.key].play.textContent = '▶';
+  sweep = null;
+}
+const speed = () => parseFloat(document.getElementById('speed').value);
+function sweepFrame(now) {
+  if (!sweep) return;
+  const sw = sweep;
+  if (sw.last === null) sw.last = now;
+  const dt = Math.min(0.1, (now - sw.last) / 1000);
+  sw.last = now;
+  if (now >= sw.pauseUntil) {
+    sw.v += sw.dir * (sw.hi - sw.lo) * dt * speed() / SWEEP_PERIOD;
+    if (sw.v >= sw.hi) { sw.v = sw.hi; sw.dir = -1; }
+    if (sw.v <= sw.lo) { sw.v = sw.lo; sw.dir = 1; }
+    const rPrev = rOf();
+    setParam(sw.key, sw.v, 0);
+    // Stop briefly at resonance r = 1.
+    const rNow = rOf();
+    if ((rPrev - 1) * (rNow - 1) < 0 || rNow === 1 && rPrev !== 1) {
+      S.wbar = S.omega;
+      sw.pauseUntil = now + 700;
+    }
+    refresh();
+  }
+  requestAnimationFrame(sweepFrame);
+}
+
+// ---- time cursor -------------------------------------------------------------------
+let tcur = null, tplay = null;
+const tbtn = document.getElementById('tplay');
+function stopTime() { tplay = null; tbtn.classList.remove('on'); tbtn.textContent = '▶ t'; }
+tbtn.addEventListener('click', () => {
+  if (tplay) { stopTime(); return; }
+  if (tcur === null || tcur >= S.T) tcur = 0;
+  tplay = { last: null };
+  tbtn.classList.add('on'); tbtn.textContent = '❚❚ t';
+  requestAnimationFrame(timeFrame);
+});
+function timeFrame(now) {
+  if (!tplay) return;
+  if (tplay.last === null) tplay.last = now;
+  const dt = Math.min(0.1, (now - tplay.last) / 1000);
+  tplay.last = now;
+  tcur += dt * speed();            // real time at 1x
+  if (tcur > S.T) tcur = 0;
+  refresh();
+  requestAnimationFrame(timeFrame);
+}
+
+// ---- plots ---------------------------------------------------------------------
+const PLOT_CFG = { displayModeBar: false, responsive: true };
+const FONT = { family: 'system-ui, sans-serif', size: 14, color: '#1d1d1f' };
+const COL = { exc: '#1d1d1f', yp: '#d9621c', yh: '#1f5fbf', env: '#888', y: '#1d1d1f', cur: '#c8102e',
+              curve: '#c8102e', ref: '#c4c4c8', pt: '#1f5fbf' };
+const baseLayout = (extra) => Object.assign({
+  font: FONT, margin: { l: 50, r: 14, t: 8, b: 40 }, showlegend: false,
+  paper_bgcolor: '#fff', plot_bgcolor: '#fff', uirevision: 'keep',
+}, extra);
+const axis = (extra) => Object.assign({
+  zeroline: true, zerolinecolor: '#888', zerolinewidth: 1.5, gridcolor: '#eee',
+  linecolor: '#bbb', mirror: true, showline: true, fixedrange: true,
+}, extra);
+const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+const line = (x, y, color, width, dash) => ({ x, y, mode: 'lines', line: { color, width, dash }, hoverinfo: 'skip' });
+
+// Symmetric y-range: fit the data when autoscaling, else fixed +-3.
+function yRange(auto, ...arrays) {
+  if (!auto) return [-3, 3];
+  let m = 0;
+  for (const arr of arrays) for (const v of arr) if (Number.isFinite(v) && Math.abs(v) > m) m = Math.abs(v);
+  const L = m > 0 ? 1.1 * m : 1;
+  return [-L, L];
+}
+// Time-cursor decorations: a vertical line plus dots on the given curves.
+function cursor(fns, colors) {
+  if (tcur === null) return { shapes: [], traces: [] };
+  return {
+    shapes: [{ type: 'line', xref: 'x', yref: 'paper', x0: tcur, x1: tcur, y0: 0, y1: 1,
+               line: { color: COL.cur, width: 1.5 } }],
+    traces: fns.map((f, i) => ({ x: [tcur], y: [f(tcur)], mode: 'markers', hoverinfo: 'skip',
+                                 marker: { size: 9, color: colors[i] } })),
+  };
+}
+const timeAxis = () => axis({ range: [0, S.T], title: { text: 't', standoff: 4 } });
+
+function samples() {
+  const cycles = S.T * Math.max(S.omega, S.wbar) / (2 * Math.PI);
+  return linspace(0, S.T, Math.round(Math.min(8000, Math.max(800, 40 * cycles))));
+}
+
+function drawPlot1(R, t) {
+  const a = amp(), cf = R.coef, sup = isSup();
+  const exc = t.map(R.excite), yp = t.map(tt => R.yp(tt) / a);
+  const cur = cursor([R.excite, tt => R.yp(tt) / a], [COL.exc, COL.yp]);
+  Plotly.react('plot1', [
+    line(t, exc, COL.exc, 2), line(t, yp, COL.yp, 2.5), ...cur.traces,
+  ], baseLayout({
+    xaxis: timeAxis(),
+    yaxis: axis({ range: yRange(document.getElementById('auto1').checked, exc, yp) }),
+    shapes: cur.shapes,
+    annotations: [{ xref: 'paper', yref: 'paper', x: 1, y: 1, xanchor: 'right', yanchor: 'top', showarrow: false,
+                    bgcolor: 'rgba(255,255,255,0.85)', font: { size: 13 },
+                    text: `<b style="color:${COL.exc}">${sup ? 'y<sub>s</sub>/y₀' : 'F/F₀'}</b>   ` +
+                          `<b style="color:${COL.yp}">y<sub>p</sub>/${sup ? 'y₀' : 'y<sub>st</sub>'}</b>` }],
+  }), PLOT_CFG);
+
+  const lag = cf.resonant ? '' : `, lag θ/ω̄ = ${fmt(cf.theta / S.wbar)} s`;
+  document.getElementById('p1info').textContent = sup
+    ? `θ = ${piFmt(cf.theta)}, β = ${piFmt(cf.beta)}, β − θ = ${piFmt(cf.beta - cf.theta)}`
+    : `θ = ${piFmt(cf.theta)}${lag}`;
+  const n = sup ? 'y_0' : 'y_{st}', w = texNum(S.wbar);
+  let s;
+  if (cf.resonant) {
+    s = `\\frac{y_p}{${n}} = -\\frac{\\omega t}{2}\\cos\\omega t = -${texNum(S.omega / 2)}\\,t\\cos ${texNum(S.omega)}t`
+      + `\\quad(\\xi = 0,\\ r = 1\\text{: grows without bound})`;
+  } else if (sup) {
+    s = `\\frac{y_p}{y_0} = T_r\\sin(\\bar\\omega t + \\beta - \\theta) = ${texNum(cf.ratio)}\\sin(${w}t ${texPhase(cf.phi)})`;
+  } else {
+    s = `\\frac{y_p}{y_{st}} = D\\sin(\\bar\\omega t - \\theta) = ${texNum(cf.ratio)}\\sin(${w}t ${texPhase(cf.phi)})`;
+  }
+  tex(document.getElementById('eq1'), s);
+}
+
+function drawPlot2(R, t) {
+  const a = amp(), cf = R.coef;
+  const yh = t.map(tt => R.yh(tt) / a);
+  const traces = [];
+  if (S.xi > 0 && cf.C > 0) {
+    const e = t.map(tt => R.env(tt) / a);
+    traces.push(line(t, e, COL.env, 1.5, 'dot'), line(t, e.map(v => -v), COL.env, 1.5, 'dot'));
+  }
+  traces.push(line(t, yh, COL.yh, 2.5));
+  const cur = cursor([tt => R.yh(tt) / a], [COL.yh]);
+  traces.push(...cur.traces);
+  Plotly.react('plot2', traces, baseLayout({
+    xaxis: timeAxis(),
+    yaxis: axis({ range: yRange(document.getElementById('auto2').checked, yh) }),
+    shapes: cur.shapes,
+  }), PLOT_CFG);
+  document.getElementById('p2info').textContent =
+    `A/${isSup() ? 'y₀' : 'y_st'} = ${fmt(cf.A / a)}, B/${isSup() ? 'y₀' : 'y_st'} = ${fmt(cf.B / a)}, ω_D = ${fmt(cf.wd)}`;
+  const expo = Math.abs(cf.a) < 5e-13 ? '' : `e^{${texNum(cf.a)}\\,t}`;
+  const n = isSup() ? 'y_0' : 'y_{st}', wd = texNum(cf.wd);
+  tex(document.getElementById('eq2'),
+    `A = y(0) - y_p(0),\\ B = \\frac{\\dot y(0) - \\dot y_p(0) + \\xi\\omega A}{\\omega_D};\\quad`
+    + `\\frac{y_h}{${n}} = ${expo}\\left[${texNum(cf.A / a)}\\cos ${wd}t ${texSigned(cf.B / a)}\\sin ${wd}t\\right]`);
+}
+
+function drawPlot3(R, t) {
+  const a = amp(), cf = R.coef;
+  const y = t.map(tt => R.y(tt) / a);
+  const traces = [];
+  const showp = document.getElementById('showp').checked;
+  if (showp) traces.push(line(t, t.map(tt => R.yp(tt) / a), COL.yp, 1.5, 'dot'));
+  traces.push(line(t, y, COL.y, 2.5),
+              { x: [0], y: [S.yi / a], mode: 'markers', marker: { size: 9, color: COL.cur }, hoverinfo: 'skip' });
+  const cur = cursor([tt => R.y(tt) / a], [COL.y]);
+  traces.push(...cur.traces);
+  Plotly.react('plot3', traces, baseLayout({
+    xaxis: timeAxis(),
+    yaxis: axis({ range: yRange(document.getElementById('auto3').checked, y) }),
+    shapes: cur.shapes,
+  }), PLOT_CFG);
+  const n = isSup() ? 'y_0' : 'y_{st}';
+  document.getElementById('p3info').textContent =
+    `y(0)/${isSup() ? 'y₀' : 'y_st'} = ${fmt(S.yi / a)}, ẏ(0)/(ω·${isSup() ? 'y₀' : 'y_st'}) = ${fmt(S.vi / (S.omega * a))}`;
+  const expo = Math.abs(cf.a) < 5e-13 ? '' : `e^{${texNum(cf.a)}\\,t}`, wd = texNum(cf.wd);
+  const hom = `${expo}\\left[${texNum(cf.A / a)}\\cos ${wd}t ${texSigned(cf.B / a)}\\sin ${wd}t\\right]`;
+  const part = cf.resonant ? `- ${texNum(S.omega / 2)}\\,t\\cos ${texNum(S.omega)}t`
+                           : `+ ${texNum(cf.ratio)}\\sin(${texNum(S.wbar)}t ${texPhase(cf.phi)})`;
+  tex(document.getElementById('eq3'), `\\frac{y}{${n}} = \\frac{y_h + y_p}{${n}} = ${hom} ${part}`);
+}
+
+// Panel 4 shows either the frequency response D(r) / Tr(r) or the restoring-force loop.
+let view4 = 'freq';
+function drawPlot4(R, t) {
+  document.getElementById('auto4lbl').style.display = view4 === 'loop' ? 'none' : '';
+  for (const b of document.querySelectorAll('#p4seg button')) b.classList.toggle('on', b.dataset.v === view4);
+  document.getElementById('p4freq').textContent = isSup() ? 'Tr(r)' : 'D(r)';
+  if (view4 === 'loop') drawLoop(R, t); else drawFreq(R);
+}
+
+// Restoring force f_R versus deformation: full trajectory over [0, t_max], the steady-state ellipse,
+// the spring line f_R = k u, and sparse markers from the measured route F - m y'' (or -m y'').
+function drawLoop(R, t) {
+  const sup = isSup(), cf = R.coef, L = restoring(R, S.mode, S.omega, S.xi, S.wbar, amp());
+  const u = t.map(L.u), f = t.map(L.fR);
+  const traces = [line(u, f, COL.y, 1.2)];
+  let eu = [], ef = [];
+  if (!cf.resonant) {
+    const tp = linspace(0, 2 * Math.PI / S.wbar, 241);
+    eu = tp.map(L.up); ef = tp.map(L.fRp);
+    traces.push(line(eu, ef, COL.yp, 3.5));
+  }
+  const maxAbs = arr => arr.reduce((m, v) => Number.isFinite(v) ? Math.max(m, Math.abs(v)) : m, 0);
+  const X = 1.1 * Math.max(maxAbs(u), maxAbs(eu), 1e-9), F = 1.1 * Math.max(maxAbs(f), maxAbs(ef), 1e-9);
+  const Z = Math.max(X, F);
+  traces.push(line([-Z, Z], [-Z, Z], '#666', 1.2, 'dash'));
+  const tm = linspace(0, S.T, 81);
+  traces.push({ x: tm.map(L.u), y: tm.map(L.fRmeas), mode: 'markers', hoverinfo: 'skip',
+                marker: { size: 7, color: 'rgba(0,0,0,0)', line: { color: COL.yh, width: 1.5 } } });
+  if (tcur !== null) traces.push({ x: [L.u(tcur)], y: [L.fR(tcur)], mode: 'markers', hoverinfo: 'skip',
+                                   marker: { size: 11, color: COL.cur } });
+  const n = sup ? 'y₀' : 'y<sub>st</sub>';
+  const legend = `<span style="color:${COL.y}">━ 0 ≤ t ≤ t<sub>max</sub></span>   ` +
+    (cf.resonant ? '(no steady state)' : `<span style="color:${COL.yp}">━ steady state</span>`) +
+    `   <span style="color:${COL.yh}">○ ${sup ? '−mÿ' : 'F − mÿ'}</span>   <span style="color:#666">╌ spring k${sup ? 'u' : 'y'}</span>`;
+  Plotly.react('plot4', traces, baseLayout({
+    xaxis: axis({ range: [-X, X], title: { text: sup ? 'u / y₀ = (y − y<sub>s</sub>) / y₀' : 'y / y<sub>st</sub>', standoff: 4 } }),
+    yaxis: axis({ range: [-F, F], title: { text: sup ? 'f<sub>R</sub> / (k y₀)' : 'f<sub>R</sub> / F₀', standoff: 4 } }),
+    annotations: [{ xref: 'paper', yref: 'paper', x: 0, y: 1, xanchor: 'left', yanchor: 'top', showarrow: false,
+                    bgcolor: 'rgba(255,255,255,0.85)', font: { size: 12 }, text: legend }],
+  }), PLOT_CFG);
+  // Steady-state amplitude of the deformation: D (force) or r^2 D (relative motion under support motion).
+  const U = cf.resonant ? Infinity : (sup ? cf.r * cf.r * dmf(cf.r, S.xi) : cf.ratio);
+  document.getElementById('p4info').innerHTML = `U/${n} = ${sup ? 'r²D' : 'D'} = ${fmt(U)}`;
+  tex(document.getElementById('eq4'), sup
+    ? `f_R = ku + c\\dot u = -m\\ddot y,\\quad u = y - y_s;\\qquad \\frac{f_R}{k y_0} = \\frac{u}{y_0} + \\frac{2\\xi}{\\omega}\\,\\frac{\\dot u}{y_0}`
+    : `f_R = ky + c\\dot y = F(t) - m\\ddot y;\\qquad \\frac{f_R}{F_0} = \\frac{y}{y_{st}} + \\frac{2\\xi}{\\omega}\\,\\frac{\\dot y}{y_{st}}`);
+}
+
+const REF_XI = [0.05, 0.1, 0.2, 0.5, 1.0];
+function drawFreq(R) {
+  const sup = isSup(), f = sup ? trans : dmf, cf = R.coef, xi = S.xi, r = cf.r;
+  const rMax = Math.max(R_MAX, 1.1 * r);
+  const rr = linspace(0, rMax, 901);
+  const clip = v => Number.isFinite(v) ? Math.min(v, 1e4) : 1e4;
+  const v = cf.ratio;
+  const auto = document.getElementById('auto4').checked;
+  const yTop = auto && Number.isFinite(v) ? Math.max(2, 1.15 * v) : 6;
+  const traces = [], ann = [];
+  for (const z of REF_XI) {
+    if (Math.abs(z - xi) < 1e-6) continue;
+    traces.push(line(rr, rr.map(x => clip(f(x, z))), COL.ref, 1.2));
+    const y1 = f(1, z);
+    if (y1 < 0.95 * yTop) ann.push({ x: 1, y: y1, xanchor: 'left', yanchor: 'bottom', xshift: 3, showarrow: false,
+                                     text: `ξ=${z}`, font: { size: 11, color: '#999' } });
+  }
+  traces.push(line(rr, rr.map(x => clip(f(x, xi))), COL.curve, 3));
+  const shapes = [
+    { type: 'line', xref: 'x', yref: 'paper', x0: 1, x1: 1, y0: 0, y1: 1, line: { color: '#666', width: 1.2, dash: 'dash' } },
+    { type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: '#666', width: 1.2, dash: 'dash' } },
+  ];
+  if (sup) {
+    shapes.push({ type: 'line', xref: 'x', yref: 'paper', x0: Math.SQRT2, x1: Math.SQRT2, y0: 0, y1: 1,
+                  line: { color: '#999', width: 1, dash: 'dot' } });
+    ann.push({ x: Math.SQRT2, y: 0, yref: 'paper', yanchor: 'bottom', xanchor: 'left', showarrow: false,
+               text: 'r = √2', font: { size: 12, color: '#777' } });
+  }
+  const off = !(v <= yTop);
+  traces.push({ x: [r], y: [off ? 0.97 * yTop : v], mode: 'markers', hoverinfo: 'skip',
+                marker: { size: 14, symbol: off ? 'triangle-up' : 'circle', color: 'rgba(0,0,0,0)',
+                          line: { color: COL.pt, width: 3 } } });
+  if (off) ann.push({ x: r, y: 0.97 * yTop, xanchor: 'left', showarrow: false, xshift: 10,
+                      text: `${sup ? 'Tr' : 'D'} = ${fmt(v)} (off scale)`, font: { size: 12, color: COL.pt } });
+  ann.push({ xref: 'paper', yref: 'paper', x: 1, y: 1, xanchor: 'right', yanchor: 'top', showarrow: false,
+             text: `<b style="color:${COL.curve}">ξ = ${fmt(xi)}</b>`, font: { size: 14 } });
+  Plotly.react('plot4', traces, baseLayout({
+    xaxis: axis({ range: [0, rMax], title: { text: 'r = ω̄/ω', standoff: 4 }, zeroline: false }),
+    yaxis: axis({ range: [0, yTop], title: { text: sup ? 'Tr' : 'D', standoff: 4 }, zeroline: false }),
+    shapes, annotations: ann,
+  }), PLOT_CFG);
+  document.getElementById('p4info').textContent = `r = ${fmt(r)}, ${sup ? 'Tr' : 'D'} = ${fmt(v)}`;
+  tex(document.getElementById('eq4'), sup
+    ? `T_r = \\frac{Y}{y_0} = \\frac{\\sqrt{1+(2\\xi r)^2}}{\\sqrt{(1-r^2)^2+(2\\xi r)^2}} = ${texNum(v).replace('∞', '\\infty')}`
+    : `D = \\frac{Y}{y_{st}} = \\frac{1}{\\sqrt{(1-r^2)^2+(2\\xi r)^2}} = ${texNum(v).replace('∞', '\\infty')}`);
+}
+
+// ---- titles & readouts -------------------------------------------------------------
+function drawTitles() {
+  const sup = isSup(), n = sup ? 'y₀' : 'y<sub>st</sub>';
+  document.getElementById('p1title').innerHTML = sup
+    ? `1 · Support y<sub>s</sub>/y₀, steady state y<sub>p</sub>/y₀`
+    : `1 · Load F/F₀, steady state y<sub>p</sub>/y<sub>st</sub>`;
+  document.getElementById('p2title').innerHTML = `2 · Transient y<sub>h</sub>(t)/${n}`;
+  document.getElementById('p3title').innerHTML = `3 · Total response y(t)/${n}`;
+  document.getElementById('p4title').innerHTML = view4 === 'loop'
+    ? (sup ? '4 · Restoring force f<sub>R</sub> = ku + cu̇ vs relative displacement u'
+           : '4 · Restoring force f<sub>R</sub> = ky + cẏ vs y')
+    : (sup ? '4 · Transmissibility Tr(r)' : '4 · Dynamic magnification factor D(r)');
+  tex(document.getElementById('eomTex'), sup
+    ? 'm\\ddot y + c(\\dot y - \\dot y_s) + k(y - y_s) = 0,\\ \\ y_s = y_0\\sin\\bar\\omega t,\\ \\ r = \\bar\\omega/\\omega'
+    : 'm\\ddot y + c\\dot y + ky = F_0\\sin\\bar\\omega t,\\ \\ y_{st} = F_0/k,\\ \\ r = \\bar\\omega/\\omega');
+}
+
+function drawReadouts(R) {
+  const { m, omega: w, xi, wbar } = S, k = kOf(), cf = R.coef, sup = isSup();
+  const items = [
+    `<span class="case" style="background:var(--${sup ? 'support' : 'force'})">${sup ? 'support motion' : 'forced vibration'}</span>`,
+    `<span><b>ω</b> = √(k/m) = ${fmt(w, 4)} rad/s</span>`,
+    `<span><b>T</b> = ${fmt(2 * Math.PI / w)} s</span>`,
+    `<span><b>ξ</b> = c/(2√(mk)) = ${fmt(xi, 4)}</span>`,
+    `<span><b>ω<sub>D</sub></b> = ${fmt(cf.wd, 4)}</span>`,
+    `<span><b>ω̄</b> = ${fmt(wbar, 4)} rad/s</span>`,
+    `<span><b>T̄</b> = 2π/ω̄ = ${fmt(2 * Math.PI / wbar)} s</span>`,
+    `<span><b>r</b> = ω̄/ω = ${fmt(cf.r, 4)}</span>`,
+    sup ? `<span><b>Tr</b> = ${fmt(cf.ratio)}</span>` : `<span><b>D</b> = ${fmt(cf.ratio)}</span>`,
+    `<span><b>Y</b> = ${sup ? 'Tr·y₀' : 'D·y<sub>st</sub>'} = ${cf.resonant ? '∞ (linear growth)' : fmt(cf.Y)}</span>`,
+    `<span><b>θ</b> = ${piFmt(cf.theta)}</span>`,
+  ];
+  if (sup) items.push(`<span><b>β</b> = atan(2rξ) = ${piFmt(cf.beta)}</span>`,
+                      `<span><b>F₀,eq</b> = k y₀√(1+(2rξ)²) = ${fmt(k * S.yo * Math.hypot(1, 2 * cf.r * xi))}</span>`);
+  else items.push(`<span><b>F₀</b> = k·y<sub>st</sub> = ${fmt(k * S.yst)}</span>`);
+  document.getElementById('readouts').innerHTML = items.join('');
+}
+
+// ---- main refresh (coalesced to one per animation frame) ----------------------------
+let pending = false, pendingKey = null, lastHeaderHeights = '';
+function refresh(activeKey = null) {
+  pendingKey = activeKey;
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => {
+    pending = false;
+    if (tcur !== null && tcur > S.T) tcur = S.T;
+    syncControls(pendingKey);
+    const R = harmonicResponse(S.mode, S.omega, S.xi, S.wbar, amp(), S.yi, S.vi);
+    drawTitles();
+    drawReadouts(R);
+    if (typeof Plotly !== 'undefined') {
+      const t = samples();
+      drawPlot1(R, t); drawPlot2(R, t); drawPlot3(R, t); drawPlot4(R, t);
+      // A header that re-wraps or an equation that gains a scrollbar (mode switch, narrow screen)
+      // changes the room left for a plot.
+      const heights = [...document.querySelectorAll('.panel h2, .panel .eq')].map(h => h.offsetHeight).join();
+      if (heights !== lastHeaderHeights) {
+        lastHeaderHeights = heights;
+        for (const id of ['plot1', 'plot2', 'plot3', 'plot4']) Plotly.Plots.resize(id);
+      }
+    }
+    writeHash();
+  });
+}
+
+// ---- URL hash: bookmarkable states -----------------------------------------------------
+function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (p.get('mode') === 's') S.mode = 'support';
+  if (p.get('p4') === 'loop') view4 = 'loop';
+  for (const key of NUM_KEYS) {
+    const v = parseFloat(p.get(key));
+    if (Number.isFinite(v)) S[key] = v;
+  }
+  if (S.m <= 0 || S.omega <= 0 || S.wbar <= 0 || S.yst <= 0 || S.yo <= 0 || S.T <= 0 || !(S.xi >= 0 && S.xi < 1))
+    Object.assign(S, DEFAULTS);
+}
+let hashTimer = null;
+function writeHash() {
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => {
+    const p = [`mode=${isSup() ? 's' : 'f'}`, ...(view4 === 'loop' ? ['p4=loop'] : []), ...NUM_KEYS.map(k => `${k}=${Number(S[k].toPrecision(6))}`)].join('&');
+    history.replaceState(null, '', '#' + p);
+  }, 300);
+}
+
+for (const b of document.querySelectorAll('#modeSeg button')) {
+  b.addEventListener('click', () => { if (S.mode !== b.dataset.mode) { S.mode = b.dataset.mode; clearPreset(); refresh(); } });
+}
+document.getElementById('reset').addEventListener('click', () => {
+  stopSweep(); stopTime(); tcur = null; clearPreset();
+  const mode = S.mode;
+  Object.assign(S, DEFAULTS, { mode });
+  refresh();
+});
+for (const b of document.querySelectorAll('#p4seg button')) {
+  b.addEventListener('click', () => { if (view4 !== b.dataset.v) { view4 = b.dataset.v; refresh(); } });
+}
+for (const id of ['auto1', 'auto2', 'auto3', 'auto4', 'showp']) document.getElementById(id).addEventListener('change', () => refresh());
+readHash();
+refresh();
+</script>
+</body>
+</html>
