@@ -8,7 +8,8 @@
      202603/src/Chap07-animation-spec.md. Tab A: one step of the three Newmark cases;
      tab B: stepping along the wall's F_s(y) (Example A of the examples handout);
      tab C: stability. Open this file directly in a browser (internet needed for Plotly and
-     KaTeX). The state is in the URL hash, e.g. #tab=b&rule=sec&dt=0.01&step=8. -->
+     KaTeX). The state is in the URL hash, e.g. #tab=b&rule=sec&dt=0.01&step=8.
+     On a landscape screen (the iPad in class) each tab fits the screen; see the last @media. -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.3/plotly.min.js"></script>
@@ -19,19 +20,18 @@
     --grid: #ececef; --uh: #c8102e; --hl: #fff4d6;
     --c-const: #d9621c; --c-avg: #1f5fbf; --c-lin: #188a4a; --c-wil: #7a3fb0; --c-paz: #b0306f;
     --c-custom: #8a6d00; --c-exact: #9a9aa2; --c-gap: #d0021b;
-    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color-scheme: light;
   }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-    --bg: #17181b; --panel: #202226; --ink: #e8e8ea; --muted: #a0a0a8; --line: #3a3c42;
-    --grid: #2c2e33; --uh: #ff5a6e; --hl: #3a3420;
-    --c-const: #ff9b5c; --c-avg: #6aa5ff; --c-lin: #4cc77f; --c-wil: #b88cf0; --c-paz: #f07ab0;
-    --c-custom: #e0c050; --c-exact: #8a8a92; --c-gap: #ff5a5a; color-scheme: dark } }
+  /* Light by default, whatever the system setting (projectors); the header button sets dark */
   :root[data-theme="dark"] {
     --bg: #17181b; --panel: #202226; --ink: #e8e8ea; --muted: #a0a0a8; --line: #3a3c42;
     --grid: #2c2e33; --uh: #ff5a6e; --hl: #3a3420;
     --c-const: #ff9b5c; --c-avg: #6aa5ff; --c-lin: #4cc77f; --c-wil: #b88cf0; --c-paz: #f07ab0;
     --c-custom: #e0c050; --c-exact: #8a8a92; --c-gap: #ff5a5a; color-scheme: dark }
   * { box-sizing: border-box; }
+  /* No double-tap zoom on the iPad when a button is tapped repeatedly */
+  html, body, button, input, select, label, nav a { touch-action: manipulation; }
+  button, nav a, label { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--ink);
          font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
          padding-left: max(16px, env(safe-area-inset-left, 0px));
@@ -57,7 +57,7 @@
   select { font: inherit; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px 8px;
-           min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+           min-width: 0; display: flex; flex-direction: column; gap: 4px; position: relative; }
   .panel.wide { grid-column: 1 / -1; }
   .panel h2 { font-size: 15px; margin: 2px 0 0; }
   .panel h2 .ref { font-weight: 400; color: var(--muted); font-size: 13px; }
@@ -83,10 +83,35 @@
   .eq { text-align: center; font-size: 14px; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
   .eq .katex-html { white-space: nowrap; }
   #loaderr { display: none; margin: 12px 0; padding: 12px; background: var(--hl); border: 1px solid var(--uh); }
+  .duo { display: flex; gap: 8px; flex-wrap: wrap; }
+  .duo > * { min-width: 0; }
+  .stack { flex: 3 1 420px; display: flex; flex-direction: column; gap: 4px; }
+  #p6c { flex: 2 1 300px; }
+  body.nocap .see { display: none; }
   @media (max-width: 900px) {
     .grid { grid-template-columns: 1fr; }
     .bar input[type=range] { width: 120px; }
     .tools { margin-left: 0; }
+  }
+  /* Landscape screens (the iPad in class): the open tab fills the screen and the plots take the
+     height left over. Tabs A and B fit whole; in tab C the controls stay and panels 4, 5, 6
+     each fill the rest of the screen, snapping as they scroll. */
+  @media (min-width: 1000px) and (min-height: 600px) and (orientation: landscape) {
+    body { height: 100vh; height: 100dvh; margin: 0; display: flex; flex-direction: column;
+           padding-block: 4px 8px; }
+    header, nav, .bar { flex: none; }
+    section:not([hidden]) { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+    section > .grid { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+    .panel { min-height: 0; }
+    .plot { flex: 1 1 0; height: auto; min-height: 80px; overflow: hidden; }
+    .duo, .row { flex: 1 1 0; min-height: 0; flex-wrap: nowrap; }
+    .stack, .grow { display: flex; flex-direction: column; min-height: 0; }
+    #p1tab { flex: 0 0 auto; width: min-content; max-height: none; align-self: stretch; }
+    #p4a { flex-grow: 1.4; }
+    #p3read td, #p3read th { padding-inline: 4px; }
+    #sec-c > .grid { display: flex; flex-direction: column; overflow-y: auto; scroll-snap-type: y proximity;
+                     -webkit-overflow-scrolling: touch; }
+    #sec-c .panel { flex: none; height: 100%; scroll-snap-align: start; }
   }
 </style>
 </head>
@@ -99,6 +124,8 @@
       <option value="0.25">¼×</option><option value="0.5">½×</option>
       <option value="1" selected>1×</option><option value="2">2×</option>
     </select></label>
+    <button id="caps" class="on" title="show or hide the explanations under the panel titles">captions</button>
+    <button id="theme" title="light or dark colors">☾ dark</button>
     <button id="reset" title="all controls back to their defaults">Reset</button>
   </span>
 </header>
@@ -125,7 +152,7 @@
     <label class="chk"><input type="checkbox" id="aAll">all three</label>
     <label class="chk" title="Start every step from the exact state, so only one step's error shows"><input type="checkbox" id="aRestart">each step from the exact state</label>
     <label class="chk"><input type="checkbox" id="aZoom">zoom on step</label>
-    <span class="grp"><button id="aPrev" title="previous step">◀</button><button id="aNext" title="next step">Step ▶</button><button id="aFirst" title="first step">⏮</button>
+    <span class="grp"><button id="aPrev" title="previous step">◀</button><button id="aNext" title="next step">Step ▶</button><button id="aPlay">▶ play</button><button id="aFirst" title="first step">⏮</button>
       <span class="val" id="aStepLbl"></span></span>
   </div>
   <div class="grid">
@@ -134,8 +161,10 @@
       <p class="see">Grey: exact. Colored: the assumed ÿ(τ) over the current step, its area (= Δẏᵢ) shaded, and the ẏ and y it implies; dots: past steps; open circle: the state at tᵢ₊₁.
         <b>The schemes differ only in the shape of ÿ over the step.</b> Holding ÿᵢ needs nothing at tᵢ₊₁ and lags; the other two need ÿᵢ₊₁, not yet known, and get it by solving the step's linear equation k̄ᵢ Δyᵢ = ΔF̄ᵢ.</p>
       <div class="eq" id="eq1"></div>
-      <div id="p1" class="plot h520"></div>
-      <div class="readout scroll" id="p1tab"></div>
+      <div class="duo">
+        <div id="p1" class="plot h520"></div>
+        <div class="readout scroll" id="p1tab"></div>
+      </div>
     </div>
   </div>
 </section>
@@ -189,7 +218,7 @@
       <button id="cR056" title="just above the limit 0.551">0.56</button></span>
     <datalist id="cRTicks"></datalist>
     <span class="grp"><span class="sym">ξ</span><button class="play" id="cXiPlay" title="sweep ξ">▶</button><input type="range" id="cXi" min="0" max="0.2" step="0.001" value="0" style="width:110px"><span class="val" id="cXiLbl"></span></span>
-    <span class="grp">periods <button class="play" id="cPPlay" title="sweep the number of periods">▶</button><input type="range" id="cP" min="10" max="50" step="1" value="20" style="width:90px"><span class="val" id="cPLbl"></span></span>
+    <span class="grp">periods <button class="play" id="cPPlay" title="sweep the number of periods">▶</button><input type="range" id="cP" min="1" max="50" step="1" value="20" style="width:90px"><span class="val" id="cPLbl"></span></span>
     <span class="grp"><span class="sym">θ</span><button class="play" id="cThPlay" title="sweep θ">▶</button><input type="range" id="cTh" min="1" max="2" step="0.001" value="1.4" list="cThTicks" style="width:110px"><span class="val" id="cThLbl"></span></span>
     <datalist id="cThTicks"><option value="1.366"></option></datalist>
   </div>
@@ -210,19 +239,23 @@
       <div class="eq" id="eq4"></div>
       <div id="p5" class="plot h300"></div>
     </div>
-    <div class="panel">
+    <div class="panel wide">
       <h2>5 · Spectral radius and period error <span class="ref">amplification matrix</span></h2>
       <p class="see">ρ &gt; 1 means growth. <b>Linear acceleration leaves ρ = 1 at exactly √3/π = 0.551</b>; average acceleration stays on 1; Wilson drops below 1 for θ ≥ 1.37. Click the (β, γ) plane to move the custom scheme.</p>
       <div class="eq" id="eq5"></div>
-      <div id="p6a" class="plot h220"></div>
-      <div id="p6b" class="plot h220"></div>
-      <div id="p6c" class="plot h300"></div>
+      <div class="duo">
+        <div class="stack">
+          <div id="p6a" class="plot h220"></div>
+          <div id="p6b" class="plot h220"></div>
+        </div>
+        <div id="p6c" class="plot h300"></div>
+      </div>
     </div>
-    <div class="panel">
+    <div class="panel wide">
       <h2>6 · The extended step: Wilson-θ <span class="ref">Paz 16.2; Wilson-θ Method slides</span></h2>
       <p class="see">ÿ/ω² over one step of the free vibration; grey: exact. Purple line: Eq. (16.9) from tᵢ to tᵢ + τ; filled: its value at tᵢ + Δt, where the next step starts (16.19). <b>θ = 1 is linear acceleration; the longer τ makes the extrapolated acceleration lag, which damps the short periods.</b></p>
       <div class="eq" id="eq6"></div>
-      <div class="bar" style="margin:0"><button id="c7Prev" title="previous step">◀</button><button id="c7Next" title="next step">Step ▶</button><button id="c7First" title="first step">⏮</button><span class="val" id="c7Lbl"></span></div>
+      <div class="bar" style="margin:0"><button id="c7Prev" title="previous step">◀</button><button id="c7Next" title="next step">Step ▶</button><button id="c7Play">▶ play</button><button id="c7First" title="first step">⏮</button><span class="val" id="c7Lbl"></span></div>
       <div id="p7" class="plot h300"></div>
       <div class="readout" id="p7read"></div>
     </div>
@@ -493,6 +526,22 @@ function sweeper(btn, input, period = 6000) {
   SWEEPS.push(sw);
   return sw;
 }
+// Step a panel forward on a timer (the ▶ play next to a Step button); from the last step it
+// starts over at the first.
+function player(btn, { next, atEnd, toStart, ms = 400 }) {
+  let timer = null;
+  const stop = () => { clearTimeout(timer); timer = null; btn.classList.remove('on'); btn.textContent = '▶ play'; };
+  const tick = () => { if (atEnd()) { stop(); return; } next(); timer = setTimeout(tick, ms / speed()); };
+  btn.addEventListener('click', () => {
+    if (timer) { stop(); return; }
+    btn.classList.add('on'); btn.textContent = '❚❚ pause';
+    if (atEnd()) toStart();
+    timer = setTimeout(tick, ms / speed());
+  });
+  const pl = { stop() { if (timer) stop(); } };
+  SWEEPS.push(pl);
+  return pl;
+}
 function tex(el, s) {
   if (typeof katex === 'undefined') { el.textContent = s; return; }
   katex.render(s, el, { throwOnError: false, displayMode: false });
@@ -603,7 +652,7 @@ function renderA() {
 }
 
 // ============================ Tab B ============================
-const B = { rule: 'tan', u: 0, curve: 'wall', meth: 'lin', i: 6, timer: null };
+const B = { rule: 'tan', u: 0, curve: 'wall', meth: 'lin', i: 6 };
 const dtFromU = u => 0.001 * Math.pow(30, u), uFromDt = dt => Math.log(dt / 0.001) / Math.log(30);
 const T0 = 2 * Math.PI * Math.sqrt(WALL.m / WALL.k0), Tu = 2 * Math.PI * Math.sqrt(WALL.m / (WALL.Vu / WALL.yu));
 let BR = null; const BREF = {};
@@ -855,6 +904,8 @@ $('aZoom').addEventListener('change', e => { A.zoom = e.target.checked; renderA(
 $('aNext').addEventListener('click', () => { A.i = Math.min(A.i + 1, AP.N - 1); renderA(); });
 $('aPrev').addEventListener('click', () => { A.i = Math.max(A.i - 1, 0); renderA(); });
 $('aFirst').addEventListener('click', () => { A.i = 0; renderA(); });
+player($('aPlay'), { next: () => { A.i++; renderA(); }, atEnd: () => A.i >= AP.N - 1,
+                     toStart: () => { A.i = 0; renderA(); }, ms: 700 });
 // Tab B
 B.u = uFromDt(0.005); B.zoom = true;
 $('bDtTicks').innerHTML = [0.1 * T0, 0.1 * Tu, 0.005].map(d => `<option value="${uFromDt(d).toFixed(3)}"></option>`).join('');
@@ -867,19 +918,8 @@ $('bZoom').addEventListener('change', e => { B.zoom = e.target.checked; renderB(
 $('bNext').addEventListener('click', () => { B.i = Math.min(B.i + 1, BR.N - 1); renderB(); });
 $('bPrev').addEventListener('click', () => { B.i = Math.max(B.i - 1, 0); renderB(); });
 $('bFirst').addEventListener('click', () => { B.i = 0; renderB(); });
-function stopPlayB() {
-  clearTimeout(B.timer); B.timer = null; $('bPlay').classList.remove('on'); $('bPlay').textContent = '▶ play';
-}
-function tickB() {
-  if (B.i >= BR.N - 1) { stopPlayB(); return; }
-  B.i++; renderB(); B.timer = setTimeout(tickB, 400 / speed());
-}
-$('bPlay').addEventListener('click', () => {
-  if (B.timer) { stopPlayB(); return; }
-  $('bPlay').classList.add('on'); $('bPlay').textContent = '❚❚ pause';
-  if (B.i >= BR.N - 1) B.i = 0;
-  B.timer = setTimeout(tickB, 400 / speed());
-});
+player($('bPlay'), { next: () => { B.i++; renderB(); }, atEnd: () => B.i >= BR.N - 1,
+                     toStart: () => { B.i = 0; renderB(); } });
 // Tab C
 C.u = uFromR(0.1);
 $('cRTicks').innerHTML = [0.1, Math.sqrt(3) / Math.PI].map(r => `<option value="${uFromR(r).toFixed(4)}"></option>`).join('');
@@ -900,6 +940,8 @@ Object.keys(C.show).forEach(s => $('cShow-' + s).addEventListener('change', e =>
 $('c7Next').addEventListener('click', () => { C.i7++; renderC7(); });
 $('c7Prev').addEventListener('click', () => { C.i7 = Math.max(0, C.i7 - 1); renderC7(); });
 $('c7First').addEventListener('click', () => { C.i7 = 0; renderC7(); });
+player($('c7Play'), { next: () => { C.i7++; renderC7(); }, atEnd: () => C.i7 >= 59,
+                      toStart: () => { C.i7 = 0; renderC7(); }, ms: 600 });
 
 // ---- State in the URL hash: the open tab and its controls, e.g. #tab=b&rule=sec&dt=0.01&step=8
 const DEF = { A: { ...A }, B: { ...B }, C: { ...C, show: { ...C.show } } };
@@ -941,7 +983,7 @@ function readHash() {
   } else {
     if (num('r', 0.01, 2) != null) C.u = uFromR(num('r', 0.01, 2));
     if (num('xi', 0, 0.2) != null) C.xi = num('xi', 0, 0.2);
-    if (num('periods', 10, 50) != null) C.P = Math.round(num('periods', 10, 50));
+    if (num('periods', 1, 50) != null) C.P = Math.round(num('periods', 1, 50));
     if (num('theta', 1, 2) != null) C.th = num('theta', 1, 2);
     if (num('beta', 0, 0.5) != null) C.beta = num('beta', 0, 0.5);
     if (num('gamma', 0, 1) != null) C.gamma = num('gamma', 0, 1);
@@ -960,7 +1002,7 @@ function syncControls() {
   $('cB').value = C.beta; $('cG').value = C.gamma;
   Object.keys(C.show).forEach(s => { $('cShow-' + s).checked = C.show[s]; });
 }
-function stopAll() { SWEEPS.forEach(sw => sw.stop()); if (B.timer) stopPlayB(); }
+function stopAll() { SWEEPS.forEach(sw => sw.stop()); }
 function applyHash() { stopAll(); const t = readHash(); setupA(); setupB(); syncControls(); showTab(t); }
 window.addEventListener('hashchange', applyHash);
 $('reset').addEventListener('click', () => {
@@ -970,8 +1012,15 @@ $('reset').addEventListener('click', () => {
   setupA(); setupB(); syncControls(); render[tab]();
 });
 
-// theme changes: redraw with the new tokens
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => render[tab]());
+// Header buttons: dark colors and captions, for this visit only; a theme change redraws
+$('theme').addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme !== 'dark';
+  if (dark) document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme;
+  $('theme').textContent = dark ? '☀ light' : '☾ dark';
+});
+$('caps').addEventListener('click', () => {
+  $('caps').classList.toggle('on', document.body.classList.toggle('nocap') === false);
+});
 new MutationObserver(() => render[tab]()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
 applyHash();
