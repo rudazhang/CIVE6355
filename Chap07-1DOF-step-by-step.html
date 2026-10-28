@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Step-by-Step Integration — CIVE 6355</title>
+<!-- CIVE 6355 Structural Dynamics, deck 07 (Paz Ch. 6 and Sec. 16.2), from
+     202603/src/Chap07-animation-spec.md. Tab A: one step of the three Newmark cases;
+     tab B: stepping along the wall's F_s(y) (Example A of the examples handout);
+     tab C: stability. Open this file directly in a browser (internet needed for Plotly and
+     KaTeX). The state is in the URL hash, e.g. #tab=b&rule=sec&dt=0.01&step=8. -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.3/plotly.min.js"></script>
+<style>
+  /* Layout: header with tabs, one control bar per tab, panels in a two-column grid */
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1f; --muted: #66666c; --line: #d9d9de;
+    --grid: #ececef; --uh: #c8102e; --hl: #fff4d6;
+    --c-const: #d9621c; --c-avg: #1f5fbf; --c-lin: #188a4a; --c-wil: #7a3fb0; --c-paz: #b0306f;
+    --c-custom: #8a6d00; --c-exact: #9a9aa2; --c-gap: #d0021b;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #17181b; --panel: #202226; --ink: #e8e8ea; --muted: #a0a0a8; --line: #3a3c42;
+    --grid: #2c2e33; --uh: #ff5a6e; --hl: #3a3420;
+    --c-const: #ff9b5c; --c-avg: #6aa5ff; --c-lin: #4cc77f; --c-wil: #b88cf0; --c-paz: #f07ab0;
+    --c-custom: #e0c050; --c-exact: #8a8a92; --c-gap: #ff5a5a; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #17181b; --panel: #202226; --ink: #e8e8ea; --muted: #a0a0a8; --line: #3a3c42;
+    --grid: #2c2e33; --uh: #ff5a6e; --hl: #3a3420;
+    --c-const: #ff9b5c; --c-avg: #6aa5ff; --c-lin: #4cc77f; --c-wil: #b88cf0; --c-paz: #f07ab0;
+    --c-custom: #e0c050; --c-exact: #8a8a92; --c-gap: #ff5a5a; color-scheme: dark }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink);
+         font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         padding-left: max(16px, env(safe-area-inset-left, 0px));
+         padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 8px 24px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; padding-block: 4px 8px; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .sub { color: var(--muted); }
+  nav { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  nav a { padding: 6px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0;
+          color: var(--muted); text-decoration: none; }
+  nav a.on { background: var(--panel); border-color: var(--line); color: var(--ink); font-weight: 600;
+             margin-bottom: -1px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
+  .bar label, .bar .grp { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; white-space: nowrap; }
+  .bar input[type=range] { width: 150px; }
+  .bar .val { font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 5.5em; }
+  .sym { font-style: italic; font-family: "Times New Roman", serif; font-size: 16px; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+           border-radius: 4px; padding: 2px 9px; cursor: pointer; }
+  button.on { background: var(--uh); border-color: var(--uh); color: #fff; }
+  button:focus-visible, select:focus-visible, input:focus-visible, nav a:focus-visible { outline: 2px solid var(--uh); outline-offset: 1px; }
+  select { font: inherit; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px 8px;
+           min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .panel.wide { grid-column: 1 / -1; }
+  .panel h2 { font-size: 15px; margin: 2px 0 0; }
+  .panel h2 .ref { font-weight: 400; color: var(--muted); font-size: 13px; }
+  .see { color: var(--muted); font-size: 13px; margin: 0; max-width: 95ch; }
+  .see b { color: var(--ink); font-weight: 600; }
+  .plot { width: 100%; min-width: 0; }
+  .h300 { height: 300px; } .h220 { height: 220px; } .h420 { height: 420px; } .h520 { height: 520px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; }
+  .row > * { min-width: 0; }
+  .grow { flex: 1 1 420px; }
+  .readout { font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums;
+             overflow-x: auto; }
+  table { border-collapse: collapse; }
+  td, th { padding: 1px 8px; text-align: right; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); }
+  tr.cur td { background: var(--hl); }
+  .scroll { max-height: 230px; overflow: auto; }
+  .note { font-size: 12.5px; color: var(--muted); }
+  canvas { max-width: 100%; }
+  .chk { display: inline-flex; gap: 4px; align-items: center; }
+  .sw { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; }
+  .tools { margin-left: auto; display: inline-flex; gap: 10px; align-items: center; color: var(--muted); }
+  .eq { text-align: center; font-size: 14px; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+  .eq .katex-html { white-space: nowrap; }
+  #loaderr { display: none; margin: 12px 0; padding: 12px; background: var(--hl); border: 1px solid var(--uh); }
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+    .bar input[type=range] { width: 120px; }
+    .tools { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Step-by-step integration</h1>
+  <span class="sub">CIVE 6355 · deck 07 · Paz Ch. 6 and Sec. 16.2</span>
+  <span class="tools">
+    <label>speed <select id="speed">
+      <option value="0.25">¼×</option><option value="0.5">½×</option>
+      <option value="1" selected>1×</option><option value="2">2×</option>
+    </select></label>
+    <button id="reset" title="all controls back to their defaults">Reset</button>
+  </span>
+</header>
+<div id="loaderr">Plotly/KaTeX could not be loaded from the CDN. This page needs an internet connection.</div>
+<nav id="tabs">
+  <a href="#tab=a" data-tab="a">A · One step, three assumptions</a>
+  <a href="#tab=b" data-tab="b">B · Stepping along F<sub>s</sub>(y)</a>
+  <a href="#tab=c" data-tab="c">C · Stability</a>
+</nav>
+
+<!-- ======================= Tab A ======================= -->
+<section id="sec-a" hidden>
+  <div class="bar">
+    <label>Problem <select id="aPreset">
+      <option value="chopra">Chopra Ex. 5.3/5.4: half-sine, T = 1 s, Δt = 0.1 s</option>
+      <option value="paz62">Paz Ex. 6.2: tower, F₀ sin 30t, T = 0.2 s, Δt = 0.01 s</option>
+      <option value="wall">Wall, Example A: first steps, Δt = 0.005 s</option>
+    </select></label>
+    <span class="grp">Scheme
+      <label class="chk"><input type="radio" name="aScheme" value="const" id="aSchConst"><span class="sw" style="background:var(--c-const)"></span>constant ÿᵢ</label>
+      <label class="chk"><input type="radio" name="aScheme" value="avg" id="aSchAvg"><span class="sw" style="background:var(--c-avg)"></span>average</label>
+      <label class="chk"><input type="radio" name="aScheme" value="lin" id="aSchLin" checked><span class="sw" style="background:var(--c-lin)"></span>linear</label>
+    </span>
+    <label class="chk"><input type="checkbox" id="aAll">all three</label>
+    <label class="chk" title="Start every step from the exact state, so only one step's error shows"><input type="checkbox" id="aRestart">each step from the exact state</label>
+    <label class="chk"><input type="checkbox" id="aZoom">zoom on step</label>
+    <span class="grp"><button id="aPrev" title="previous step">◀</button><button id="aNext" title="next step">Step ▶</button><button id="aFirst" title="first step">⏮</button>
+      <span class="val" id="aStepLbl"></span></span>
+  </div>
+  <div class="grid">
+    <div class="panel wide">
+      <h2>1 · What each scheme assumes over a step <span class="ref">Paz 6.3–6.5</span></h2>
+      <p class="see">Grey: exact. Colored: the assumed ÿ(τ) over the current step, its area (= Δẏᵢ) shaded, and the ẏ and y it implies; dots: past steps; open circle: the state at tᵢ₊₁.
+        <b>The schemes differ only in the shape of ÿ over the step.</b> Holding ÿᵢ needs nothing at tᵢ₊₁ and lags; the other two need ÿᵢ₊₁, not yet known, and get it by solving the step's linear equation k̄ᵢ Δyᵢ = ΔF̄ᵢ.</p>
+      <div class="eq" id="eq1"></div>
+      <div id="p1" class="plot h520"></div>
+      <div class="readout scroll" id="p1tab"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= Tab B ======================= -->
+<section id="sec-b" hidden>
+  <div class="bar">
+    <label>Stiffness kᵢ <select id="bRule">
+      <option value="tan">tangent at yᵢ (Example A)</option>
+      <option value="sec">secant over the step, iterated</option>
+    </select></label>
+    <span class="grp"><span class="sym">Δt</span><button class="play" id="bDtPlay" title="sweep Δt">▶</button>
+      <input type="range" id="bDt" min="0" max="1" step="0.001" list="bDtTicks"><span class="val" id="bDtLbl"></span></span>
+    <datalist id="bDtTicks"></datalist>
+    <label>Curve <select id="bCurve"><option value="wall">wall, (A.1) of Example A</option><option value="tanh">generic, F_u tanh(k₀y/F_u)</option></select></label>
+    <label>Method <select id="bMeth"><option value="lin">linear acceleration</option><option value="avg">average acceleration</option></select></label>
+    <span class="grp"><button id="bPrev" title="previous step">◀</button><button id="bNext" title="next step">Step ▶</button><button id="bPlay">▶ play</button><button id="bFirst" title="first step">⏮</button><span class="val" id="bStepLbl"></span></span>
+    <label class="chk"><input type="checkbox" id="bZoom" checked>zoom on step</label>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>2 · The state on the spring curve <span class="ref">Eq. 6.7; Structural Wall slides</span></h2>
+      <p class="see">Grey: the load–deflection curve. Dot: (yᵢ, F<sub>s</sub>(yᵢ)); colored line: slope kᵢ; open circle: the force the step assumes; filled: the true F<sub>s</sub>(yᵢ₊₁); <span style="color:var(--c-gap)">red</span>: the force not in Eq. (6.7).
+        <b>Each step replaces the curve by a line</b>. With the tangent, ÿᵢ₊₁ from equilibrium with the true F<sub>s</sub> (6.39) puts the gap back into the next step, so it does not accumulate; the iterated secant closes it within the step.</p>
+      <div class="eq" id="eq2"></div>
+      <div id="p3" class="plot h420"></div>
+      <div class="readout" id="p3read"></div>
+    </div>
+    <div class="panel">
+      <h2>3 · Response in time <span class="ref">Structural Wall: Computed Response</span></h2>
+      <p class="see">Thick grey: reference (Δt = 0.0005 s, iterated secant); dashed: the elastic twin, k = k₀; shaded: the load F(t).
+        <b>The softer wall moves more and later than its elastic twin</b>, unloads along the secant to its peak and swings back through zero; with Δt above about 0.1T the peak drifts from the reference.</p>
+      <div class="eq" id="eq3"></div>
+      <div class="row">
+        <div class="grow">
+          <div id="p4a" class="plot h300"></div>
+          <div id="p4b" class="plot h220"></div>
+        </div>
+        <div style="flex:0 0 150px"><canvas id="p4wall" width="150" height="230" aria-label="wall sketch"></canvas>
+          <p class="note">The wall at tᵢ: shear exaggerated, arrow ∝ F(t).</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= Tab C ======================= -->
+<section id="sec-c" hidden>
+  <div class="bar">
+    <span class="grp"><span class="sym">Δt/T</span><button class="play" id="cRPlay" title="sweep Δt/T">▶</button>
+      <input type="range" id="cR" min="0" max="1" step="0.0005" list="cRTicks"><span class="val" id="cRLbl"></span>
+      <button id="cR056" title="just above the limit 0.551">0.56</button></span>
+    <datalist id="cRTicks"></datalist>
+    <span class="grp"><span class="sym">ξ</span><button class="play" id="cXiPlay" title="sweep ξ">▶</button><input type="range" id="cXi" min="0" max="0.2" step="0.001" value="0" style="width:110px"><span class="val" id="cXiLbl"></span></span>
+    <span class="grp">periods <button class="play" id="cPPlay" title="sweep the number of periods">▶</button><input type="range" id="cP" min="10" max="50" step="1" value="20" style="width:90px"><span class="val" id="cPLbl"></span></span>
+    <span class="grp"><span class="sym">θ</span><button class="play" id="cThPlay" title="sweep θ">▶</button><input type="range" id="cTh" min="1" max="2" step="0.001" value="1.4" list="cThTicks" style="width:110px"><span class="val" id="cThLbl"></span></span>
+    <datalist id="cThTicks"><option value="1.366"></option></datalist>
+  </div>
+  <div class="bar">
+    Show
+    <label class="chk"><input type="checkbox" id="cShow-avg" checked><span class="sw" style="background:var(--c-avg)"></span>average (¼, ½)</label>
+    <label class="chk"><input type="checkbox" id="cShow-lin" checked><span class="sw" style="background:var(--c-lin)"></span>linear (⅙, ½)</label>
+    <label class="chk"><input type="checkbox" id="cShow-const" checked><span class="sw" style="background:var(--c-const)"></span>constant ÿᵢ (0, 0)</label>
+    <label class="chk" title="with the force out of balance r_i; the acceleration carried"><input type="checkbox" id="cShow-wil" checked><span class="sw" style="background:var(--c-wil)"></span>Wilson-θ</label>
+    <label class="chk" title="the acceleration from equilibrium, Paz Eq. (16.24)"><input type="checkbox" id="cShow-paz"><span class="sw" style="background:var(--c-paz)"></span>Wilson-θ, Paz (16.24)</label>
+    <label class="chk"><input type="checkbox" id="cShow-custom"><span class="sw" style="background:var(--c-custom)"></span>custom (β, γ)</label>
+    <span class="grp"><span class="sym">β</span><button class="play" id="cBPlay" title="sweep β">▶</button><input type="range" id="cB" min="0" max="0.5" step="0.005" value="0.3" style="width:90px"><span class="sym">γ</span><button class="play" id="cGPlay" title="sweep γ">▶</button><input type="range" id="cG" min="0" max="1" step="0.01" value="0.6" style="width:90px"><span class="val" id="cBGLbl"></span></span>
+  </div>
+  <div class="grid">
+    <div class="panel wide">
+      <h2>4 · Free vibration by each scheme <span class="ref">Paz 6.5, 16.2</span></h2>
+      <p class="see">y/y₀ against t/T; grey: exact. <b>Below Δt/T = 0.551 linear acceleration is the most accurate; just above (try 0.56) it grows ×1.23 per step</b>. Average acceleration never grows, but its period lengthens. Constant ÿᵢ grows at every Δt when ξ = 0. Wilson with θ ≥ 1.37 never grows and damps the motion; Paz's form (16.24) grows for every θ &gt; 1 (try Δt/T = 0.1, 50 periods).</p>
+      <div class="eq" id="eq4"></div>
+      <div id="p5" class="plot h300"></div>
+    </div>
+    <div class="panel">
+      <h2>5 · Spectral radius and period error <span class="ref">amplification matrix</span></h2>
+      <p class="see">ρ &gt; 1 means growth. <b>Linear acceleration leaves ρ = 1 at exactly √3/π = 0.551</b>; average acceleration stays on 1; Wilson drops below 1 for θ ≥ 1.37. Click the (β, γ) plane to move the custom scheme.</p>
+      <div class="eq" id="eq5"></div>
+      <div id="p6a" class="plot h220"></div>
+      <div id="p6b" class="plot h220"></div>
+      <div id="p6c" class="plot h300"></div>
+    </div>
+    <div class="panel">
+      <h2>6 · The extended step: Wilson-θ <span class="ref">Paz 16.2; Wilson-θ Method slides</span></h2>
+      <p class="see">ÿ/ω² over one step of the free vibration; grey: exact. Purple line: Eq. (16.9) from tᵢ to tᵢ + τ; filled: its value at tᵢ + Δt, where the next step starts (16.19). <b>θ = 1 is linear acceleration; the longer τ makes the extrapolated acceleration lag, which damps the short periods.</b></p>
+      <div class="eq" id="eq6"></div>
+      <div class="bar" style="margin:0"><button id="c7Prev" title="previous step">◀</button><button id="c7Next" title="next step">Step ▶</button><button id="c7First" title="first step">⏮</button><span class="val" id="c7Lbl"></span></div>
+      <div id="p7" class="plot h300"></div>
+      <div class="readout" id="p7read"></div>
+    </div>
+  </div>
+</section>
+<script>
+"use strict";
+// ---- Core: one integrator for every panel (spec, Notes). Units kip, in, s. -------------------
+// Newmark in Paz's incremental form with gamma general; (beta, gamma) = (0, 0) coded directly;
+// Wilson-theta classic (residual r_i, yddot carried) or Paz (16.24) (yddot from equilibrium).
+
+const WALL = { m: 0.5, xi: 0.07, Vu: 1609.9, yu: 0.415, k0: 572.2 / 0.0778, Vn: 1600 };
+WALL.n = WALL.k0 * WALL.yu / WALL.Vu;
+WALL.F = t => t <= 0 ? 0 : t <= 0.02 ? 1200 * t / 0.02 : t <= 0.1 ? 1200 * (0.1 - t) / 0.08 : 0;
+
+function backboneWall() {   // Example A, (A.1): V = Vu [1 - (1 - y/yu)^n], flat beyond yu
+  const { Vu, yu, n, k0 } = WALL;
+  return { k0, yu, name: 'wall (A.1)',
+    f: y => Vu * (1 - Math.pow(1 - Math.min(y, yu) / yu, n)),
+    fp: y => y >= yu ? 0 : k0 * Math.pow(1 - y / yu, n - 1) };
+}
+function backboneTanh(Fu = 1650) {   // generic softening curve with the same k0
+  const k0 = WALL.k0;
+  return { k0, yu: Infinity, name: 'tanh',
+    f: y => Fu * Math.tanh(k0 * y / Fu), fp: y => k0 / Math.cosh(k0 * y / Fu) ** 2 };
+}
+function springLinear(k) {
+  return { kind: 'linear', k0: k, init: () => ({}), force: (y, st) => ({ V: k * y, st }),
+           kA: () => k };
+}
+// Origin-oriented: the backbone on first loading; unloading and reloading along the secant
+// to the origin from the largest excursion on that side, mirrored for y < 0.
+function springOO(bb) {
+  return { kind: 'oo', k0: bb.k0, bb,
+    init: () => ({ yp: 0, Vp: 0, yn: 0, Vn: 0 }),
+    force(y, st) {
+      const s = { ...st }; let V;
+      if (y >= 0) {
+        if (y >= s.yp) { V = bb.f(y); s.yp = y; s.Vp = V; }
+        else V = s.yp > 0 ? s.Vp / s.yp * y : bb.k0 * y;
+      } else {
+        if (y <= s.yn) { V = -bb.f(-y); s.yn = y; s.Vn = V; }
+        else V = s.yn < 0 ? s.Vn / s.yn * y : bb.k0 * y;
+      }
+      return { V, st: s };
+    },
+    // Example A: tangent while loading on the backbone, else the secant to the origin
+    kA(y, v, st) {
+      if (y >= 0 && y >= st.yp && v >= 0) return bb.fp(y);
+      if (y <= 0 && y <= st.yn && v <= 0) return bb.fp(-y);
+      if (y >= 0) return st.yp > 0 ? st.Vp / st.yp : bb.k0;
+      return st.yn < 0 ? st.Vn / st.yn : bb.k0;
+    } };
+}
+const damp = (sys, k) => sys.xi != null ? 2 * sys.xi * Math.sqrt(Math.max(k, 0) * sys.m) : sys.c;
+
+const SCHEMES = {
+  const: { type: 'nm', beta: 0, gamma: 0, label: 'constant ÿᵢ (0, 0)' },
+  avg: { type: 'nm', beta: 1 / 4, gamma: 1 / 2, label: 'average acceleration (¼, ½)' },
+  lin: { type: 'nm', beta: 1 / 6, gamma: 1 / 2, label: 'linear acceleration (⅙, ½)' },
+};
+const wilson = (theta, variant = 'classic') => ({ type: 'wil', theta, variant });
+const newmark = (beta, gamma) => ({ type: 'nm', beta, gamma });
+
+// The step from state s = {t, y, v, a, V, st} with stiffness k held over the step.
+function trial(sys, meth, s, k, dt, Ffun) {
+  const m = sys.m, c = damp(sys, k), F0 = Ffun(s.t), F1 = Ffun(s.t + dt), dF = F1 - F0;
+  const o = { k, c, dF, F1 };
+  if (meth.type === 'nm') {
+    const b = meth.beta, g = meth.gamma;
+    if (b > 0) {
+      o.kbar = k + g * c / (b * dt) + m / (b * dt * dt);                          // (6.45)
+      o.kin = m / (b * dt * dt); o.dmp = g * c / (b * dt);
+      o.dFbar = dF + (m / (b * dt) + g * c / b) * s.v
+              + (m / (2 * b) + dt * (g / (2 * b) - 1) * c) * s.a;                   // (6.46)
+      o.dy = o.dFbar / o.kbar;
+      o.dv = g / (b * dt) * o.dy - g / b * s.v + dt * (1 - g / (2 * b)) * s.a;
+    } else {      // explicit: dy known before equilibrium; solve for the acceleration increment
+      const kb = m + g * dt * c;
+      const da = (dF - c * dt * s.a - k * (dt * s.v + dt * dt / 2 * s.a)) / kb;
+      o.dy = dt * s.v + dt * dt / 2 * s.a;
+      o.dv = dt * s.a + g * dt * da;
+      o.kbar = NaN; o.dFbar = NaN;
+    }
+    o.aint = null;
+  } else {
+    const th = meth.theta, tau = th * dt;
+    o.tau = tau;
+    o.kbar = k + 6 * m / tau ** 2 + 3 * c / tau;                                    // (16.17)
+    let dFh = meth.variant === 'paz' ? Ffun(s.t + tau) - F0 : th * dF;
+    o.r = F0 - m * s.a - c * s.v - s.V;                    // force out of balance at t_i
+    if (meth.variant === 'classic') dFh += o.r;
+    o.dFbar = dFh + m * (6 * s.v / tau + 3 * s.a) + c * (3 * s.v + tau / 2 * s.a);
+    const dyh = o.dFbar / o.kbar;                                                   // (16.16)
+    o.dah = 6 / tau ** 2 * dyh - 6 / tau * s.v - 3 * s.a;                           // (16.14)
+    const da = o.dah / th;                                                          // (16.19)
+    o.dv = s.a * dt + da * dt / 2;                                                  // (16.20)
+    o.dy = s.v * dt + s.a * dt * dt / 2 + da * dt * dt / 6;                         // (16.21)
+    o.aint = meth.variant === 'classic' ? s.a + da : null;
+  }
+  return o;
+}
+
+// One step with the stiffness rule: 'tan' tangent at y_i (Example A), 'sec' secant over the
+// step, iterated from the tangent. Returns the new state and the step's numbers.
+function oneStep(sys, meth, s, dt, Ffun, rule = 'tan') {
+  const sp = sys.spring;
+  let k = sp.kA(s.y, s.v, s.st);
+  let o = trial(sys, meth, s, k, dt, Ffun), nIt = 0;
+  if (rule === 'sec' && sp.kind !== 'linear') {
+    for (nIt = 0; nIt < 30 && Math.abs(o.dy) > 1e-12; nIt++) {
+      const kn = (sp.force(s.y + o.dy, s.st).V - s.V) / o.dy;
+      if (Math.abs(kn - k) < 1e-9 * sp.k0) break;
+      k = kn; o = trial(sys, meth, s, k, dt, Ffun);
+    }
+  }
+  const y = s.y + o.dy, v = s.v + o.dv, t = s.t + dt;
+  const { V, st } = sp.force(y, s.st);
+  let a;
+  if (o.aint != null) a = o.aint;
+  else {
+    const cn = damp(sys, sp.kA(y, v, st));
+    a = (o.F1 - cn * v - V) / sys.m;                                                // (6.39)
+  }
+  o.Vpred = s.V + k * o.dy; o.nIt = nIt;
+  return { s: { t, y, v, a, V, st }, o };
+}
+
+function initState(sys, Ffun, y0 = 0, v0 = 0) {
+  const sp = sys.spring, { V, st } = sp.force(y0, sp.init());
+  const a = (Ffun(0) - damp(sys, sp.k0) * v0 - V) / sys.m;
+  return { t: 0, y: y0, v: v0, a, V, st };
+}
+
+// N steps; returns states S[0..N] and step records O[0..N-1]
+function run(sys, meth, dt, N, Ffun, s0, rule = 'tan') {
+  const S = [s0 || initState(sys, Ffun)], O = [];
+  for (let i = 0; i < N; i++) {
+    const r = oneStep(sys, meth, S[i], dt, Ffun, rule);
+    S.push(r.s); O.push(r.o);
+    if (!isFinite(r.s.y) || Math.abs(r.s.y) > 1e300) break;
+  }
+  return { S, O };
+}
+
+// Exact linear response by RK4 on fine substeps: returns {t, y, v, a} sampled at h
+function exactLinear(m, c, k, Ffun, tEnd, h, y0 = 0, v0 = 0) {
+  const n = Math.round(tEnd / h), out = { t: [], y: [], v: [], a: [] };
+  let y = y0, v = v0, t = 0;
+  const acc = (t, y, v) => (Ffun(t) - c * v - k * y) / m;
+  const push = () => { out.t.push(t); out.y.push(y); out.v.push(v); out.a.push(acc(t, y, v)); };
+  push();
+  const sub = 20, hs = h / sub;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < sub; j++) {
+      const k1y = v, k1v = acc(t, y, v);
+      const k2y = v + hs / 2 * k1v, k2v = acc(t + hs / 2, y + hs / 2 * k1y, v + hs / 2 * k1v);
+      const k3y = v + hs / 2 * k2v, k3v = acc(t + hs / 2, y + hs / 2 * k2y, v + hs / 2 * k2v);
+      const k4y = v + hs * k3v, k4v = acc(t + hs, y + hs * k3y, v + hs * k3v);
+      y += hs / 6 * (k1y + 2 * k2y + 2 * k3y + k4y);
+      v += hs / 6 * (k1v + 2 * k2v + 2 * k3v + k4v);
+      t += hs;
+    }
+    t = (i + 1) * h; push();
+  }
+  return out;
+}
+
+// ---- Amplification matrix of one step (linear oscillator, T = 1, dt = r) ------------------
+function oscillator(xi) {
+  const w = 2 * Math.PI;
+  return { m: 1, xi: null, c: 2 * xi * w, spring: springLinear(w * w) };
+}
+const zero = () => 0;
+function ampMatrix(meth, r, xi) {
+  const sys = oscillator(xi), k = sys.spring.k0, c = sys.c;
+  const st = (y, v, a) => ({ t: 0, y, v, a: a == null ? -(c * v + k * y) : a, V: k * y, st: {} });
+  const carry = meth.type === 'wil' && meth.variant === 'classic';
+  const cols = carry ? [st(1, 0, 0), st(0, 1, 0), st(0, 0, 1)] : [st(1, 0), st(0, 1)];
+  const A = cols.map(s0 => { const n = oneStep(sys, meth, s0, r, zero).s;
+                             return carry ? [n.y, n.v, n.a] : [n.y, n.v]; });
+  return A[0].map((_, i) => A.map(col => col[i]));   // columns -> rows
+}
+// eigenvalues of a 2x2 or 3x3 real matrix as [re, im] pairs
+function eig(A) {
+  if (A.length === 2) {
+    const tr = A[0][0] + A[1][1], det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
+    const d = tr * tr - 4 * det;
+    if (d < 0) return [[tr / 2, Math.sqrt(-d) / 2], [tr / 2, -Math.sqrt(-d) / 2]];
+    return [[(tr + Math.sqrt(d)) / 2, 0], [(tr - Math.sqrt(d)) / 2, 0]];
+  }
+  const a = A, p1 = a[0][0] + a[1][1] + a[2][2];
+  const p2 = a[0][0] * a[1][1] - a[0][1] * a[1][0] + a[0][0] * a[2][2] - a[0][2] * a[2][0]
+           + a[1][1] * a[2][2] - a[1][2] * a[2][1];
+  const p3 = a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1])
+           - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0])
+           + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
+  // Durand-Kerner on z^3 - p1 z^2 + p2 z - p3
+  const mul = (x, y) => [x[0] * y[0] - x[1] * y[1], x[0] * y[1] + x[1] * y[0]];
+  const div = (x, y) => { const d = y[0] * y[0] + y[1] * y[1];
+                          return [(x[0] * y[0] + x[1] * y[1]) / d, (x[1] * y[0] - x[0] * y[1]) / d]; };
+  const P = z => { let q = [1, 0]; q = mul(q, z); q = [q[0] - p1, q[1]]; q = mul(q, z);
+                   q = [q[0] + p2, q[1]]; q = mul(q, z); return [q[0] - p3, q[1]]; };
+  let z = [[0.4, 0.9], [-0.65, 0.72], [0.9, -0.3]];
+  for (let it = 0; it < 200; it++) {
+    z = z.map((zi, i) => { let den = [1, 0];
+      z.forEach((zj, j) => { if (j !== i) den = mul(den, [zi[0] - zj[0], zi[1] - zj[1]]); });
+      const dz = div(P(zi), den); return [zi[0] - dz[0], zi[1] - dz[1]]; });
+  }
+  return z;
+}
+function spectral(meth, r, xi = 0) {
+  const ev = eig(ampMatrix(meth, r, xi));
+  const mod = ev.map(e => Math.hypot(e[0], e[1]));
+  const rho = Math.max(...mod);
+  // period from the complex pair (the principal root); none: NaN
+  let best = null;
+  ev.forEach((e, i) => { if (Math.abs(e[1]) > 1e-9 && (!best || mod[i] > best.m)) best = { m: mod[i], e }; });
+  const Tr = best ? (2 * Math.PI * r) / Math.abs(Math.atan2(best.e[1], best.e[0])) : NaN;
+  return { rho, Tr, ev };
+}
+
+// ---- App -----------------------------------------------------------------------------------
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const cfg = { displayModeBar: false, responsive: true };
+const fmt = (x, d = 4) => !isFinite(x) ? '—' :
+  Math.abs(x) >= 1000 ? x.toLocaleString('en-US', { maximumFractionDigits: Math.min(d, 1) }) : x.toFixed(d);
+const COL = { const: '--c-const', avg: '--c-avg', lin: '--c-lin', wil: '--c-wil', paz: '--c-paz',
+              custom: '--c-custom' };
+const col = s => css(COL[s]);
+function lay(extra = {}) {
+  return Object.assign({ paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: css('--ink'), size: 12 }, margin: { l: 58, r: 14, t: 8, b: 38 },
+    showlegend: false, hovermode: 'closest' }, extra);
+}
+function ax(title, extra = {}) {
+  return Object.assign({ title: { text: title, standoff: 4 }, gridcolor: css('--grid'),
+    zerolinecolor: css('--line'), linecolor: css('--line'), automargin: true }, extra);
+}
+const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+const pad = (lo, hi, f = 0.08) => { const d = (hi - lo) || Math.abs(hi) || 1; return [lo - f * d, hi + f * d]; };
+const rangeOf = arrs => { let lo = Infinity, hi = -Infinity;
+  arrs.forEach(a => a.forEach(v => { if (isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }));
+  return pad(lo, hi); };
+
+// Sweep a range input back and forth (the ▶ next to a slider); the speed menu scales it.
+// The position is kept as a float, so coarse slider steps do not stall the sweep.
+const speed = () => +$('speed').value || 1;
+const SWEEPS = [];
+function sweeper(btn, input, period = 6000) {
+  let on = false, dir = 1, last = 0, cur = 0;
+  const lo = +input.min, hi = +input.max;
+  function tick(ts) {
+    if (!on) return;
+    const dt = last ? ts - last : 16; last = ts;
+    cur += dir * (hi - lo) * dt * speed() / period;
+    if (cur >= hi) { cur = hi; dir = -1; } if (cur <= lo) { cur = lo; dir = 1; }
+    input.value = cur; input.dispatchEvent(new Event('input'));
+    requestAnimationFrame(tick);
+  }
+  function set(v) {
+    on = v; btn.classList.toggle('on', on); btn.textContent = on ? '❚❚' : '▶'; last = 0;
+    if (on) { cur = +input.value; requestAnimationFrame(tick); }
+  }
+  btn.addEventListener('click', () => set(!on));
+  const sw = { stop() { if (on) set(false); } };
+  SWEEPS.push(sw);
+  return sw;
+}
+function tex(el, s) {
+  if (typeof katex === 'undefined') { el.textContent = s; return; }
+  katex.render(s, el, { throwOnError: false, displayMode: false });
+}
+
+// ============================ Tab A ============================
+const A = { preset: 'chopra', scheme: 'lin', all: false, restart: false, zoom: false, i: 0 };
+const APRESETS = {
+  chopra: () => ({ sys: { m: 0.2533, xi: 0.05, spring: springLinear(10) },
+    F: t => t <= 0.6 ? 10 * Math.sin(Math.PI * t / 0.6) : 0, dt: 0.1, N: 10,
+    note: 'Chopra Tables E5.3 (average) and E5.4 (linear); m = 0.2533 kip·s²/in, k = 10 kip/in, ξ = 5%' }),
+  paz62: () => ({ sys: { m: 0.1, xi: 0, spring: springLinear(100) },
+    F: t => 100 * Math.sin(30 * t), dt: 0.01, N: 30,
+    note: 'Paz Ex. 6.2 in kip (m = 0.1 kip·s²/in, k = 100 kip/in, F₀ = 100 kip); exact y = 1.6076, −3.1865, 4.7420 in at 0.1, 0.2, 0.3 s' }),
+  wall: () => ({ sys: { m: WALL.m, xi: WALL.xi, spring: springOO(backboneWall()) },
+    F: WALL.F, dt: 0.005, N: 14,
+    note: 'Wall of Example A, tangent kᵢ; "exact" = Δt/20 reference, iterated secant' }),
+};
+let AP = null;   // the current preset with its runs
+function setupA() {
+  const P = APRESETS[A.preset](), sub = 20;
+  const { sys, F, dt, N } = P;
+  let ex;
+  if (sys.spring.kind === 'linear') {
+    const k = sys.spring.k0, c = damp(sys, k);
+    const e = exactLinear(sys.m, c, k, F, N * dt + 3 * dt, dt / sub);
+    ex = { ...e, state: i => ({ t: i * dt, y: e.y[i * sub], v: e.v[i * sub], a: e.a[i * sub],
+                                V: k * e.y[i * sub], st: {} }) };
+  } else {
+    const R = run(sys, SCHEMES.lin, dt / sub, (N + 3) * sub, F, null, 'sec');
+    ex = { t: R.S.map(s => s.t), y: R.S.map(s => s.y), v: R.S.map(s => s.v), a: R.S.map(s => s.a),
+           state: i => ({ ...R.S[i * sub], t: i * dt }) };
+  }
+  const runs = {};
+  for (const s of ['const', 'avg', 'lin']) runs[s] = run(sys, SCHEMES[s], dt, N, F);
+  AP = { ...P, ex, runs, sub };
+  A.i = Math.min(A.i, N - 1);
+}
+// the state at t_i and the step from it, for scheme s
+function stepA(s) {
+  const s0 = A.restart ? AP.ex.state(A.i) : AP.runs[s].S[A.i];
+  const r = oneStep(AP.sys, SCHEMES[s], s0, AP.dt, AP.F);
+  return { s0, s1: r.s, o: r.o };
+}
+function inStep(s, st) {   // the assumed acceleration and what it implies, tau in [0, dt]
+  const { s0, s1 } = st, dt = AP.dt, tau = linspace(0, dt, 31);
+  const ai = s0.a, da = s1.a - s0.a;
+  const aF = s === 'const' ? () => ai : s === 'avg' ? () => ai + da / 2 : x => ai + da * x / dt;
+  const vF = s === 'const' ? x => s0.v + ai * x : s === 'avg' ? x => s0.v + (ai + da / 2) * x
+           : x => s0.v + ai * x + da * x * x / (2 * dt);
+  const yF = s === 'const' ? x => s0.y + s0.v * x + ai * x * x / 2
+           : s === 'avg' ? x => s0.y + s0.v * x + (ai + da / 2) * x * x / 2
+           : x => s0.y + s0.v * x + ai * x * x / 2 + da * x ** 3 / (6 * dt);
+  return { t: tau.map(x => s0.t + x), a: tau.map(aF), v: tau.map(vF), y: tau.map(yF) };
+}
+function renderA() {
+  const { dt, N, ex } = AP, i = A.i, shown = A.all ? ['const', 'avg', 'lin'] : [A.scheme];
+  $('aStepLbl').textContent = `step ${i + 1} of ${N}: t = ${fmt(i * dt, 3)} → ${fmt((i + 1) * dt, 3)} s`;
+  const tr = [], rows = ['a', 'v', 'y'], yax = { a: 'y', v: 'y2', y: 'y3' };
+  const tEnd = (N + 1) * dt;
+  const exN = ex.t.findIndex(t => t > tEnd + 1e-12);
+  const cut = arr => exN > 0 ? arr.slice(0, exN) : arr;
+  for (const r of rows) tr.push({ x: cut(ex.t), y: cut(ex[r]), yaxis: yax[r], mode: 'lines',
+    line: { color: css('--c-exact'), width: 2 }, hoverinfo: 'skip' });
+  const win = A.zoom ? [Math.max(0, (i - 1.5) * dt), (i + 2.5) * dt] : [0, tEnd];
+  const vis = { a: [], v: [], y: [] };
+  for (const r of rows) vis[r].push(ex.t.map((t, j) => t >= win[0] && t <= win[1] ? ex[r][j] : NaN));
+  for (const s of shown) {
+    const c = col(s), R = AP.runs[s], st = stepA(s), cur = inStep(s, st);
+    const past = R.S.slice(0, i + 1);
+    for (const r of rows) {
+      const key = r;
+      tr.push({ x: past.map(q => q.t), y: past.map(q => q[key]), yaxis: yax[r], mode: 'markers',
+        marker: { color: c, size: 6 }, name: s, hovertemplate: `${SCHEMES[s].label}<br>t=%{x:.3f}<br>%{y:.4g}<extra></extra>` });
+      tr.push({ x: cur.t, y: cur[r], yaxis: yax[r], mode: 'lines', line: { color: c, width: 3 },
+        fill: r === 'a' ? 'tozeroy' : 'none', fillcolor: c + '33', hoverinfo: 'skip' });
+      tr.push({ x: [st.s1.t], y: [st.s1[key]], yaxis: yax[r], mode: 'markers',
+        marker: { color: css('--panel'), size: 9, line: { color: c, width: 2 } },
+        hovertemplate: `t=%{x:.3f}<br>%{y:.4g}<extra>${s}</extra>` });
+      if (A.restart) tr.push({ x: [st.s0.t], y: [st.s0[key]], yaxis: yax[r], mode: 'markers',
+        marker: { color: c, size: 9, symbol: 'diamond' }, hoverinfo: 'skip' });
+      vis[r].push(past.map(q => q.t >= win[0] && q.t <= win[1] ? q[key] : NaN), cur[r], [st.s1[key]]);
+    }
+  }
+  const shapes = ['y', 'y2', 'y3'].map(ya => ({ type: 'rect', xref: 'x', yref: ya + ' domain',
+    x0: i * dt, x1: (i + 1) * dt, y0: 0, y1: 1, fillcolor: css('--hl'), line: { width: 0 }, layer: 'below' }));
+  const L = lay({ margin: { l: 64, r: 10, t: 6, b: 38 }, shapes,
+    xaxis: ax('t (s)', { range: win, anchor: 'y3' }),
+    yaxis: ax('ÿ (in/s²)', { domain: [0.69, 1], range: rangeOf(vis.a) }),
+    yaxis2: ax('ẏ (in/s)', { domain: [0.35, 0.65], range: rangeOf(vis.v) }),
+    yaxis3: ax('y (in)', { domain: [0, 0.31], range: rangeOf(vis.y) }) });
+  Plotly.react('p1', tr, L, cfg);
+  // table of y_i
+  const sch = ['const', 'avg', 'lin'];
+  let h = `<table><tr><th>tᵢ (s)</th><th>exact y</th>${sch.map(s => `<th style="color:${col(s)}">${s === 'const' ? 'const ÿᵢ' : s === 'avg' ? 'average' : 'linear'}</th>`).join('')}</tr>`;
+  for (let j = 0; j <= N; j++) {
+    h += `<tr class="${j === i + 1 ? 'cur' : ''}"><td>${fmt(j * dt, 3)}</td><td>${fmt(ex.state(Math.min(j, N)).y)}</td>`
+       + sch.map(s => `<td>${fmt(AP.runs[s].S[j].y)}</td>`).join('') + '</tr>';
+  }
+  $('p1tab').innerHTML = h + `</table><div class="note">${AP.note}; each scheme from its own state.</div>`;
+  const EQ1 = {
+    const: String.raw`\ddot y(\tau) = \ddot y_i`,
+    avg: String.raw`\ddot y(\tau) = \tfrac12\,(\ddot y_i + \ddot y_{i+1})`,
+    lin: String.raw`\ddot y(\tau) = \ddot y_i + \frac{\tau}{\Delta t}\,\Delta\ddot y_i` };
+  tex($('eq1'), shown.map(s => String.raw`\textcolor{${col(s)}}{${EQ1[s]}}`).join(String.raw`\qquad`)
+    + String.raw`\qquad (0 \le \tau \le \Delta t)`);
+  writeHash();
+}
+
+// ============================ Tab B ============================
+const B = { rule: 'tan', u: 0, curve: 'wall', meth: 'lin', i: 6, timer: null };
+const dtFromU = u => 0.001 * Math.pow(30, u), uFromDt = dt => Math.log(dt / 0.001) / Math.log(30);
+const T0 = 2 * Math.PI * Math.sqrt(WALL.m / WALL.k0), Tu = 2 * Math.PI * Math.sqrt(WALL.m / (WALL.Vu / WALL.yu));
+let BR = null; const BREF = {};
+function setupB() {
+  const dt = dtFromU(B.u), bb = B.curve === 'wall' ? backboneWall() : backboneTanh();
+  const sys = { m: WALL.m, xi: WALL.xi, spring: springOO(bb) };
+  const N = Math.ceil(0.13 / dt - 1e-9), meth = SCHEMES[B.meth];
+  const R = run(sys, meth, dt, N, WALL.F, null, B.rule);
+  if (!BREF[B.curve]) BREF[B.curve] = run(sys, SCHEMES.lin, 0.0005, 260, WALL.F, null, 'sec');
+  const lsys = { m: WALL.m, xi: WALL.xi, spring: springLinear(WALL.k0) };
+  const E = run(lsys, meth, dt, N, WALL.F);
+  BR = { dt, bb, sys, R, N, E, ref: BREF[B.curve] };
+  B.i = Math.min(B.i, N - 1);
+}
+const RULECOL = { tan: '--c-avg', sec: '--c-lin' };
+function renderB() {
+  const { dt, bb, R, N, E, ref } = BR, i = B.i, S = R.S, O = R.O, s = S[i], o = O[i], s1 = S[i + 1];
+  $('bDtLbl').textContent = `${fmt(dt, 4)} s = ${fmt(dt / T0, 3)} T₀`;
+  $('bStepLbl').textContent = `step ${i + 1} of ${N}: t = ${fmt(s.t, 3)} s`;
+  const rc = css(RULECOL[B.rule]), ym = isFinite(bb.yu) ? bb.yu : 0.45;
+  const Y = linspace(-ym, ym, 241);
+  const tr = [{ x: Y, y: Y.map(y => y >= 0 ? bb.f(y) : -bb.f(-y)), mode: 'lines', line: { color: css('--c-exact'), width: 3 }, hoverinfo: 'skip' }];
+  const past = S.slice(0, i + 1);
+  tr.push({ x: past.map(q => q.y), y: past.map(q => q.V), mode: 'lines+markers', line: { color: rc, width: 1.5 },
+            marker: { size: 5, color: rc }, hovertemplate: 'y=%{x:.4f}<br>V=%{y:.0f}<extra></extra>' });
+  const x0 = s.y - 0.4 * o.dy, x1 = s.y + 1.4 * o.dy;
+  tr.push({ x: [x0, x1], y: [s.V - 0.4 * o.k * o.dy, s.V + 1.4 * o.k * o.dy], mode: 'lines', line: { color: rc, width: 3 }, hoverinfo: 'skip' });
+  tr.push({ x: [s.y], y: [s.V], mode: 'markers', marker: { size: 11, color: rc }, hoverinfo: 'skip' });
+  tr.push({ x: [s1.y, s1.y], y: [o.Vpred, s1.V], mode: 'lines', line: { color: css('--c-gap'), width: 4 }, hoverinfo: 'skip' });
+  tr.push({ x: [s1.y], y: [o.Vpred], mode: 'markers', marker: { size: 11, color: css('--panel'), line: { color: rc, width: 2.5 } },
+            hovertemplate: 'assumed: %{y:.1f} kip<extra></extra>' });
+  tr.push({ x: [s1.y], y: [s1.V], mode: 'markers', marker: { size: 11, color: css('--ink') },
+            hovertemplate: 'true Fs: %{y:.1f} kip<extra></extra>' });
+  const gap = o.Vpred - s1.V;
+  let xr = [-0.12, ym + 0.02], yr = [-700, 1750];
+  if (B.zoom) {
+    const xs = [s.y, s1.y, x0, x1], vs = [s.V, s1.V, o.Vpred];
+    const dx = Math.max(Math.abs(o.dy), 0.004), dv = Math.max(Math.abs(o.k * o.dy), Math.abs(gap), 20);
+    xr = [Math.min(...xs) - dx, Math.max(...xs) + dx]; yr = [Math.min(...vs) - dv, Math.max(...vs) + dv];
+  }
+  const ann = [{ x: s1.y, y: (o.Vpred + s1.V) / 2, text: `force not in (6.7): ${fmt(gap, 1)} kip`, showarrow: true, ax: 60, ay: 0,
+                 font: { color: css('--c-gap'), size: 12 }, xanchor: 'left' }];
+  Plotly.react('p3', tr, lay({ annotations: ann, xaxis: ax('y (in)', { range: xr }), yaxis: ax('F<sub>s</sub> (kip)', { range: yr }) }), cfg);
+  const c1 = damp(BR.sys, o.k);
+  $('p3read').innerHTML = `<table><tr><th>tᵢ</th><th>yᵢ</th><th>ẏᵢ</th><th>ÿᵢ</th><th>F<sub>s</sub>(yᵢ)</th><th>kᵢ</th><th>cᵢ</th><th>k̄ᵢ</th><th>ΔF̄ᵢ</th><th>Δyᵢ</th><th>Δẏᵢ</th><th>ÿᵢ₊₁</th></tr>
+    <tr><td>${fmt(s.t, 3)}</td><td>${fmt(s.y)}</td><td>${fmt(s.v, 2)}</td><td>${fmt(s.a, 0)}</td><td>${fmt(s.V, 1)}</td><td>${fmt(o.k, 0)}</td><td>${fmt(c1, 3)}</td>
+    <td>${fmt(o.kbar, 0)}</td><td>${fmt(o.dFbar, 1)}</td><td>${fmt(o.dy, 5)}</td><td>${fmt(o.dv, 3)}</td><td>${fmt(s1.a, 0)}</td></tr></table>
+    <span class="note">units kip, in, s; cᵢ = 2ξ√(kᵢm) (not in Paz)${B.rule === 'sec' ? `; ${o.nIt} secant iterations` : ''}</span>`;
+  const kRule = B.rule === 'tan' ? String.raw`k_i = \left.\frac{dF_s}{dy}\right|_{y_i}`
+    : String.raw`k_i = \frac{F_s(y_{i+1}) - F_s(y_i)}{\Delta y_i}`;
+  tex($('eq2'), String.raw`m\,\Delta\ddot y_i + c_i\,\Delta\dot y_i + \textcolor{${rc}}{k_i}\,\Delta y_i = \Delta F_i \ \ (6.7),\qquad \textcolor{${rc}}{${kRule}}`);
+  tex($('eq3'), (B.meth === 'lin' ? String.raw`\bar k_i = k_i + \frac{6m}{\Delta t^2} + \frac{3c_i}{\Delta t}\ \ (6.34)`
+    : String.raw`\bar k_i = k_i + \frac{4m}{\Delta t^2} + \frac{2c_i}{\Delta t}\ \ (6.45)`)
+    + String.raw`,\qquad c_i = 2\xi\sqrt{k_i m},\qquad \Delta t \le 0.1\,T_0 = ${fmt(0.1 * T0, 4)}\text{ s}`);
+  // panel 3
+  const t = S.map(q => q.t), y = S.map(q => q.y), V = S.map(q => q.V);
+  const Ft = linspace(0, 0.13, 131);
+  let im = 0; S.forEach((q, j) => { if (q.y > S[im].y) im = j; });
+  let ie = 0; E.S.forEach((q, j) => { if (q.y > E.S[ie].y) ie = j; });
+  const tr4 = [
+    { x: Ft, y: Ft.map(WALL.F), yaxis: 'y2', mode: 'lines', fill: 'tozeroy', line: { width: 0 }, fillcolor: css('--line') + '99', hoverinfo: 'skip' },
+    { x: ref.S.map(q => q.t), y: ref.S.map(q => q.y), mode: 'lines', line: { color: css('--c-exact'), width: 4 }, hoverinfo: 'skip' },
+    { x: E.S.map(q => q.t), y: E.S.map(q => q.y), mode: 'lines', line: { color: css('--ink'), width: 1.5, dash: 'dash' }, hovertemplate: 'elastic<br>%{x:.3f} s, %{y:.4f} in<extra></extra>' },
+    { x: t, y, mode: dt > 0.002 ? 'lines+markers' : 'lines', line: { color: rc, width: 2 }, marker: { size: 4 }, hovertemplate: '%{x:.3f} s, %{y:.4f} in<extra></extra>' },
+    { x: [s.t], y: [s.y], mode: 'markers', marker: { size: 11, color: rc }, hoverinfo: 'skip' },
+  ];
+  const ann4 = [{ x: S[im].t, y: S[im].y, text: `peak ${fmt(S[im].y, 3)} in at ${fmt(S[im].t, 3)} s`, showarrow: true, ax: 50, ay: -18, font: { size: 11, color: rc } },
+                { x: E.S[ie].t, y: E.S[ie].y, text: `elastic ${fmt(E.S[ie].y, 3)} in`, showarrow: true, ax: -40, ay: -26, font: { size: 11 } }];
+  Plotly.react('p4a', tr4, lay({ annotations: ann4, margin: { l: 58, r: 50, t: 8, b: 36 },
+    xaxis: ax('t (s)', { range: [0, 0.13] }), yaxis: ax('y (in)', { range: [-0.12, 0.42] }),
+    yaxis2: { overlaying: 'y', side: 'right', range: [-400, 1400], title: { text: 'F (kip)' }, showgrid: false, zeroline: false } }), cfg);
+  const Vm = Math.max(...V), iv = V.indexOf(Vm);
+  Plotly.react('p4b', [
+    { x: [0, 0.13], y: [WALL.Vn, WALL.Vn], mode: 'lines', line: { color: css('--uh'), dash: 'dash', width: 1.5 }, hoverinfo: 'skip' },
+    { x: ref.S.map(q => q.t), y: ref.S.map(q => q.V), mode: 'lines', line: { color: css('--c-exact'), width: 3 }, hoverinfo: 'skip' },
+    { x: t, y: V, mode: 'lines', line: { color: rc, width: 2 }, hovertemplate: '%{x:.3f} s, %{y:.0f} kip<extra></extra>' },
+    { x: [s.t], y: [s.V], mode: 'markers', marker: { size: 10, color: rc }, hoverinfo: 'skip' },
+  ], lay({ annotations: [{ x: t[iv], y: Vm, text: `V<sub>max</sub> = ${fmt(Vm, 0)} kip`, showarrow: true, ax: 40, ay: 18, font: { size: 11, color: rc } },
+                         { x: 0.125, y: WALL.Vn, text: 'V<sub>n</sub> = 1600', showarrow: false, yanchor: 'bottom', xanchor: 'right', font: { size: 11, color: css('--uh') } }],
+           xaxis: ax('t (s)', { range: [0, 0.13] }), yaxis: ax('F<sub>s</sub> (kip)', { range: [-500, 1900] }) }), cfg);
+  drawWall(s.y, WALL.F(s.t));
+  writeHash();
+}
+function drawWall(y, F) {
+  const cv = $('p4wall'), g = cv.getContext('2d'), W = cv.width, H = cv.height;
+  g.clearRect(0, 0, W, H);
+  const base = H - 20, top = 60, x0 = 45, w = 60, sh = y * 120;   // shear magnified
+  g.fillStyle = css('--line'); g.fillRect(10, base, W - 20, 6);
+  g.beginPath(); g.moveTo(x0, base); g.lineTo(x0 + w, base); g.lineTo(x0 + w + sh, top); g.lineTo(x0 + sh, top); g.closePath();
+  g.fillStyle = css('--c-exact') + '88'; g.fill(); g.strokeStyle = css('--ink'); g.lineWidth = 1.5; g.stroke();
+  const L = 40 * F / 1200;
+  if (L > 1) {
+    const ay = top + 6;
+    g.strokeStyle = css('--uh'); g.fillStyle = css('--uh'); g.lineWidth = 3;
+    g.beginPath(); g.moveTo(x0 + sh - L - 4, ay); g.lineTo(x0 + sh - 4, ay); g.stroke();
+    g.beginPath(); g.moveTo(x0 + sh - 2, ay); g.lineTo(x0 + sh - 10, ay - 5); g.lineTo(x0 + sh - 10, ay + 5); g.fill();
+  }
+  g.fillStyle = css('--ink'); g.font = '12px system-ui';
+  g.fillText(`y = ${y.toFixed(3)} in`, 10, 18); g.fillText(`F = ${F.toFixed(0)} kip`, 10, 34);
+}
+
+// ============================ Tab C ============================
+const C = { u: 0, xi: 0, P: 20, th: 1.4, beta: 0.3, gamma: 0.6, i7: 0,
+            show: { avg: true, lin: true, const: true, wil: true, paz: false, custom: false } };
+const rFromU = u => 0.01 * Math.pow(200, u), uFromR = r => Math.log(r / 0.01) / Math.log(200);
+const methC = s => s === 'wil' ? wilson(C.th) : s === 'paz' ? wilson(C.th, 'paz')
+                 : s === 'custom' ? newmark(C.beta, C.gamma) : SCHEMES[s];
+const LABC = { avg: 'average', lin: 'linear', const: 'const ÿᵢ', wil: 'Wilson', paz: 'Wilson (16.24)', custom: 'custom' };
+function renderC5() {
+  const r = rFromU(C.u), xi = C.xi, sys = oscillator(xi), F0 = () => 0, P = C.P;
+  $('cRLbl').textContent = fmt(r, 3); $('cXiLbl').textContent = `${(100 * xi).toFixed(1)}%`;
+  $('cPLbl').textContent = P; $('cThLbl').textContent = C.th.toFixed(3);
+  $('cBGLbl').textContent = `(${C.beta.toFixed(3)}, ${C.gamma.toFixed(2)})`;
+  const w = 2 * Math.PI, wd = w * Math.sqrt(1 - xi * xi), T = linspace(0, P, Math.min(4000, 80 * P));
+  const tr = [{ x: T, y: T.map(t => Math.exp(-xi * w * t) * (Math.cos(wd * t) + xi / Math.sqrt(1 - xi * xi) * Math.sin(wd * t))),
+                mode: 'lines', line: { color: css('--c-exact'), width: 3 }, name: 'exact', hoverinfo: 'skip' }];
+  const ann = [];
+  const N = Math.min(Math.ceil(P / r), 6000);
+  let k = 0;
+  for (const s of ['avg', 'lin', 'const', 'wil', 'paz', 'custom']) {
+    if (!C.show[s]) continue;
+    const R = run(sys, methC(s), r, N, F0, initState(sys, F0, 1, 0));
+    const S = R.S; let jx = S.findIndex(q => !(Math.abs(q.y) <= 3));
+    const kept = jx < 0 ? S : S.slice(0, jx + 1);
+    const c = col(s);
+    tr.push({ x: kept.map(q => q.t), y: kept.map(q => q.y), mode: N <= 400 ? 'lines+markers' : 'lines',
+      line: { color: c, width: 1.6 }, marker: { size: 3.5 }, name: LABC[s], hovertemplate: `${LABC[s]}<br>t/T=%{x:.2f}<br>%{y:.3f}<extra></extra>` });
+    if (jx >= 0) {
+      const mx = Math.max(...S.map(q => Math.abs(q.y)).filter(isFinite));
+      const n = isFinite(mx) && S.length === N + 1 ? Math.floor(Math.log10(mx)) : null;
+      const q = S[jx], qy = Math.max(-3, Math.min(3, q.y));
+      ann.push({ x: q.t, y: qy, text: `${LABC[s]}: leaves at step ${jx}${n != null ? `, ×10<sup>${n}</sup> by t/T = ${P}` : ', overflow'}`,
+                 showarrow: true, ax: 0, ay: qy > 0 ? 18 + 16 * k : -18 - 16 * k, font: { size: 11, color: c } });
+      k++;
+    }
+  }
+  Plotly.react('p5', tr, lay({ annotations: ann, showlegend: true, legend: { orientation: 'h', y: 1.08, x: 0 },
+    xaxis: ax('t/T', { range: [0, P] }), yaxis: ax('y/y₀', { range: [-3.2, 3.2] }) }), cfg);
+  tex($('eq4'), String.raw`\ddot y + 2\xi\omega\,\dot y + \omega^2 y = 0,\quad y(0) = y_0,\ \dot y(0) = 0;\qquad \Delta t/T = ${fmt(r, 3)},\ \ \xi = ${(100 * xi).toFixed(1)}\%`);
+  writeHash();
+}
+let C6cache = null;
+function renderC6() {
+  const r = rFromU(C.u), key = [C.xi, C.th, C.beta, C.gamma, ...Object.values(C.show)].join();
+  const Rg = linspace(Math.log10(0.01), Math.log10(10), 260).map(x => 10 ** x);
+  if (!C6cache || C6cache.key !== key) {
+    const curves = {};
+    for (const s of ['avg', 'lin', 'const', 'wil', 'paz', 'custom']) {
+      if (!C.show[s]) continue;
+      const sp = Rg.map(x => spectral(methC(s), x, C.xi));
+      curves[s] = { rho: sp.map(q => q.rho), Tr: sp.map(q => q.Tr) };
+    }
+    C6cache = { key, curves };
+  }
+  const tA = [], tB = [];
+  for (const [s, cv] of Object.entries(C6cache.curves)) {
+    const c = col(s), here = spectral(methC(s), r, C.xi);
+    tA.push({ x: Rg, y: cv.rho.map(v => Math.min(v, 5)), mode: 'lines', line: { color: c, width: 2 }, name: LABC[s], hovertemplate: `${LABC[s]}: ρ=%{y:.4f} at %{x:.3f}<extra></extra>` });
+    tA.push({ x: [r], y: [here.rho], mode: 'markers', marker: { color: c, size: 8 }, hoverinfo: 'skip' });
+    tB.push({ x: Rg, y: cv.Tr, mode: 'lines', line: { color: c, width: 2 }, hovertemplate: `${LABC[s]}: T̄/T=%{y:.3f}<extra></extra>` });
+    tB.push({ x: [r], y: [here.Tr], mode: 'markers', marker: { color: c, size: 8 }, hoverinfo: 'skip' });
+  }
+  const lim = Math.sqrt(3) / Math.PI, mute = css('--muted');
+  tA.push({ x: [r, r], y: [0.3, 1.5], mode: 'lines', line: { color: mute, dash: 'dot', width: 1 }, hoverinfo: 'skip' },
+          { x: [lim, lim], y: [0.3, 1.5], mode: 'lines+text', text: ['', '√3/π = 0.551'], textposition: 'bottom right',
+            textfont: { size: 11, color: col('lin') }, line: { color: col('lin'), dash: 'dash', width: 1 }, hoverinfo: 'skip' });
+  tB.push({ x: [r, r], y: [0.95, 2.2], mode: 'lines', line: { color: mute, dash: 'dot', width: 1 }, hoverinfo: 'skip' });
+  Plotly.react('p6a', tA, lay({ shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: css('--ink'), width: 1 } }],
+    xaxis: ax('Δt/T', { type: 'log' }), yaxis: ax('spectral radius ρ', { range: [0.3, 1.5] }) }), cfg);
+  Plotly.react('p6b', tB, lay({ shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: css('--ink'), width: 1 } }],
+    xaxis: ax('Δt/T', { type: 'log' }), yaxis: ax('period ratio T̄/T', { range: [0.95, 2.2] }) }), cfg);
+  tex($('eq5'), String.raw`\begin{bmatrix} y_{i+1} \\ \dot y_{i+1} \end{bmatrix} = \mathbf A \begin{bmatrix} y_i \\ \dot y_i \end{bmatrix},\quad \rho = \max|\lambda(\mathbf A)|;\qquad \gamma = \tfrac12:\ \ \frac{\Delta t}{T} \le \frac{1}{\pi\sqrt{1 - 4\beta}}`);
+  renderPlane();
+}
+function renderPlane() {
+  const bx = linspace(0, 0.5, 101), gy = linspace(0, 1, 101);
+  const z = gy.map(() => bx.map(() => 0));
+  const tr = [{ type: 'heatmap', x: bx, y: gy, z, showscale: false, hoverinfo: 'none',
+                colorscale: [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0)']] },
+    { x: [0, 0.25, 1 / 6, C.beta], y: [0, 0.5, 0.5, C.gamma], mode: 'markers+text', textposition: ['top right', 'top right', 'bottom center', 'top right'],
+      text: ['const ÿᵢ', 'average', 'linear', 'custom'], marker: { size: [9, 9, 9, 13], color: [col('const'), col('avg'), col('lin'), col('custom')] },
+      textfont: { size: 11 }, hoverinfo: 'skip' }];
+  const sh = [
+    { type: 'rect', x0: 0, x1: 0.5, y0: 0, y1: 0.5, fillcolor: css('--c-gap') + '22', line: { width: 0 }, layer: 'below' },
+    { type: 'path', path: 'M 0.25 0.5 L 0.5 0.5 L 0.5 1 Z', fillcolor: col('lin') + '33', line: { width: 0 }, layer: 'below' },
+    { type: 'path', path: 'M 0 0.5 L 0.25 0.5 L 0.5 1 L 0 1 Z', fillcolor: col('avg') + '18', line: { width: 0 }, layer: 'below' }];
+  const an = [{ x: 0.42, y: 0.62, text: 'unconditionally<br>stable', showarrow: false, font: { size: 11 } },
+              { x: 0.12, y: 0.85, text: 'conditionally stable', showarrow: false, font: { size: 11 } },
+              { x: 0.3, y: 0.22, text: 'unstable (γ < ½)', showarrow: false, font: { size: 11 } }];
+  Plotly.react('p6c', tr, lay({ shapes: sh, annotations: an, xaxis: ax('β', { range: [-0.01, 0.51] }), yaxis: ax('γ', { range: [-0.02, 1.02] }) }), cfg);
+  const el = $('p6c');
+  if (!el._bound) { el._bound = true;
+    el.on('plotly_click', ev => { const p = ev.points[0]; if (p.x == null) return;
+      C.beta = Math.round(p.x * 200) / 200; C.gamma = Math.round(p.y * 100) / 100;
+      $('cB').value = C.beta; $('cG').value = C.gamma; C.show.custom = true; $('cShow-custom').checked = true; renderC(); }); }
+}
+function renderC7() {
+  const r = rFromU(C.u), th = C.th, sys = oscillator(0), F0 = () => 0, w2 = (2 * Math.PI) ** 2;
+  const N = 60, R = run(sys, wilson(th), r, N, F0, initState(sys, F0, 1, 0));
+  const i = Math.min(C.i7, R.O.length - 1); C.i7 = i;
+  const s = R.S[i], o = R.O[i], s1 = R.S[i + 1], tau = th * r;
+  $('c7Lbl').textContent = `step ${i + 1}: t/T = ${fmt(s.t, 3)} → ${fmt(s.t + r, 3)}, τ = θΔt = ${fmt(tau, 3)}`;
+  const t0 = Math.max(0, s.t - 1.5 * r), t1 = s.t + Math.max(tau, r) + 1.5 * r;
+  const T = linspace(t0, t1, 200);
+  const past = R.S.slice(0, i + 1);
+  const tr = [{ x: T, y: T.map(t => -Math.cos(2 * Math.PI * t)), mode: 'lines', line: { color: css('--c-exact'), width: 3 }, hoverinfo: 'skip' },
+    { x: past.map(q => q.t), y: past.map(q => q.a / w2), mode: 'markers', marker: { color: col('wil'), size: 7 }, hoverinfo: 'skip' },
+    { x: [s.t, s.t + tau], y: [s.a / w2, (s.a + o.dah) / w2], mode: 'lines+markers', line: { color: col('wil'), width: 3 },
+      marker: { size: [0, 9], symbol: 'circle-open', color: col('wil') }, hoverinfo: 'skip' },
+    { x: [s1.t], y: [s1.a / w2], mode: 'markers', marker: { color: col('wil'), size: 12 }, hovertemplate: 'carried ÿᵢ₊₁/ω² = %{y:.4f}<extra></extra>' }];
+  const shapes = [{ type: 'rect', x0: s.t, x1: s.t + r, yref: 'paper', y0: 0, y1: 1, fillcolor: css('--hl'), line: { width: 0 }, layer: 'below' },
+                  { type: 'line', x0: s.t + tau, x1: s.t + tau, yref: 'paper', y0: 0, y1: 1, line: { color: col('wil'), dash: 'dot', width: 1 } }];
+  const ann = [{ x: s.t + tau, y: (s.a + o.dah) / w2, text: 'at tᵢ + τ', showarrow: true, ax: 30, ay: -20, font: { size: 11, color: col('wil') } },
+               { x: s1.t, y: s1.a / w2, text: 'Δÿᵢ = Δ̂ÿᵢ/θ: next step starts here', showarrow: true, ax: 40, ay: 30, font: { size: 11, color: col('wil') } }];
+  let pazLine = '';
+  if (C.show.paz) {
+    const rp = oneStep(sys, wilson(th, 'paz'), s, r, F0);
+    tr.push({ x: [rp.s.t], y: [rp.s.a / w2], mode: 'markers', marker: { color: col('paz'), size: 12, symbol: 'x' }, hovertemplate: 'Paz (16.24): %{y:.4f}<extra></extra>' });
+    pazLine = `; Paz (16.24) from equilibrium: ${fmt(rp.s.a / w2, 4)}`;
+  }
+  Plotly.react('p7', tr, lay({ shapes, annotations: ann, xaxis: ax('t/T', { range: [t0, t1] }), yaxis: ax('ÿ/ω²', { range: [-1.5, 1.5] }) }), cfg);
+  const rc = spectral(wilson(th), r).rho, rp = spectral(wilson(th, 'paz'), r).rho;
+  $('p7read').innerHTML = `θ = ${th.toFixed(3)}, Δt/T = ${fmt(r, 3)}: ρ = <b>${rc.toFixed(5)}</b> (with rᵢ, ÿ carried)
+    · ρ = ${rp.toFixed(5)} (Paz 16.24)<br>force out of balance rᵢ = Fᵢ − mÿᵢ − cẏᵢ − F<sub>s</sub>(yᵢ) = ${fmt(o.r / w2, 5)} kω²
+    <br>carried ÿᵢ₊₁/ω² = ${fmt(s1.a / w2, 4)}; exact ${fmt(-Math.cos(2 * Math.PI * s1.t), 4)}${pazLine}
+    <br><span class="note">ρ &gt; 1 at large Δt/T when θ &lt; 1.366 = (1 + √3)/2; θ = 1 is linear acceleration.</span>`;
+  tex($('eq6'), String.raw`\tau = \theta\,\Delta t = ${fmt(tau, 3)}\,T,\qquad \Delta\ddot y_i = \hat\Delta\ddot y_i/\theta\ \ (16.19),\qquad \ddot y_{i+1} = \ddot y_i + \Delta\ddot y_i`);
+  writeHash();
+}
+function renderC() { renderC5(); renderC6(); renderC7(); }
+
+// ============================ Wiring ============================
+if (typeof Plotly === 'undefined' || typeof katex === 'undefined') $('loaderr').style.display = 'block';
+let tab = 'a';
+const render = { a: renderA, b: renderB, c: renderC };
+function showTab(t) {
+  tab = t;
+  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
+  ['a', 'b', 'c'].forEach(x => { $('sec-' + x).hidden = x !== t; });
+  render[t]();
+}
+
+// Tab A
+$('aPreset').addEventListener('change', e => { A.preset = e.target.value; A.i = 0; setupA(); renderA(); });
+document.querySelectorAll('input[name=aScheme]').forEach(r => r.addEventListener('change', e => { A.scheme = e.target.value; renderA(); }));
+$('aAll').addEventListener('change', e => { A.all = e.target.checked; renderA(); });
+$('aRestart').addEventListener('change', e => { A.restart = e.target.checked; renderA(); });
+$('aZoom').addEventListener('change', e => { A.zoom = e.target.checked; renderA(); });
+$('aNext').addEventListener('click', () => { A.i = Math.min(A.i + 1, AP.N - 1); renderA(); });
+$('aPrev').addEventListener('click', () => { A.i = Math.max(A.i - 1, 0); renderA(); });
+$('aFirst').addEventListener('click', () => { A.i = 0; renderA(); });
+// Tab B
+B.u = uFromDt(0.005); B.zoom = true;
+$('bDtTicks').innerHTML = [0.1 * T0, 0.1 * Tu, 0.005].map(d => `<option value="${uFromDt(d).toFixed(3)}"></option>`).join('');
+$('bDt').title = `ticks: 0.1 T₀ = ${(0.1 * T0).toFixed(4)} s, 0.1 Tᵤ = ${(0.1 * Tu).toFixed(4)} s, 0.005 s`;
+$('bDt').addEventListener('input', e => { const t = B.i * BR.dt; B.u = +e.target.value; setupB(); B.i = Math.min(Math.round(t / BR.dt), BR.N - 1); renderB(); });
+sweeper($('bDtPlay'), $('bDt'));
+for (const [id, k] of [['bRule', 'rule'], ['bCurve', 'curve'], ['bMeth', 'meth']])
+  $(id).addEventListener('change', e => { B[k] = e.target.value; setupB(); renderB(); });
+$('bZoom').addEventListener('change', e => { B.zoom = e.target.checked; renderB(); });
+$('bNext').addEventListener('click', () => { B.i = Math.min(B.i + 1, BR.N - 1); renderB(); });
+$('bPrev').addEventListener('click', () => { B.i = Math.max(B.i - 1, 0); renderB(); });
+$('bFirst').addEventListener('click', () => { B.i = 0; renderB(); });
+function stopPlayB() {
+  clearTimeout(B.timer); B.timer = null; $('bPlay').classList.remove('on'); $('bPlay').textContent = '▶ play';
+}
+function tickB() {
+  if (B.i >= BR.N - 1) { stopPlayB(); return; }
+  B.i++; renderB(); B.timer = setTimeout(tickB, 400 / speed());
+}
+$('bPlay').addEventListener('click', () => {
+  if (B.timer) { stopPlayB(); return; }
+  $('bPlay').classList.add('on'); $('bPlay').textContent = '❚❚ pause';
+  if (B.i >= BR.N - 1) B.i = 0;
+  B.timer = setTimeout(tickB, 400 / speed());
+});
+// Tab C
+C.u = uFromR(0.1);
+$('cRTicks').innerHTML = [0.1, Math.sqrt(3) / Math.PI].map(r => `<option value="${uFromR(r).toFixed(4)}"></option>`).join('');
+$('cR').addEventListener('input', e => { C.u = +e.target.value; renderC(); });
+$('cR056').addEventListener('click', () => { C.u = uFromR(0.56); $('cR').value = C.u; renderC(); });
+sweeper($('cRPlay'), $('cR'), 10000);
+sweeper($('cThPlay'), $('cTh'), 6000);
+sweeper($('cXiPlay'), $('cXi'), 6000);
+sweeper($('cPPlay'), $('cP'), 8000);
+sweeper($('cBPlay'), $('cB'), 6000);
+sweeper($('cGPlay'), $('cG'), 6000);
+$('cXi').addEventListener('input', e => { C.xi = +e.target.value; renderC(); });
+$('cP').addEventListener('input', e => { C.P = +e.target.value; renderC5(); $('cPLbl').textContent = C.P; });
+$('cTh').addEventListener('input', e => { C.th = +e.target.value; renderC(); });
+$('cB').addEventListener('input', e => { C.beta = +e.target.value; renderC(); });
+$('cG').addEventListener('input', e => { C.gamma = +e.target.value; renderC(); });
+Object.keys(C.show).forEach(s => $('cShow-' + s).addEventListener('change', e => { C.show[s] = e.target.checked; renderC(); }));
+$('c7Next').addEventListener('click', () => { C.i7++; renderC7(); });
+$('c7Prev').addEventListener('click', () => { C.i7 = Math.max(0, C.i7 - 1); renderC7(); });
+$('c7First').addEventListener('click', () => { C.i7 = 0; renderC7(); });
+
+// ---- State in the URL hash: the open tab and its controls, e.g. #tab=b&rule=sec&dt=0.01&step=8
+const DEF = { A: { ...A }, B: { ...B }, C: { ...C, show: { ...C.show } } };
+function hashOf() {
+  const p = { tab };
+  if (tab === 'a') Object.assign(p, { preset: A.preset, scheme: A.scheme, all: +A.all, restart: +A.restart,
+                                      zoom: +A.zoom, step: A.i + 1 });
+  if (tab === 'b') Object.assign(p, { rule: B.rule, dt: +dtFromU(B.u).toPrecision(4), curve: B.curve,
+                                      method: B.meth, zoom: +B.zoom, step: B.i + 1 });
+  if (tab === 'c') Object.assign(p, { r: +rFromU(C.u).toPrecision(4), xi: C.xi, periods: C.P, theta: C.th,
+                                      beta: C.beta, gamma: C.gamma,
+                                      show: Object.keys(C.show).filter(s => C.show[s]).join(','), step: C.i7 + 1 });
+  return Object.entries(p).map(([k, v]) => k + '=' + v).join('&');
+}
+let hashTimer = null;   // debounced: Safari limits history.replaceState to about 100 calls in 30 s
+function writeHash() {
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => history.replaceState(null, '', '#' + hashOf()), 300);
+}
+function readHash() {
+  const h = location.hash.slice(1), old = h.match(/^tab-([abc])$/);
+  const p = Object.fromEntries(new URLSearchParams(old ? 'tab=' + old[1] : h));
+  const num = (k, lo, hi) => { const v = parseFloat(p[k]); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : null; };
+  const bool = k => p[k] == null ? null : p[k] === '1';
+  const step = () => { const v = num('step', 1, 1e4); return v == null ? null : Math.round(v) - 1; };
+  const t = ['a', 'b', 'c'].includes(p.tab) ? p.tab : 'a';
+  if (t === 'a') {
+    if (APRESETS[p.preset]) A.preset = p.preset;
+    if (SCHEMES[p.scheme]) A.scheme = p.scheme;
+    for (const k of ['all', 'restart', 'zoom']) if (bool(k) != null) A[k] = bool(k);
+    if (step() != null) A.i = step();
+  } else if (t === 'b') {
+    if (['tan', 'sec'].includes(p.rule)) B.rule = p.rule;
+    if (num('dt', 0.001, 0.03) != null) B.u = uFromDt(num('dt', 0.001, 0.03));
+    if (['wall', 'tanh'].includes(p.curve)) B.curve = p.curve;
+    if (['lin', 'avg'].includes(p.method)) B.meth = p.method;
+    if (bool('zoom') != null) B.zoom = bool('zoom');
+    if (step() != null) B.i = step();
+  } else {
+    if (num('r', 0.01, 2) != null) C.u = uFromR(num('r', 0.01, 2));
+    if (num('xi', 0, 0.2) != null) C.xi = num('xi', 0, 0.2);
+    if (num('periods', 10, 50) != null) C.P = Math.round(num('periods', 10, 50));
+    if (num('theta', 1, 2) != null) C.th = num('theta', 1, 2);
+    if (num('beta', 0, 0.5) != null) C.beta = num('beta', 0, 0.5);
+    if (num('gamma', 0, 1) != null) C.gamma = num('gamma', 0, 1);
+    if (p.show != null) { const on = p.show.split(','); Object.keys(C.show).forEach(s => { C.show[s] = on.includes(s); }); }
+    if (step() != null) C.i7 = step();
+  }
+  return t;
+}
+function syncControls() {
+  $('aPreset').value = A.preset;
+  document.querySelector(`input[name=aScheme][value=${A.scheme}]`).checked = true;
+  $('aAll').checked = A.all; $('aRestart').checked = A.restart; $('aZoom').checked = A.zoom;
+  $('bRule').value = B.rule; $('bDt').value = B.u; $('bCurve').value = B.curve; $('bMeth').value = B.meth;
+  $('bZoom').checked = B.zoom;
+  $('cR').value = C.u; $('cXi').value = C.xi; $('cP').value = C.P; $('cTh').value = C.th;
+  $('cB').value = C.beta; $('cG').value = C.gamma;
+  Object.keys(C.show).forEach(s => { $('cShow-' + s).checked = C.show[s]; });
+}
+function stopAll() { SWEEPS.forEach(sw => sw.stop()); if (B.timer) stopPlayB(); }
+function applyHash() { stopAll(); const t = readHash(); setupA(); setupB(); syncControls(); showTab(t); }
+window.addEventListener('hashchange', applyHash);
+$('reset').addEventListener('click', () => {
+  stopAll();
+  Object.assign(A, DEF.A); Object.assign(B, DEF.B); Object.assign(C, DEF.C, { show: { ...DEF.C.show } });
+  $('speed').value = '1';
+  setupA(); setupB(); syncControls(); render[tab]();
+});
+
+// theme changes: redraw with the new tokens
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => render[tab]());
+new MutationObserver(() => render[tab]()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+applyHash();
+// Plotly sizes a plot once; follow later changes of its box (KaTeX fonts loading, narrow screens).
+if (typeof Plotly !== 'undefined' && 'ResizeObserver' in window) {
+  const ro = new ResizeObserver(entries => entries.forEach(e => { if (e.target.data) Plotly.Plots.resize(e.target); }));
+  document.querySelectorAll('.plot').forEach(el => ro.observe(el));
+}
+</script>
+</body>
+</html>
