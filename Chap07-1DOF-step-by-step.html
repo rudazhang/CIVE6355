@@ -310,7 +310,8 @@ function springOO(bb) {
       return st.yn < 0 ? st.Vn / st.yn : bb.k0;
     } };
 }
-const damp = (sys, k) => sys.xi != null ? 2 * sys.xi * Math.sqrt(Math.max(k, 0) * sys.m) : sys.c;
+// constant damping: c = 2 xi sqrt(k0 m), the same damper after yielding (Chopra Secs. 1.4, 20.7.2)
+const damp = (sys, k) => sys.xi != null ? 2 * sys.xi * Math.sqrt(sys.spring.k0 * sys.m) : sys.c;
 
 const SCHEMES = {
   const: { type: 'nm', beta: 0, gamma: 0, label: 'constant ÿᵢ (0, 0)' },
@@ -697,16 +698,16 @@ function renderB() {
                  font: { color: css('--c-gap'), size: 12 }, xanchor: 'left' }];
   Plotly.react('p3', tr, lay({ annotations: ann, xaxis: ax('y (in)', { range: xr }), yaxis: ax('F<sub>s</sub> (kip)', { range: yr }) }), cfg);
   const c1 = damp(BR.sys, o.k);
-  $('p3read').innerHTML = `<table><tr><th>tᵢ</th><th>yᵢ</th><th>ẏᵢ</th><th>ÿᵢ</th><th>F<sub>s</sub>(yᵢ)</th><th>kᵢ</th><th>cᵢ</th><th>k̄ᵢ</th><th>ΔF̄ᵢ</th><th>Δyᵢ</th><th>Δẏᵢ</th><th>ÿᵢ₊₁</th></tr>
+  $('p3read').innerHTML = `<table><tr><th>tᵢ</th><th>yᵢ</th><th>ẏᵢ</th><th>ÿᵢ</th><th>F<sub>s</sub>(yᵢ)</th><th>kᵢ</th><th>c</th><th>k̄ᵢ</th><th>ΔF̄ᵢ</th><th>Δyᵢ</th><th>Δẏᵢ</th><th>ÿᵢ₊₁</th></tr>
     <tr><td>${fmt(s.t, 3)}</td><td>${fmt(s.y)}</td><td>${fmt(s.v, 2)}</td><td>${fmt(s.a, 0)}</td><td>${fmt(s.V, 1)}</td><td>${fmt(o.k, 0)}</td><td>${fmt(c1, 3)}</td>
     <td>${fmt(o.kbar, 0)}</td><td>${fmt(o.dFbar, 1)}</td><td>${fmt(o.dy, 5)}</td><td>${fmt(o.dv, 3)}</td><td>${fmt(s1.a, 0)}</td></tr></table>
-    <span class="note">units kip, in, s; cᵢ = 2ξ√(kᵢm) (not in Paz)${B.rule === 'sec' ? `; ${o.nIt} secant iterations` : ''}</span>`;
+    <span class="note">units kip, in, s; c = 2ξ√(k₀m), constant${B.rule === 'sec' ? `; ${o.nIt} secant iterations` : ''}</span>`;
   const kRule = B.rule === 'tan' ? String.raw`k_i = \left.\frac{dF_s}{dy}\right|_{y_i}`
     : String.raw`k_i = \frac{F_s(y_{i+1}) - F_s(y_i)}{\Delta y_i}`;
-  tex($('eq2'), String.raw`m\,\Delta\ddot y_i + c_i\,\Delta\dot y_i + \textcolor{${rc}}{k_i}\,\Delta y_i = \Delta F_i \ \ (6.7),\qquad \textcolor{${rc}}{${kRule}}`);
-  tex($('eq3'), (B.meth === 'lin' ? String.raw`\bar k_i = k_i + \frac{6m}{\Delta t^2} + \frac{3c_i}{\Delta t}\ \ (6.34)`
-    : String.raw`\bar k_i = k_i + \frac{4m}{\Delta t^2} + \frac{2c_i}{\Delta t}\ \ (6.45)`)
-    + String.raw`,\qquad c_i = 2\xi\sqrt{k_i m},\qquad \Delta t \le 0.1\,T_0 = ${fmt(0.1 * T0, 4)}\text{ s}`);
+  tex($('eq2'), String.raw`m\,\Delta\ddot y_i + c\,\Delta\dot y_i + \textcolor{${rc}}{k_i}\,\Delta y_i = \Delta F_i \ \ (6.7),\qquad \textcolor{${rc}}{${kRule}}`);
+  tex($('eq3'), (B.meth === 'lin' ? String.raw`\bar k_i = k_i + \frac{6m}{\Delta t^2} + \frac{3c}{\Delta t}\ \ (6.34)`
+    : String.raw`\bar k_i = k_i + \frac{4m}{\Delta t^2} + \frac{2c}{\Delta t}\ \ (6.45)`)
+    + String.raw`,\qquad c = 2\xi\sqrt{k_0 m},\qquad \Delta t \le 0.1\,T_0 = ${fmt(0.1 * T0, 4)}\text{ s}`);
   // panel 3
   const t = S.map(q => q.t), y = S.map(q => q.y), V = S.map(q => q.V);
   const Ft = linspace(0, 0.13, 131);
