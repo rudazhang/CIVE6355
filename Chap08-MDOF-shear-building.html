@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Multi-Story Shear Building — CIVE 6355</title>
+<!-- CIVE 6355 Structural Dynamics, deck 08 (Paz Sec. 7.1), from 202603/src/Chap08-animation-spec.md.
+     Tab A: columns of [K] and [R]; tab B: P-Delta, gravity softens the building; tab C: the shear
+     building against a frame with bending beams and axial column strain. No frequencies or modes:
+     they are deck 09. Open this file directly in a browser (internet needed for Plotly and KaTeX).
+     The state is in the URL hash, e.g. #tab=b&preset=demo&r=0.5. On a landscape screen (the iPad in
+     class) each tab fits one screen; see the last @media. -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.3/plotly.min.js"></script>
+<style>
+  /* Layout: header with tabs, one control bar per tab, panels in a grid (same as the deck 07 app) */
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1f; --muted: #66666c; --line: #d9d9de;
+    --grid: #ececef; --uh: #c8102e; --hl: #fff4d6;
+    --c-pos: #1f5fbf; --c-neg: #d9621c; --c-net: #188a4a; --c-grav: #7a3fb0; --c-ghost: #9a9aa2;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color-scheme: light;
+  }
+  /* Light by default, whatever the system setting (projectors); the header button sets dark */
+  :root[data-theme="dark"] {
+    --bg: #17181b; --panel: #202226; --ink: #e8e8ea; --muted: #a0a0a8; --line: #3a3c42;
+    --grid: #2c2e33; --uh: #ff5a6e; --hl: #3a3420;
+    --c-pos: #6aa5ff; --c-neg: #ff9b5c; --c-net: #4cc77f; --c-grav: #b88cf0; --c-ghost: #8a8a92;
+    color-scheme: dark }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  /* No double-tap zoom on the iPad when something is tapped repeatedly */
+  html, body, button, input, select, label, nav a, .svgbox { touch-action: manipulation; }
+  button, nav a, label, .svgbox { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--ink);
+         font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         padding-left: max(16px, env(safe-area-inset-left, 0px));
+         padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 8px 24px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; padding-block: 4px 8px; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .sub { color: var(--muted); }
+  nav { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  nav a { padding: 6px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0;
+          color: var(--muted); text-decoration: none; }
+  nav a.on { background: var(--panel); border-color: var(--line); color: var(--ink); font-weight: 600;
+             margin-bottom: -1px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; }
+  .bar label, .bar .grp, .ctl label, .ctl .grp { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; white-space: nowrap; }
+  .bar input[type=range], .ctl input[type=range] { width: 130px; }
+  .val { font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 3em; }
+  .sym { font-style: italic; font-family: "Times New Roman", serif; font-size: 16px; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+           border-radius: 4px; padding: 2px 9px; cursor: pointer; }
+  button.on { background: var(--uh); border-color: var(--uh); color: #fff; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, select:focus-visible, input:focus-visible, nav a:focus-visible { outline: 2px solid var(--uh); outline-offset: 1px; }
+  select { font: inherit; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; max-width: 190px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #sec-b .grid { grid-template-columns: 0.82fr 1.1fr 1.08fr; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px 8px;
+           min-width: 0; display: flex; flex-direction: column; gap: 4px; position: relative; }
+  .panel h2 { font-size: 15px; margin: 2px 0 0; }
+  .panel h2 .ref { font-weight: 400; color: var(--muted); font-size: 13px; }
+  .see { color: var(--muted); font-size: 13px; margin: 0; }
+  .see b { color: var(--ink); font-weight: 600; }
+  .plot { width: 100%; min-width: 0; }
+  .svgbox { position: relative; width: 100%; min-width: 0; overflow: hidden; }
+  .svgbox svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .svgbox svg * { pointer-events: none; }
+  .svgbox [data-floor], .svgbox [data-chip], .svgbox [data-chip] *, .svgbox [data-handle] { pointer-events: auto; cursor: pointer; }
+  .svgbox [data-handle] { cursor: ew-resize; }
+  .svgbox.drag { touch-action: none; }
+  .h130 { height: 130px; } .h170 { height: 170px; } .h220 { height: 220px; } .h300 { height: 300px; } .h420 { height: 420px; }
+  .duo { display: flex; gap: 8px; flex-wrap: wrap; }
+  .duo > * { min-width: 0; }
+  .f1 { flex: 1 1 260px; } .f2 { flex: 2 1 260px; } .fnone { flex: none; }
+  .col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .ctl { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 13px; }
+  .readout { font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; overflow-x: auto; }
+  .note { font-size: 12.5px; color: var(--muted); font-family: inherit; }
+  .bad { color: var(--uh); font-weight: 600; }
+  .chk { display: inline-flex; gap: 4px; align-items: center; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 2px; }
+  .tools { margin-left: auto; display: inline-flex; gap: 10px; align-items: center; color: var(--muted); }
+  .eq { text-align: center; font-size: 14px; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+  .eq .katex-html { white-space: nowrap; }
+  #loaderr { display: none; margin: 12px 0; padding: 12px; background: var(--hl); border: 1px solid var(--uh); }
+  /* matrices as grids of cells */
+  .matT { font-size: 12.5px; color: var(--muted); margin-bottom: 2px; }
+  table.mat { border-collapse: collapse; font-family: var(--mono); font-variant-numeric: tabular-nums;
+              border-left: 2px solid var(--ink); border-right: 2px solid var(--ink); }
+  table.mat td { padding: 3px 4px; text-align: right; white-space: nowrap; min-width: 2em; border: 1px solid var(--grid); }
+  table.mat td.cj { border-left: 2px solid var(--uh); border-right: 2px solid var(--uh); font-weight: 600; }
+  table.mat td.cj.t { border-top: 2px solid var(--uh); }
+  table.mat td.cj.b { border-bottom: 2px solid var(--uh); }
+  table.mat td.ri { border-top: 2px dotted var(--uh); border-bottom: 2px dotted var(--uh); }
+  table.mat td.empty { color: var(--line); text-align: center; }
+  /* the story table floats over the panels, so opening it does not move them */
+  #pop { display: none; position: fixed; z-index: 20; left: 50%; top: 96px; transform: translateX(-50%);
+         max-width: calc(100vw - 24px); max-height: calc(100vh - 110px); overflow: auto; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+  #pop table { border-collapse: collapse; font-size: 13px; }
+  #pop td, #pop th { padding: 2px 6px; text-align: left; white-space: nowrap; }
+  #pop th { color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); }
+  #pop input[type=range] { width: 92px; vertical-align: middle; }
+  #pop .val { display: inline-block; min-width: 4.2em; text-align: right; }
+  #pop button.play { padding: 0 5px; }
+  .hmrow { display: flex; gap: 4px; }
+  .hm { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+  .hmt { font-size: 12.5px; color: var(--muted); text-align: center; }
+  body.nocap .see { display: none; }
+  @media (max-width: 1000px) {
+    #sec-b .grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+    .bar input[type=range] { width: 110px; }
+    .tools { margin-left: 0; }
+  }
+  /* Landscape screens (the iPad in class): the open tab fills the screen and the drawings and plots
+     take the height left over, so nothing needs scrolling. */
+  @media (min-width: 1000px) and (min-height: 600px) and (orientation: landscape) {
+    body { height: 100vh; height: 100dvh; margin: 0; display: flex; flex-direction: column;
+           padding-block: 4px 8px; overflow: hidden; }
+    header, nav, .bar { flex: none; }
+    section:not([hidden]) { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+    section > .grid { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+    .panel { min-height: 0; overflow: hidden; }
+    .plot, .svgbox { flex: 1 1 0; height: auto; min-height: 60px; overflow: hidden; }
+    .plot.h130, .svgbox.h130 { flex: 0.7 1 0; }
+    .duo { flex: 1 1 0; min-height: 0; flex-wrap: nowrap; }
+    .duo.slim { flex: 0 1 auto; }
+    .col { min-height: 0; }
+    .hmrow { flex: 0.75 1 0; min-height: 0; }
+    .hm .plot { flex: 1 1 0; }
+    #sec-b .see { font-size: 12.5px; line-height: 1.3; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Multi-story shear building</h1>
+  <span class="sub">CIVE 6355 · deck 08 · Paz Sec. 7.1</span>
+  <span class="tools">
+    <label>speed <select id="speed">
+      <option value="0.25">¼×</option><option value="0.5">½×</option>
+      <option value="1" selected>1×</option><option value="2">2×</option>
+    </select></label>
+    <button id="caps" class="on" title="show or hide the explanations under the panel titles">captions</button>
+    <button id="theme" title="light or dark colors">☾ dark</button>
+    <button id="reset" title="all controls back to their defaults">Reset</button>
+  </span>
+</header>
+<div id="loaderr">Plotly/KaTeX could not be loaded from the CDN. This page needs an internet connection.</div>
+<nav id="tabs">
+  <a href="#tab=a" data-tab="a">A · Columns of [K] and [R]</a>
+  <a href="#tab=b" data-tab="b">B · P-Δ: gravity softens the building</a>
+  <a href="#tab=c" data-tab="c">C · When the shear building fails</a>
+</nav>
+<div id="pop"></div>
+
+<!-- ======================= Tab A ======================= -->
+<section id="sec-a" hidden>
+  <div class="bar">
+    <label>Building <select id="aPreset" class="presetAB"></select></label>
+    <span class="grp">stories <span class="sym">n</span><button class="play" id="aNPlay" title="sweep n">▶</button>
+      <input type="range" id="aN" min="1" max="10" step="1" style="width:90px"><span class="val" id="aNLbl"></span></span>
+    <button id="aTbl" title="story stiffness, height and weight, one slider per story">stories…</button>
+    <span class="grp">floor <span class="sym">j</span>
+      <input type="range" id="aJ" min="1" max="3" step="1" style="width:90px"><span class="val" id="aJLbl"></span>
+      <button id="aPrev" title="previous floor">◀</button><button id="aNext" title="next floor">Step ▶</button><button id="aPlay" title="step j = 1, ..., n">▶ play</button></span>
+    <label class="chk" title="every column of [K] at once, instead of filling it as floors are visited"><input type="checkbox" id="aAllK">all of [K]</label>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>1 · A column of [K]: hold all floors, push one <span class="ref">Paz 7.1; Eq. 7.5</span></h2>
+      <p class="see">Floor <i>j</i> (tap one to choose it) moved one unit, the others clamped; arrows: the forces that hold the shape.
+        <b>Only the two stories next to floor <i>j</i> deform, so only floors <i>j</i> − 1, <i>j</i>, <i>j</i> + 1 need a force: [K] is tridiagonal.</b>
+        The column sums to zero, except <i>j</i> = 1, where the ground takes −k₁. The dotted row matches the boxed column: k<sub>ij</sub> = k<sub>ji</sub>.</p>
+      <div class="eq" id="eq1"></div>
+      <div class="ctl">
+        <label class="chk" title="hide the forces; set each floor's sign, then reveal"><input type="checkbox" id="aPred">predict the signs</label>
+        <button id="aReveal" disabled>reveal</button>
+        <span class="note" id="a1msg"></span>
+      </div>
+      <div class="duo">
+        <div id="a1svg" class="svgbox f1 h420" role="img" aria-label="building with one floor displaced and the holding forces"></div>
+        <div class="col fnone" id="a1grid"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>2 · A column of [R]: push one floor, let all move <span class="ref">not in Paz; 2024 notes L20</span></h2>
+      <p class="see">A unit static force at floor <i>j</i>, every floor free; numbers in the stories: the shear.
+        <b>Stories below floor <i>j</i> carry the whole unit shear, stories above carry none, so the floors above ride along.</b>
+        Every floor moves, so [R] is dense: a sparse [K] has a dense inverse. Outlines: cells of equal value, the L-shapes.</p>
+      <div class="eq" id="eq2"></div>
+      <div class="ctl">
+        <label>Load <select id="aLoad"></select></label>
+        <label class="chk" title="drag each floor to your guess, then reveal"><input type="checkbox" id="aPred2">predict the shape</label>
+        <button id="aReveal2" disabled>reveal</button>
+        <span class="note" id="a2msg"></span>
+      </div>
+      <div class="duo">
+        <div id="a2svg" class="svgbox f1 h420" role="img" aria-label="building deflected by the load"></div>
+        <div class="col fnone" id="a2grid"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= Tab B ======================= -->
+<section id="sec-b" hidden>
+  <div class="bar">
+    <label>Building <select id="bPreset" class="presetAB"></select></label>
+    <span class="grp"><span class="sym">n</span><button class="play" id="bNPlay" title="sweep n">▶</button>
+      <input type="range" id="bN" min="1" max="10" step="1" style="width:70px"><span class="val" id="bNLbl"></span></span>
+    <button id="bTbl" title="story stiffness, height and weight, one slider per story">stories…</button>
+    <label>Load <select id="bLoad"></select></label>
+    <label id="bJWrap">floor <select id="bJ"></select></label>
+    <span class="grp"><span class="sym">λ/λ<sub>cr</sub></span><button class="play" id="bRPlay" title="sweep the gravity multiplier">▶</button>
+      <input type="range" id="bR" min="0" max="1.2" step="0.001" list="bRTicks" style="width:170px">
+      <span class="val" id="bRLbl"></span><button id="bOwn" title="the preset's own weight">λ = 1</button></span>
+    <datalist id="bRTicks"></datalist>
+    <span class="note" id="bCr"></span>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>3 · Gravity as a negative spring <span class="ref">2024 L19; Chopra Ex. 1.6</span></h2>
+      <p class="see">One portal frame. <b>The weight carried through the sway pushes it further, like a spring of stiffness −W/h</b>; the net stiffness falls linearly with W and is zero at W = kh, where the net line lies flat and never meets H.</p>
+      <div class="ctl">
+        <span class="grp"><span class="sym">H</span><button class="play" id="pHPlay" title="sweep H">▶</button><input type="range" id="pH" min="0" max="30" step="0.1" style="width:80px"><span class="val" id="pHLbl"></span></span>
+        <span class="grp"><span class="sym">θ</span><button class="play" id="pThPlay" title="sweep θ">▶</button><input type="range" id="pTh" min="0" max="1.1" step="0.001" style="width:80px"><span class="val" id="pThLbl"></span></span>
+        <label class="chk" title="the overturning moment W y as a horizontal couple W y / h"><input type="checkbox" id="pCouple">couple</label>
+      </div>
+      <div class="eq" id="eq3"></div>
+      <div id="p3svg" class="svgbox h220" role="img" aria-label="portal frame swaying under its weight and a lateral load"></div>
+      <div id="p3plot" class="plot h220"></div>
+    </div>
+    <div class="panel">
+      <h2>4 · The building leans under gravity <span class="ref">not in Paz; 2024 L19; Chopra Ex. 9.8</span></h2>
+      <p class="see">Grey: first order, magnification fixed at λ = 0. <b>The drift grows faster than λ, story by story: the story with the largest θ<sub>i</sub> goes first, without bound as λ → λ<sub>cr</sub>.</b> <span id="p4note"></span></p>
+      <div class="ctl">
+        <label class="chk" title="the story couples and the floor forces they induce"><input type="checkbox" id="bCouples"><span>couples, q<sub>i</sub></span></label>
+        <label class="chk" title="the load applied suddenly at t = 0, average acceleration"><input type="checkbox" id="bStep">step load</label>
+        <span class="grp" id="bStepCtl" hidden><span class="sym">ξ</span><button class="play" id="bXiPlay" title="sweep ξ">▶</button><input type="range" id="bXi" min="0" max="0.1" step="0.001" style="width:70px"><span class="val" id="bXiLbl"></span>
+          <button id="bTPlay">▶ play</button><input type="range" id="bT" min="0" max="1" step="0.002" style="width:70px"><span class="val" id="bTLbl"></span></span>
+      </div>
+      <div class="eq" id="eq4"></div>
+      <div class="duo">
+        <div id="p4svg" class="svgbox h420" style="flex:3 1 260px" role="img" aria-label="building swaying under the lateral load and gravity"></div>
+        <div class="col" style="flex:2 1 150px">
+          <div id="p4bar1" class="plot h220"></div>
+          <div id="p4bar2" class="plot h220"></div>
+        </div>
+      </div>
+      <div id="p4time" class="plot h130" style="display:none"></div>
+      <div class="readout" id="p4read"></div>
+    </div>
+    <div class="panel">
+      <h2>5 · Where λ<sub>cr</sub> comes from <span class="ref">not in Paz</span></h2>
+      <p class="see">Top: the iteration. <b>Each round adds the previous increment times λ/λ<sub>cr</sub>, a geometric series: it converges below λ<sub>cr</sub> and runs away above it.</b> Below: gravity takes P<sub>i</sub>/h<sub>i</sub> off every story, and the building fails when the weakest story reaches zero.</p>
+      <div class="ctl">
+        <button id="b5Next">Next round</button><button id="b5Play">▶ play</button><button id="b5First" title="back to round 0">⏮</button>
+        <span class="val" id="b5Lbl"></span><span class="note">capped at 30 rounds</span>
+      </div>
+      <div id="p5a" class="plot h220"></div>
+      <div class="duo">
+        <div id="p5b" class="plot f1 h220" style="flex-basis:200px"></div>
+        <div class="col fnone" style="width:96px">
+          <div class="note" style="text-align:center">buckled shape at λ<sub>cr</sub></div>
+          <div id="p5svg" class="svgbox" style="flex:1 1 0;min-height:120px" role="img" aria-label="buckled shape: one story racks"></div>
+        </div>
+      </div>
+      <div class="eq" id="eq5"></div>
+      <div class="eq" id="eq5b"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= Tab C ======================= -->
+<section id="sec-c" hidden>
+  <div class="bar">
+    <label>Building <select id="cPreset" style="max-width:170px"></select></label>
+    <span class="grp"><span class="sym">n</span><button class="play" id="cNPlay" title="sweep n">▶</button>
+      <input type="range" id="cN" min="1" max="10" step="1" style="width:70px"><span class="val" id="cNLbl"></span></span>
+    <button id="cTbl" title="story stiffness, height and weight, one slider per story">stories…</button>
+    <label>Load <select id="cLoad" style="max-width:120px"></select></label>
+    <span class="grp" title="beam-to-column stiffness ratio, Chopra Eq. (1.3.5); right end: rigid"><span class="sym">ρ</span><button class="play" id="cRhoPlay" title="sweep ρ">▶</button>
+      <input type="range" id="cRho" min="-2" max="2.2" step="0.005" style="width:110px"><span class="val" id="cRhoLbl"></span></span>
+    <span class="grp" title="A_c h² / I_c = (h/r)²; W14 sections in a 12 ft story give 460 to 610"><label class="chk" title="let the columns stretch; off: axially rigid"><input type="checkbox" id="cAx"><span>axial, A<sub>c</sub>h²/I<sub>c</sub></span></label><button class="play" id="cAPlay" title="sweep the column axial stiffness">▶</button>
+      <input type="range" id="cA" min="100" max="2000" step="1" style="width:90px"><span class="val" id="cALbl"></span></span>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>6 · Rigid floors against bending beams <span class="ref">Paz 7.1 assumptions; Chopra 9.3, Fig. 1.3.3</span></h2>
+      <p class="see">Same columns, same load, one scale; ticks show joint rotation. <b>Rigid beams keep every joint square, so each column bends in double curvature with k = 12EI/h³. As ρ falls the joints rotate and the frame softens</b>, up to ×4 for one story (6EI<sub>c</sub>/h³ against 24EI<sub>c</sub>/h³). With axial strain a tall frame also bends as a whole. Paz's third assumption reads two ways: no P-Δ (tab B) and no axial strain (the toggle).</p>
+      <div class="eq" id="eq6"></div>
+      <div class="duo">
+        <div id="c6a" class="svgbox f1 h420" role="img" aria-label="shear building deflected"></div>
+        <div id="c6b" class="svgbox f1 h420" role="img" aria-label="frame with flexible beams deflected"></div>
+      </div>
+      <div class="readout" id="c6read"></div>
+      <div class="duo slim" id="c6mats"></div>
+    </div>
+    <div class="panel">
+      <h2>7 · What it does to [K] and [R] <span class="ref">Chopra Eq. 9.3.5</span></h2>
+      <p class="see"><b>Once the joints rotate, a floor's displacement pulls on floors two and three away, so the frame's [K] fills in; tridiagonal is a property of the model, not of buildings.</b> [R] is dense either way. The shear building's drift is largest at the bottom, where the story shear is; with axial strain it spreads up the height, toward a cantilever's profile.</p>
+      <div class="hmrow">
+        <div class="hm"><div class="hmt">[K], shear building</div><div id="h1" class="plot h170"></div></div>
+        <div class="hm"><div class="hmt">[K], frame</div><div id="h2" class="plot h170"></div></div>
+        <div class="hm"><div class="hmt">[R], shear building</div><div id="h3" class="plot h170"></div></div>
+        <div class="hm"><div class="hmt">[R], frame</div><div id="h4" class="plot h170"></div></div>
+      </div>
+      <div class="readout" id="c7read"></div>
+      <div class="duo">
+        <div id="c7a" class="plot f1 h300"></div>
+        <div id="c7b" class="plot f1 h300"></div>
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+"use strict";
+// CORE-BEGIN ---- Numbers only, no page: matrices, P-Delta, step load, frame (spec, Notes). --------
+const zeros = (r, c) => Array.from({ length: r }, () => new Array(c).fill(0));
+const sum = a => a.reduce((s, x) => s + x, 0);
+const matVec = (A, x) => A.map(r => r.reduce((s, v, j) => s + v * x[j], 0));
+const matMul = (A, B) => A.map(r => B[0].map((_, j) => r.reduce((s, v, l) => s + v * B[l][j], 0)));
+const dot = (a, b) => a.reduce((s, v, i) => s + v * b[i], 0);
+const identity = n => Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => +(i === j)));
+
+// Gaussian elimination with partial pivoting; factor once, solve many
+function luFactor(A0) {
+  const n = A0.length, A = A0.map(r => r.slice()), piv = A.map((_, i) => i);
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let i = c + 1; i < n; i++) if (Math.abs(A[i][c]) > Math.abs(A[p][c])) p = i;
+    if (p !== c) { [A[p], A[c]] = [A[c], A[p]]; [piv[p], piv[c]] = [piv[c], piv[p]]; }
+    if (A[c][c] === 0) continue;
+    for (let i = c + 1; i < n; i++) {
+      const f = A[i][c] / A[c][c]; A[i][c] = f;
+      if (f !== 0) for (let j = c + 1; j < n; j++) A[i][j] -= f * A[c][j];
+    }
+  }
+  return { A, piv };
+}
+function luSolve({ A, piv }, b) {
+  const n = A.length, x = piv.map(p => b[p]);
+  for (let i = 1; i < n; i++) for (let j = 0; j < i; j++) x[i] -= A[i][j] * x[j];
+  for (let i = n - 1; i >= 0; i--) { for (let j = i + 1; j < n; j++) x[i] -= A[i][j] * x[j]; x[i] /= A[i][i]; }
+  return x;
+}
+const solve = (A, b) => luSolve(luFactor(A), b);
+
+// [K] for story stiffnesses k: k_ii = k_i + k_i+1, k_i,i+1 = -k_i+1 (Paz 7.5 for n = 3)
+function stiffness(k) {
+  const n = k.length, K = zeros(n, n);
+  for (let i = 0; i < n; i++) {
+    K[i][i] = k[i] + (i + 1 < n ? k[i + 1] : 0);
+    if (i + 1 < n) K[i][i + 1] = K[i + 1][i] = -k[i + 1];
+  }
+  return K;
+}
+// [R]: r_ij = sum_{l <= min(i,j)} 1/k_l
+function flexibility(k) {
+  const n = k.length, c = []; let s = 0;
+  for (let i = 0; i < n; i++) { s += 1 / k[i]; c.push(s); }
+  return Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => c[Math.min(i, j)]));
+}
+// Weight above level i: P_i = sum_{j >= i} W_j
+function above(W) { const P = W.slice(); for (let i = W.length - 2; i >= 0; i--) P[i] += P[i + 1]; return P; }
+const storyRatios = b => { const P = above(b.W); return b.k.map((k, i) => k * b.h[i] / P[i]); };
+// lambda_cr = min k_i h_i / P_i; [K_G] is [K] with k_i -> P_i/h_i, so no eigen-solver is needed
+function critical(b) {
+  const r = storyRatios(b); let c = 0;
+  r.forEach((v, i) => { if (v < r[c]) c = i; });
+  return { lamCr: r[c], story: c, ratios: r };
+}
+const geomStiffness = b => { const P = above(b.W); return stiffness(P.map((p, i) => p / b.h[i])); };
+// ([K] - lambda [K_G]) y = F by stories: drift_i = V_i / (k_i - lambda P_i / h_i), V_i not
+// depending on lambda (the same answer as the matrix solve, and it survives lambda = lambda_cr)
+function leaned(b, lam, F) {
+  const P = above(b.W), V = above(F), n = b.k.length, y = [], D = [];
+  let s = 0;
+  for (let i = 0; i < n; i++) {
+    const den = b.k[i] - lam * P[i] / b.h[i];
+    const d = Math.abs(den) < 1e-12 * b.k[i] ? (V[i] === 0 ? 0 : Infinity) : V[i] / den;
+    D.push(d); s += d; y.push(s);
+  }
+  return { y, D };
+}
+// P-Delta iteration: y_m+1 = y_0 + lambda [R][K_G] y_m; returns the rounds 0..N
+function pdIteration(b, lam, F, N) {
+  const R = flexibility(b.k), KG = geomStiffness(b), y0 = matVec(R, F), out = [y0];
+  for (let m = 0; m < N; m++) {
+    const q = matVec(KG, out[m]).map(v => lam * v);
+    out.push(matVec(R, q).map((v, i) => v + y0[i]));
+  }
+  return out;
+}
+// Lowest natural frequency, only for the damping of the step load: inverse iteration on [R][M]
+function omega1(k, m) {
+  const R = flexibility(k), K = stiffness(k), n = k.length;
+  let x = new Array(n).fill(1);
+  for (let it = 0; it < 400; it++) {
+    x = matVec(R, x.map((v, i) => v * m[i]));
+    const s = Math.max(...x.map(Math.abs)); x = x.map(v => v / s);
+  }
+  return Math.sqrt(dot(x, matVec(K, x)) / dot(x, x.map((v, i) => v * m[i])));
+}
+// Step load: average acceleration (Newmark 1/4, 1/2, as in the deck 07 app), [C] = a1 [K]
+function stepLoad(b, lam, F, xi, g, dt, N) {
+  const n = b.k.length, m = b.W.map(w => w / g), K = stiffness(b.k), KG = geomStiffness(b);
+  const w1 = omega1(b.k, m), a1 = 2 * xi / w1;
+  const c2 = 2 / dt, c4 = 4 / (dt * dt);
+  const Keff = K.map((r, i) => r.map((v, j) => v - lam * KG[i][j]));
+  const Khat = Keff.map((r, i) => r.map((v, j) => v + c2 * a1 * K[i][j] + (i === j ? c4 * m[i] : 0)));
+  const f = luFactor(Khat);
+  let y = new Array(n).fill(0), v = new Array(n).fill(0), a = F.map((x, i) => x / m[i]);
+  const every = Math.max(1, Math.floor(N / 900)), T = [0], Y = [y.slice()];
+  for (let s = 1; s <= N; s++) {
+    const cv = matVec(K, y.map((yi, i) => c2 * yi + v[i])).map(x => a1 * x);
+    const rhs = F.map((Fi, i) => Fi + m[i] * (c4 * y[i] + 2 * c2 * v[i] + a[i]) + cv[i]);
+    const y1 = luSolve(f, rhs);
+    for (let i = 0; i < n; i++) {
+      const dy = y1[i] - y[i], v1 = c2 * dy - v[i];
+      a[i] = c4 * dy - 2 * c2 * v[i] - a[i]; v[i] = v1; y[i] = y1[i];
+    }
+    if (s % every === 0 || s === N) { T.push(s * dt); Y.push(y.slice()); }
+  }
+  return { T, Y, w1 };
+}
+// Frame (tab C): one bay, two columns per story, Euler-Bernoulli elements. DOFs: u_i per floor
+// (beams axially rigid), joint rotations (theta = du/dz, clockwise positive), vertical joint
+// displacements if the columns stretch, base rotations if pinned. Everything but u_i is condensed
+// out (Chopra Eq. 9.3.5) and recovered for the drawing (Eq. 9.3.3).
+const RIGID_BEAM = 1e8;
+function frameModel(b, { rho, axial = false, Ar = 550, L = null }) {
+  const n = b.k.length, h = b.h, c = i => (b.pinned && i === 0 ? 3 : 12);
+  const EIc = b.k.map((k, i) => k * h[i] ** 3 / (2 * c(i)));
+  const span = L ?? 2 * h[0];
+  const EIb = EIc.map((EI, i) => (rho === Infinity ? RIGID_BEAM : rho) * 2 * EI / h[i] * span);
+  let nd = n;
+  const thL = [], thR = [], vL = [], vR = [];
+  for (let i = 0; i < n; i++) { thL.push(nd++); thR.push(nd++); }
+  if (axial) for (let i = 0; i < n; i++) { vL.push(nd++); vR.push(nd++); }
+  const bL = b.pinned ? nd++ : -1, bR = b.pinned ? nd++ : -1;
+  const K = zeros(nd, nd);
+  const add = (dofs, signs, ke) => dofs.forEach((p, a) => { if (p < 0) return;
+    dofs.forEach((q, e) => { if (q >= 0) K[p][q] += signs[a] * signs[e] * ke[a][e]; }); });
+  const beam = (EI, l) => { const f = EI / l ** 3;
+    return [[12 * f, 6 * l * f, -12 * f, 6 * l * f], [6 * l * f, 4 * l * l * f, -6 * l * f, 2 * l * l * f],
+            [-12 * f, -6 * l * f, 12 * f, -6 * l * f], [6 * l * f, 2 * l * l * f, -6 * l * f, 4 * l * l * f]]; };
+  for (let i = 0; i < n; i++) {
+    const ub = i === 0 ? -1 : i - 1, ke = beam(EIc[i], h[i]);
+    add([ub, i === 0 ? bL : thL[i - 1], i, thL[i]], [1, 1, 1, 1], ke);
+    add([ub, i === 0 ? bR : thR[i - 1], i, thR[i]], [1, 1, 1, 1], ke);
+    if (axial) {   // EA/h with A_c h^2/I_c = Ar
+      const ea = Ar * EIc[i] / h[i] ** 2 / h[i], ax = [[ea, -ea], [-ea, ea]];
+      add([i === 0 ? -1 : vL[i - 1], vL[i]], [1, 1], ax);
+      add([i === 0 ? -1 : vR[i - 1], vR[i]], [1, 1], ax);
+    }
+    // the beam's slope dv/dx is -theta at both ends
+    add([axial ? vL[i] : -1, thL[i], axial ? vR[i] : -1, thR[i]], [1, -1, 1, -1], beam(EIb[i], span));
+  }
+  const m0 = nd - n, K00 = zeros(m0, m0), K0t = zeros(m0, n);
+  for (let p = 0; p < m0; p++) {
+    for (let q = 0; q < m0; q++) K00[p][q] = K[n + p][n + q];
+    for (let q = 0; q < n; q++) K0t[p][q] = K[n + p][q];
+  }
+  const f00 = m0 ? luFactor(K00) : null;
+  const X = [];   // K00^-1 K0t, by columns
+  for (let q = 0; q < n; q++) X.push(m0 ? luSolve(f00, K0t.map(r => r[q])) : []);
+  const Khat = zeros(n, n);
+  for (let p = 0; p < n; p++) for (let q = 0; q < n; q++) {
+    let s = K[p][q];
+    for (let l = 0; l < m0; l++) s -= K[p][n + l] * X[q][l];
+    Khat[p][q] = s;
+  }
+  // symmetric by construction; average out the rounding
+  for (let p = 0; p < n; p++) for (let q = 0; q < p; q++) Khat[p][q] = Khat[q][p] = (Khat[p][q] + Khat[q][p]) / 2;
+  const fK = luFactor(Khat);
+  return { n, h, span, Khat, EIc, EIb,
+    R() { const I = identity(n), cols = I.map(e => luSolve(fK, e));
+          return I.map((_, i) => I.map((_, j) => cols[j][i])); },
+    // the deflected frame under the floor forces F: u, joint rotations, vertical displacements
+    deflect(F) {
+      const u = luSolve(fK, F), rest = new Array(m0).fill(0);
+      for (let q = 0; q < n; q++) for (let l = 0; l < m0; l++) rest[l] -= X[q][l] * u[q];
+      const at = d => (d < 0 ? 0 : rest[d - n]);
+      return { u,
+        thL: thL.map(at), thR: thR.map(at),
+        vL: axial ? vL.map(at) : u.map(() => 0), vR: axial ? vR.map(at) : u.map(() => 0),
+        baseL: at(bL), baseR: at(bR) };
+    } };
+}
+// The shear building as a deflected frame: joints square, floors level
+function shearDeflect(b, F) {
+  const u = matVec(flexibility(b.k), F), zero = u.map(() => 0);
+  const th0 = b.pinned ? 1.5 * u[0] / b.h[0] : 0;
+  return { u, thL: zero, thR: zero, vL: zero, vR: zero, baseL: th0, baseR: th0 };
+}
+// Chopra Eq. (1.3.5), one story, for the check
+const chopra135 = (EI, h, rho) => 24 * EI / h ** 3 * (12 * rho + 1) / (12 * rho + 4);
+
+// Buildings. Units: kip, in, s (presets from the examples handout and the code demo), or normalized
+const UNITS = {
+  kip: { k: 'kip/in', y: 'in', f: 'kip', h: 'in', w: 'kip', t: 's', g: 386, EI: 'kip·in²', real: true },
+  norm: { k: 'k', y: 'F/k', f: 'F', h: 'h', w: 'kh', t: '√(m/k)', g: 0.01, EI: 'kh³', real: false },
+  EI: { k: 'EI/h³', y: 'Fh³/EI', f: 'F', h: 'h', w: 'kh', t: '√(m/k)', g: 0.01, EI: 'EI', real: false },
+};
+const E_STEEL = 29000;
+const uniformB = (n, extra = {}) => ({ units: 'norm', k: new Array(n).fill(1), h: new Array(n).fill(1),
+  W: new Array(n).fill(0.01), pinned: false, F: null, ...extra });
+const PRESETS = {
+  uniform: { label: 'Uniform n-story (normalized)', n: 3, make: uniformB },
+  demo: { label: "Code demo's building: 3 stories, pinned bases", n: 3, make: () => {
+    const h = [180, 144, 144], I = [999, 307, 204], c = [3, 12, 12];
+    return { units: 'kip', h, W: [621, 612, 360], pinned: true, F: [30.375, 27, 13.5],
+             k: I.map((v, i) => 8 * c[i] * E_STEEL * v / h[i] ** 3) }; },
+    note: 'At its own weight θ₁ = 0.074: story 1 drifts 8% more, the roof 6.4% more; at half of λ<sub>cr</sub> the roof 78% more.' },
+  p811: { label: 'Chopra Prob. 8.11: 3 stories, EI, 2EI/3, EI/3', n: 3, make: () => {
+    const f = 2 * 12 * E_STEEL * 1400 / 144 ** 3;
+    return { units: 'kip', h: [144, 144, 144], W: [100, 100, 50], pinned: false, F: [8.64, 8.64, 4.32],
+             k: [f, f * 2 / 3, f / 3] }; },
+    note: 'At its own weight θ₁ = 0.0053: P-Δ adds 0.5%, which is why the shear model can usually leave it out.' },
+  p811e: { label: 'Chopra Prob. 8.11, uniform EI (Problem A(e))', n: 3, make: () => {
+    const f = 2 * 12 * E_STEEL * 1400 / 144 ** 3;
+    return { units: 'kip', h: [144, 144, 144], W: [100, 100, 50], pinned: false, F: [8.64, 8.64, 4.32],
+             k: [f, f, f] }; } },
+  ex91: { label: 'Chopra Ex. 9.1a, 9.8: 2 stories, leaning columns', n: 2, make: () => {
+    const f = 12 * E_STEEL * 250 / 144 ** 3;
+    return { units: 'kip', h: [144, 144], W: [600, 300], pinned: false, F: [6, 3], k: [4 * f, 2 * f] }; },
+    makeC: () => ({ units: 'EI', h: [1, 1], W: [0.02, 0.01], pinned: false, F: null, k: [48, 24] }), rho: 0.25,
+    note: 'Leaning columns: it carries the gravity load of half the building, θ₁ = 0.054, and its story-1 drift grows by 5.7%.' },
+  soft: { label: 'Soft first story: 5 stories, k₁ = 0.3k', n: 5, make: n => {
+    const b = uniformB(n); b.k[0] = 0.3; return b; },
+    note: 'The soft first story takes the amplification: θ₁ is 3.3 times the uniform building\'s.' },
+  tall: { label: 'Tall and flexible: 10 stories, θ₁ = 0.10', n: 10, make: uniformB, rho: Infinity, axial: 550,
+    note: 'θ₁ = 0.10 at λ = 1, the limit below which ASCE 7-16 Sec. 12.8.7 lets P-Δ be ignored (not in Paz).' },
+};
+function makeBuilding(id, n = null, forC = false) {
+  const P = PRESETS[id], nn = n ?? (forC && id === 'uniform' ? 5 : P.n);
+  const b0 = (forC && P.makeC ? P.makeC : P.make)(nn);
+  const b = { preset: id, edited: false, ...b0 };
+  return resized(b, nn);
+}
+// A preset at another n: extra stories copy the top one
+function resized(b, n) {
+  const fit = a => { const r = a.slice(0, n); while (r.length < n) r.push(a[a.length - 1]); return r; };
+  return { ...b, n, k: fit(b.k), h: fit(b.h), W: fit(b.W), F: b.F ? fit(b.F) : null };
+}
+// Lateral loads. Uniform and triangle keep the preset's wind base shear (else 1 per floor).
+function loadVector(b, kind, j = 0) {
+  const n = b.k.length, tot = b.F ? sum(b.F) : n;
+  if (kind === 'wind' && b.F) return b.F.slice();
+  if (kind === 'unit') return Array.from({ length: n }, (_, i) => +(i === j));
+  if (kind === 'top') return Array.from({ length: n }, (_, i) => +(i === n - 1));
+  if (kind === 'tri') { let z = 0; const zs = b.h.map(h => (z += h)), s = sum(zs); return zs.map(v => tot * v / s); }
+  return new Array(n).fill(tot / n);
+}
+// CORE-END ----------------------------------------------------------------------------------------
+
+// ---- App -----------------------------------------------------------------------------------
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const cfg = { displayModeBar: false, responsive: true };
+function lay(extra = {}) {
+  return Object.assign({ paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: css('--ink'), size: 12 }, margin: { l: 50, r: 12, t: 6, b: 36 },
+    showlegend: false, hovermode: 'closest' }, extra);
+}
+function ax(title, extra = {}) {
+  return Object.assign({ title: { text: title, standoff: 4, font: { size: 12 } }, gridcolor: css('--grid'),
+    zerolinecolor: css('--line'), linecolor: css('--line'), automargin: true }, extra);
+}
+const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+const MINUS = '−';
+// significant digits, with a true minus; thousands with commas
+function sig(x, d = 4) {
+  if (x === Infinity) return '∞'; if (x === -Infinity) return MINUS + '∞';
+  if (!Number.isFinite(x)) return '—';
+  if (Math.abs(x) < 1e-12) return '0';
+  const a = Math.abs(x);
+  const s = a >= 10 ** d ? Math.round(a).toLocaleString('en-US')
+          : a >= 1e-3 ? String(+a.toPrecision(d)) : a.toExponential(d - 1);
+  return (x < 0 ? MINUS : '') + s;
+}
+// fixed number of significant digits, for columns of numbers (0.8590, not 0.859)
+const sigF = (x, d = 4) => (!Number.isFinite(x) ? sig(x) : Math.abs(x) < 1e-12 ? '0'
+  : (x < 0 ? MINUS : '') + Math.abs(x).toPrecision(d));
+const SUB = '₀₁₂₃₄₅₆₇₈₉';
+const sub = i => String(i).split('').map(c => SUB[+c]).join('');
+const sub2 = (i, j) => (i > 9 || j > 9 ? sub(i) + ',' + sub(j) : sub(i) + sub(j));
+const speed = () => +$('speed').value || 1;
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+const shapeFixed = s => 3 * s * s - 2 * s ** 3, shapePinned = s => (3 * s - s ** 3) / 2;
+
+// Sweep a range input back and forth (the ▶ next to a slider); the speed menu scales it.
+// The position is kept as a float, so coarse slider steps do not stall the sweep.
+const SWEEPS = [];
+function sweeper(btn, input, period = 6000) {
+  let on = false, dir = 1, last = 0, cur = 0;
+  const lo = +input.min, hi = +input.max;
+  function tick(ts) {
+    if (!on) return;
+    const dt = last ? ts - last : 16; last = ts;
+    cur += dir * (hi - lo) * dt * speed() / period;
+    if (cur >= hi) { cur = hi; dir = -1; } if (cur <= lo) { cur = lo; dir = 1; }
+    input.value = cur; input.dispatchEvent(new Event('input'));
+    requestAnimationFrame(tick);
+  }
+  function set(v) {
+    on = v; btn.classList.toggle('on', on); btn.textContent = on ? '❚❚' : '▶'; last = 0;
+    if (on) { cur = +input.value; requestAnimationFrame(tick); }
+  }
+  btn.addEventListener('click', () => set(!on));
+  const sw = { stop() { if (on) set(false); } };
+  SWEEPS.push(sw);
+  return sw;
+}
+// Step a panel forward on a timer (the ▶ play next to a Step button); from the last step it
+// starts over at the first.
+function player(btn, { next, atEnd, toStart, ms = 400 }) {
+  let timer = null;
+  const stop = () => { clearTimeout(timer); timer = null; btn.classList.remove('on'); btn.textContent = '▶ play'; };
+  const tick = () => { if (atEnd()) { stop(); return; } next(); timer = setTimeout(tick, ms / speed()); };
+  btn.addEventListener('click', () => {
+    if (timer) { stop(); return; }
+    btn.classList.add('on'); btn.textContent = '❚❚ pause';
+    if (atEnd()) toStart();
+    timer = setTimeout(tick, ms / speed());
+  });
+  const pl = { stop() { if (timer) stop(); } };
+  SWEEPS.push(pl);
+  return pl;
+}
+function tex(el, s) {
+  if (typeof katex === 'undefined') { el.textContent = s; return; }
+  katex.render(s, el, { throwOnError: false, displayMode: false });
+}
+
+// ---- SVG drawing. Sizes are the box's own pixels, so type stays the same size at any scale. ---
+const n1 = x => (Number.isFinite(x) ? x.toFixed(1) : '0');
+const sv = {
+  line: (x1, y1, x2, y2, c = 'var(--ink)', w = 1.5, extra = '') =>
+    `<line x1="${n1(x1)}" y1="${n1(y1)}" x2="${n1(x2)}" y2="${n1(y2)}" style="stroke:${c};stroke-width:${w}" ${extra}/>`,
+  poly: (pts, c = 'var(--ink)', w = 2, extra = '') =>
+    `<polyline points="${pts.map(p => n1(p[0]) + ',' + n1(p[1])).join(' ')}" style="fill:none;stroke:${c};stroke-width:${w};stroke-linejoin:round" ${extra}/>`,
+  text: (x, y, s, { c = 'var(--ink)', size = 12, anchor = 'start', weight = 400, base = 'middle', cls = '' } = {}) =>
+    `<text x="${n1(x)}" y="${n1(y)}" text-anchor="${anchor}" dominant-baseline="${base}" font-size="${size}" font-weight="${weight}" class="${cls}" style="fill:${c}">${s}</text>`,
+  rect: (x, y, w, h, fill, extra = '') => `<rect x="${n1(x)}" y="${n1(y)}" width="${n1(w)}" height="${n1(h)}" style="fill:${fill}" ${extra}/>`,
+  circle: (x, y, r, fill, stroke = 'none', sw = 0, extra = '') =>
+    `<circle cx="${n1(x)}" cy="${n1(y)}" r="${r}" style="fill:${fill};stroke:${stroke};stroke-width:${sw}" ${extra}/>`,
+  arrow(x1, y1, x2, y2, c = 'var(--uh)', w = 2.5) {
+    const L = Math.hypot(x2 - x1, y2 - y1); if (L < 1) return '';
+    const ux = (x2 - x1) / L, uy = (y2 - y1) / L, hl = Math.min(9, L * 0.6), hw = 4.5;
+    const bx = x2 - ux * hl, by = y2 - uy * hl;
+    return sv.line(x1, y1, bx, by, c, w)
+      + `<polygon points="${n1(x2)},${n1(y2)} ${n1(bx - uy * hw)},${n1(by + ux * hw)} ${n1(bx + uy * hw)},${n1(by - ux * hw)}" style="fill:${c}"/>`;
+  },
+};
+function setSvg(el, body) {
+  const W = el.clientWidth, H = el.clientHeight;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
+}
+// Geometry of a building in a box: floor heights in px, the bay, ground
+function geom(el, b, { mL = 40, mR = 110, mT = 16, mB = 24, bay = null, frac = 0 } = {}) {
+  const W = el.clientWidth, H = el.clientHeight, n = b.k.length;
+  const tot = sum(b.h), sz = (H - mT - mB) / tot;
+  let z = 0; const zs = [H - mB];
+  b.h.forEach(h => { z += h; zs.push(H - mB - z * sz); });
+  const avail = W - mL - mR, bw = bay ?? clamp(avail * 0.42, 40, 130);
+  const x0 = mL + frac * Math.max(0, avail - bw);
+  return { W, H, n, zs, bw, x0, x1: x0 + bw, ground: H - mB };
+}
+// Offsets in px are clamped, so a runaway stays finite on the page
+const off = (sc, y) => (Number.isFinite(sc * y) ? clamp(sc * y, -3000, 3000) : (y > 0 ? 3000 : -3000));
+// One bent column from floor displacement ya to yb (shape in the story)
+function columnPts(xc, za, zb, ya, yb, sc, shape) {
+  const P = [];
+  for (let s = 0; s <= 1.0001; s += 0.1) {
+    const d = (Number.isFinite(ya) ? ya : 0) + ((Number.isFinite(yb) ? yb : 0) - (Number.isFinite(ya) ? ya : 0)) * shape(s);
+    P.push([xc + off(sc, Number.isFinite(ya) && Number.isFinite(yb) ? d : yb > 0 ? 1e9 : -1e9), za + (zb - za) * s]);
+  }
+  return P;
+}
+// The building: columns, girders, floor dots. style: { c, w, dash, storyC(i), dots }
+function frameSvg(g, b, y, sc, { c = 'var(--ink)', w = 2, dash = '', storyC = null, dots = true, girder = 3.5 } = {}) {
+  let s = '';
+  const yy = i => (i < 0 ? 0 : y[i]), ex = dash ? `stroke-dasharray="${dash}"` : '';
+  for (let i = 0; i < g.n; i++) {
+    const shape = b.pinned && i === 0 ? shapePinned : shapeFixed, col = storyC ? storyC(i) : c;
+    s += sv.poly(columnPts(g.x0, g.zs[i], g.zs[i + 1], yy(i - 1), yy(i), sc, shape), col, w, ex);
+    s += sv.poly(columnPts(g.x1, g.zs[i], g.zs[i + 1], yy(i - 1), yy(i), sc, shape), col, w, ex);
+  }
+  for (let i = 0; i < g.n; i++) {
+    const d = off(sc, y[i]);
+    s += sv.line(g.x0 + d, g.zs[i + 1], g.x1 + d, g.zs[i + 1], c, girder, ex);
+    if (dots) s += sv.circle((g.x0 + g.x1) / 2 + d, g.zs[i + 1], 4, c);
+  }
+  return s;
+}
+function groundSvg(g, b) {
+  let s = sv.line(g.x0 - 18, g.ground, g.x1 + 18, g.ground, 'var(--muted)', 2);
+  for (let x = g.x0 - 14; x < g.x1 + 18; x += 9) s += sv.line(x, g.ground + 7, x + 6, g.ground + 1, 'var(--line)', 1);
+  if (b.pinned) for (const x of [g.x0, g.x1]) s += sv.circle(x, g.ground - 3, 3.2, 'var(--panel)', 'var(--ink)', 1.5);
+  return s;
+}
+function hitBands(g) {   // tap a floor: a band around it
+  let s = '';
+  for (let i = 0; i < g.n; i++) {
+    const hi = i + 2 <= g.n ? (g.zs[i + 1] + g.zs[i + 2]) / 2 : 0, lo = i === 0 ? g.H : (g.zs[i] + g.zs[i + 1]) / 2;
+    s += `<rect data-floor="${i}" x="0" y="${n1(hi)}" width="${g.W}" height="${n1(lo - hi)}" style="fill:transparent"/>`;
+  }
+  return s;
+}
+// ---- Matrices as grids of cells
+const tint = (x, a = '2e') => (x > 1e-12 ? css('--c-pos') + a : x < -1e-12 ? css('--c-neg') + a : 'transparent');
+const matSize = n => (n <= 4 ? 13 : n <= 6 ? 11.5 : n <= 8 ? 10 : 9);
+function matHTML(M, { title = '', f = x => sig(x, 3), col = -1, row = -1, show = null, bg = null, border = null, size = null } = {}) {
+  const n = M.length, fs = size ?? matSize(n);
+  let h = title ? `<div class="matT">${title}</div>` : '';
+  h += `<table class="mat" style="font-size:${fs}px">`;
+  for (let i = 0; i < n; i++) {
+    h += '<tr>';
+    for (let j = 0; j < n; j++) {
+      const vis = show ? show(i, j) : true, cl = [];
+      if (j === col) { cl.push('cj'); if (i === 0) cl.push('t'); if (i === n - 1) cl.push('b'); }
+      if (i === row && j !== col) cl.push('ri');
+      if (!vis) cl.push('empty');
+      const st = (vis ? `background:${bg ? bg(i, j, M[i][j]) : tint(M[i][j])};` : '') + (border ? border(i, j) : '');
+      h += `<td class="${cl.join(' ')}" style="${st}">${vis ? f(M[i][j]) : '·'}</td>`;
+    }
+    h += '</tr>';
+  }
+  return h + '</table>';
+}
+
+// ============================ Buildings (tabs A and B share one; tab C has its own) ============
+let SB = makeBuilding('demo'), SC = makeBuilding('uniform', null, true);
+const unitsOf = b => UNITS[b.units];
+const LOADNAME = { wind: "preset's wind", uniform: 'uniform', tri: 'inverted triangle', unit: 'unit force at floor j', top: 'unit force at the top' };
+function fillLoad(sel, kinds, b, cur) {
+  const list = kinds.filter(k => k !== 'wind' || b.F);
+  sel.innerHTML = list.map(k => `<option value="${k}">${LOADNAME[k]}</option>`).join('');
+  const v = list.includes(cur) ? cur : list[0];
+  sel.value = v;
+  return v;
+}
+
+// ============================ Tab A ============================
+const A = { j: 0, seen: new Set([0]), allK: false, pred: false, rev: false, guess: [], load: 'unit',
+            pred2: false, rev2: false, g2: [], t: 1 };
+let aAnim = 0;
+function animateA() {   // the push grows from zero when floor j changes
+  cancelAnimationFrame(aAnim);
+  const t0 = performance.now(), dur = 320 / speed();
+  const step = ts => {
+    A.t = clamp((ts - t0) / dur, 0, 1);
+    drawA1(); drawA2();
+    if (A.t < 1) aAnim = requestAnimationFrame(step);
+  };
+  A.t = 0; aAnim = requestAnimationFrame(step);
+}
+function setJ(j) {
+  const n = SB.k.length; j = clamp(j, 0, n - 1);
+  if (j !== A.j) { A.guess = []; A.rev = false; A.g2 = []; A.rev2 = false; }
+  A.j = j; A.seen.add(j);
+  $('aJ').value = j + 1;
+  renderA(); animateA();
+}
+function drawA1() {
+  const el = $('a1svg'); if (!el.clientWidth) return;
+  const b = SB, K = stiffness(b.k), n = b.k.length, j = A.j, u = unitsOf(b);
+  const g = geom(el, b, { mL: 34, mR: 150 });
+  const unit = Math.min(g.bw * 0.5, 46), sc = unit * A.t, y = Array.from({ length: n }, (_, i) => +(i === j));
+  let s = '';
+  // the undeformed building and the deformed one; the two stories that deform are red
+  s += frameSvg(g, b, new Array(n).fill(0), 0, { c: 'var(--c-ghost)', w: 1, dash: '3 3', dots: false, girder: 1 });
+  s += groundSvg(g, b);
+  s += frameSvg(g, b, y, sc, { storyC: i => (i === j || i === j + 1 ? 'var(--uh)' : 'var(--ink)') });
+  // clamps on the held floors
+  for (let i = 0; i < n; i++) if (i !== j) {
+    const yc = g.zs[i + 1];
+    s += sv.rect(g.x0 - 13, yc - 6, 9, 12, 'var(--line)') + sv.line(g.x0 - 4, yc - 6, g.x0 - 4, yc + 6, 'var(--muted)', 1.5);
+  }
+  for (let i = 0; i < n; i++) {
+    s += sv.text(g.x0 - 18, g.zs[i + 1], 'y' + sub(i + 1), { size: 11, anchor: 'end', c: i === j ? 'var(--uh)' : 'var(--muted)' });
+    s += sv.text((g.x0 + g.x1) / 2 + (i === j || i === j - 1 ? 0 : 0), (g.zs[i] + g.zs[i + 1]) / 2, 'k' + sub(i + 1), { size: 11, anchor: 'middle', c: 'var(--muted)' });
+  }
+  // forces: right of the farthest sway; + points right, - points left
+  const xA = g.x1 + unit + 10, maxF = Math.max(...K.flat().map(Math.abs)), hidden = A.pred && !A.rev;
+  const labX = xA + 68;
+  for (let i = 0; i < n; i++) {
+    const v = K[i][j], yc = g.zs[i + 1], ok = A.guess[i] == null ? null
+      : (A.guess[i] === '+' && v > 0) || (A.guess[i] === MINUS && v < 0) || (A.guess[i] === '0' && v === 0);
+    if (hidden) {
+      const lab = A.guess[i] ?? '?';
+      s += `<g data-chip="${i}">` + sv.rect(xA, yc - 11, 44, 22, A.guess[i] ? 'var(--hl)' : 'var(--grid)', 'rx="4"')
+        + sv.text(xA + 22, yc, lab, { anchor: 'middle', size: 15, weight: 600 }) + '</g>';
+      continue;
+    }
+    const L = Math.abs(v) < 1e-12 ? 0 : 10 + 50 * Math.abs(v) / maxF;
+    const col = v > 0 ? 'var(--c-pos)' : 'var(--c-neg)', Lt = L * A.t;
+    if (L) s += v > 0 ? sv.arrow(xA, yc, xA + Lt, yc, col) : sv.arrow(xA + Lt, yc, xA, yc, col);
+    const mark = A.pred && A.rev && ok != null ? (ok ? ' ✓' : ' ✗') : '';
+    s += sv.text(L ? labX : xA + 2, yc, `k${sub2(i + 1, j + 1)} = ${sig(v, 4)}${mark}`,
+                 { size: 11.5, c: mark.includes('✗') ? 'var(--uh)' : L ? 'var(--ink)' : 'var(--muted)' });
+  }
+  if (!hidden) {   // base reaction
+    const v = j === 0 ? -b.k[0] : 0, L = v ? 10 + 50 * Math.abs(v) / maxF : 0;
+    if (L) s += sv.arrow(xA + L * A.t, g.ground, xA, g.ground, 'var(--c-neg)');
+    s += sv.text(L ? labX : xA + 2, g.ground, `base ${sig(v, 4)}`, { size: 11.5, c: L ? 'var(--ink)' : 'var(--muted)' });
+  }
+  s = hitBands(g) + s;
+  setSvg(el, s);
+}
+function drawA2() {
+  const el = $('a2svg'); if (!el.clientWidth) return;
+  const b = SB, R = flexibility(b.k), n = b.k.length, j = A.j, u = unitsOf(b), isUnit = A.load === 'unit';
+  const F = loadVector(b, A.load, j), yy = matVec(R, F), V = above(F);
+  const g = geom(el, b, { mL: 48, mR: 142 });
+  const room = Math.max(40, g.W - g.x1 - 92);
+  // one scale for all columns of [R], so the columns can be compared and the scale gives nothing away
+  const sc = room / (isUnit ? R[n - 1][n - 1] : Math.max(...yy));
+  const hide = isUnit && A.pred2 && !A.rev2;
+  const tt = hide ? 1 : A.t;
+  const yDraw = yy.map(v => v * tt);
+  let s = '';
+  s += frameSvg(g, b, new Array(n).fill(0), 0, { c: 'var(--c-ghost)', w: 1, dash: '3 3', dots: false, girder: 1 });
+  s += groundSvg(g, b);
+  if (!hide) s += frameSvg(g, b, yDraw, sc);
+  // the load
+  const Fm = Math.max(...F);
+  for (let i = 0; i < n; i++) {
+    if (F[i] <= 0) continue;
+    const yc = g.zs[i + 1], L = 12 + 24 * F[i] / Fm, tip = g.x0 + off(sc, hide ? 0 : yDraw[i]) - 3;
+    s += sv.arrow(tip - L, yc, tip, yc, 'var(--uh)');
+    s += sv.text(tip - L - 2, yc - 8, isUnit ? '1' : sig(F[i], 3), { size: 11, c: 'var(--uh)', anchor: 'middle' });
+  }
+  // story shears, in the story
+  for (let i = 0; i < n; i++) {
+    const zc = (g.zs[i] + g.zs[i + 1]) / 2, d = hide ? 0 : off(sc, (i ? yDraw[i - 1] : 0) / 2 + yDraw[i] / 2);
+    s += sv.text((g.x0 + g.x1) / 2 + d, zc, 'V = ' + sig(V[i], 3), { size: 11, anchor: 'middle', c: V[i] > 1e-12 ? 'var(--ink)' : 'var(--muted)' });
+  }
+  // displacement labels; a load vector stacks F_j times column j at each floor
+  for (let i = 0; i < n; i++) {
+    const yc = g.zs[i + 1];
+    if (!hide) {
+      const x = g.x1 + off(sc, yDraw[i]) + 8;
+      s += sv.text(x, yc - (isUnit ? 0 : 0), isUnit ? `r${sub2(i + 1, j + 1)} = ${sig(R[i][j], 3)}` : `y${sub(i + 1)} = ${sig(yy[i], 3)}`, { size: 11.5 });
+    }
+    if (!isUnit && A.t >= 1) {
+      let acc = 0;
+      for (let l = 0; l < n; l++) {
+        const w = sc * F[l] * R[i][l];
+        if (w > 0) s += sv.rect(g.x0 + acc, yc + 4, Math.max(w - 1.5, 0.5), 7, catColor(l, n));
+        acc += w;
+      }
+    }
+  }
+  if (hide) {   // draggable guesses
+    const pts = [[g.x1, g.ground], ...A.g2.map((v, i) => [g.x1 + sc * v, g.zs[i + 1]])];
+    s += sv.poly(pts, 'var(--c-pos)', 1.5, 'stroke-dasharray="4 3"');
+    A.g2.forEach((v, i) => { s += sv.circle(g.x1 + sc * v, g.zs[i + 1], 9, 'var(--c-pos)', 'var(--panel)', 2, `data-handle="${i}"`); });
+    el._sc = sc; el._x1 = g.x1;
+  } else if (isUnit && A.pred2 && A.rev2) {
+    const pts = [[g.x1, g.ground], ...A.g2.map((v, i) => [g.x1 + sc * v, g.zs[i + 1]])];
+    s += sv.poly(pts, 'var(--c-pos)', 1.5, 'stroke-dasharray="4 3"');
+    A.g2.forEach((v, i) => { s += sv.circle(g.x1 + sc * v, g.zs[i + 1], 5, 'var(--c-pos)'); });
+  }
+  s += sv.text(4, 10, hide ? 'drag each dot to your guess' : `magnified; top ${sig(yy[n - 1], 3)} ${u.y}`, { size: 11, c: 'var(--muted)' });
+  if (!hide) s = hitBands(g) + s;
+  setSvg(el, s);
+}
+// Floors are ordered, so the stacked segments use one hue, light to dark, with a gap between them
+const catColor = (l, n) => { const c = css('--c-pos'), a = Math.round(255 * (0.3 + 0.7 * (l + 1) / n)); return c + a.toString(16).padStart(2, '0'); };
+function renderA() {
+  const b = SB, n = b.k.length, K = stiffness(b.k), R = flexibility(b.k), u = unitsOf(b), j = A.j;
+  $('aJ').max = n; $('aJ').value = j + 1; $('aN').value = n;
+  $('aNLbl').textContent = n; $('aJLbl').textContent = j + 1;
+  // panel 1: the grid fills as floors are visited
+  const hideJ = A.pred && !A.rev;
+  const show = (i, c) => (c === j ? !hideJ : (A.allK || A.seen.has(c)) && !(hideJ && c === j));
+  $('a1grid').innerHTML = matHTML(K, { title: `[K] (${u.k}), column ${j + 1} boxed`, col: j, row: j, show })
+    + `<div class="note" style="margin-top:4px;max-width:${Math.max(180, 44 * n)}px">${hideJ ? 'Set a sign at each floor, then reveal.'
+      : `Column ${j + 1} sums to ${sig(sum(K.map(r => r[j])), 4)}${j === 0 ? ` = k₁; the ground takes ${MINUS}k₁` : ', no force on the ground'}.`}</div>`;
+  $('aReveal').disabled = !A.pred || A.rev || A.guess.filter(g => g != null).length < n;
+  $('a1msg').textContent = A.pred ? (A.rev ? 'Step to the next floor to predict again.' : 'Tap each chip: +, −, 0.') : '';
+  // panel 2: equal cells in L-shapes
+  const lev = (i, c) => Math.min(i, c), isUnit = A.load === 'unit', hide2 = isUnit && A.pred2 && !A.rev2;
+  const showR = (i, c) => !(hide2 && c === j);
+  const edge = (i, c) => {
+    const l = lev(i, c), bs = '1.5px solid var(--ink)', st = [];
+    if (i === 0 || lev(i - 1, c) !== l) st.push('border-top:' + bs);
+    if (i === n - 1 || lev(i + 1, c) !== l) st.push('border-bottom:' + bs);
+    if (c === 0 || lev(i, c - 1) !== l) st.push('border-left:' + bs);
+    if (c === n - 1 || lev(i, c + 1) !== l) st.push('border-right:' + bs);
+    return st.join(';');
+  };
+  const shade = (i, c) => css('--c-pos') + Math.round(255 * (0.08 + 0.3 * (lev(i, c) + 1) / n)).toString(16).padStart(2, '0');
+  const RK = matMul(R, K), err = Math.max(...RK.flatMap((r, i) => r.map((v, c) => Math.abs(v - +(i === c)))));
+  $('a2grid').innerHTML = matHTML(R, { title: `[R] (${u.y}/${u.f})`, col: isUnit ? j : -1, show: showR, bg: shade, border: edge,
+                                       f: x => sig(x, 3), size: n <= 4 ? 12.5 : matSize(n) })
+    + matHTML(RK, { title: '[R][K]', f: x => (Math.abs(x) < 1e-9 ? '0' : x.toFixed(3)), bg: (i, c, v) => (Math.abs(v) > 1e-9 ? css('--c-net') + '2e' : 'transparent'), size: Math.min(11, matSize(n)) })
+    + `<div class="note">max |[R][K] ${MINUS} [I]| = ${err.toExponential(1).replace('-', MINUS)}</div>`
+    + (isUnit ? '' : `<div class="note" style="max-width:${Math.max(180, 44 * n)}px">{y} = Σ F<sub>j</sub> × column j of [R]; the bars under the floors stack the terms, ${Array.from({ length: n }, (_, l) => `<span class="sw" style="background:${catColor(l, n)}"></span>F${sub(l + 1)}`).join(' ')}</div>`);
+  $('aReveal2').disabled = !isUnit || !A.pred2 || A.rev2;
+  $('aPred2').disabled = !isUnit;
+  $('a2svg').classList.toggle('drag', hide2);
+  $('a2msg').textContent = A.pred2 && A.rev2 ? 'Dashed: your guess.' : '';
+  if (hide2 && A.g2.length !== n) A.g2 = new Array(n).fill(0);
+  tex($('eq1'), String.raw`\{F\} = [K]\{y\},\quad y_j = 1,\ y_{i \ne j} = 0 \ \Rightarrow\ F_i = k_{ij};\qquad k_{ii} = k_i + k_{i+1},\ \ k_{i,i+1} = -k_{i+1}`);
+  tex($('eq2'), String.raw`\{y\} = [R]\{F\},\qquad r_{ij} = \sum_{l \le \min(i,j)} \frac{1}{k_l},\qquad [R] = [K]^{-1}`);
+  drawA1(); drawA2();
+  writeHash();
+}
+
+// ============================ Tab B ============================
+const B = { r: 0, load: 'wind', j: 0, couples: false, step: false, xi: 0.05, tf: 1, round: 0,
+            H: 10, th: 0.3, couple: false };
+const PORTAL = { k: 100, h: 144, b: 240 };
+const curLoadB = () => loadVector(SB, B.load, B.j);
+const lamOf = () => B.r * critical(SB).lamCr;
+function ownR() { return 1 / critical(SB).lamCr; }   // lambda = 1 as a fraction of lambda_cr
+
+function renderP3() {
+  const { k, h, b } = PORTAL, H = B.H, th = B.th, W = th * k * h;
+  const net = k - W / h, ok = net > 1e-9, y = ok ? H / net : Infinity, Fv = ok ? W * y / b : 0;
+  $('pHLbl').textContent = `${H.toFixed(1)} kip`; $('pThLbl').textContent = th.toFixed(3);
+  tex($('eq3'), String.raw`y = \frac{H}{k - W/h} = \frac{H/k}{1 - \theta},\quad \theta = \frac{W}{k h}`);
+  // drawing
+  const el = $('p3svg');
+  if (el.clientWidth) {
+    const Wp = el.clientWidth, Hp = el.clientHeight, base = Hp - 34, top = 44;
+    const bw = Math.min(Wp * 0.42, 150), x0 = Wp * 0.26, x1 = x0 + bw, mag = 90;   // px per inch of sway
+    const d = ok ? clamp(y * mag, -400, 400) : 400, col = ok ? 'var(--ink)' : 'var(--uh)';
+    let s = sv.line(x0 - 20, base, x1 + 20, base, 'var(--muted)', 2);
+    for (let x = x0 - 16; x < x1 + 20; x += 9) s += sv.line(x, base + 7, x + 6, base + 1, 'var(--line)', 1);
+    const pts = xc => linspace(0, 1, 11).map(q => [xc + d * shapeFixed(q), base + (top - base) * q]);
+    s += sv.line(x0, base, x0, top, 'var(--c-ghost)', 1, 'stroke-dasharray="3 3"') + sv.line(x1, base, x1, top, 'var(--c-ghost)', 1, 'stroke-dasharray="3 3"');
+    s += sv.poly(pts(x0), col, 2.5) + sv.poly(pts(x1), col, 2.5) + sv.line(x0 + d, top, x1 + d, top, col, 4);
+    // W at mid-girder, carried through the sway; a dashed plumb line from the base shows the lever arm
+    const xm = (x0 + x1) / 2, La = 8 + 26 * Math.min(th, 1.1);
+    s += sv.line(xm, base, xm, top, 'var(--c-grav)', 1, 'stroke-dasharray="2 3"');
+    s += sv.arrow(xm + d, top - La - 3, xm + d, top - 3, 'var(--c-grav)');
+    s += sv.text(xm + d + 6, top - La + 1, `W = ${sig(W, 3)} kip`, { size: 11.5 });
+    if (H > 0) { const LH = 10 + 26 * H / 30; s += sv.arrow(x0 + d - LH - 3, top, x0 + d - 3, top, 'var(--uh)'); s += sv.text(x0 + d - LH - 5, top, 'H', { anchor: 'end', size: 12, c: 'var(--uh)' }); }
+    if (ok) {
+      // vertical reactions W/2 -/+ F (L19 p. 46)
+      const Rl = W / 2 - Fv, Rr = W / 2 + Fv, Rm = PORTAL.k * PORTAL.h * 0.6;
+      const rArrow = (x, v) => { const L = clamp(Math.abs(v) / Rm * 24, 2, 24);
+        return v >= 0 ? sv.arrow(x, base + 5 + L, x, base + 3, 'var(--c-net)') : sv.arrow(x, base + 3, x, base + 5 + L, 'var(--c-neg)'); };
+      s += rArrow(x0, Rl) + rArrow(x1, Rr);
+      s += sv.text(x0 + 8, base + 22, `W/2 ${MINUS} F = ${sig(Rl, 3)}`, { size: 11, anchor: 'end' });
+      s += sv.text(x1 - 8, base + 22, `W/2 + F = ${sig(Rr, 3)}`, { size: 11 });
+      if (d !== 0) s += sv.text(xm + d / 2, base - 8, `y = ${sig(y, 3)} in`, { size: 11, anchor: 'middle', c: 'var(--muted)' });
+      if (B.couple && W * y / h > 1e-6) {
+        const C = W * y / h, L = clamp(C / 30 * 36, 6, 40);
+        s += sv.arrow(x1 + d + 3, top + 12, x1 + d + 3 + L, top + 12, 'var(--c-grav)');
+        s += sv.arrow(x1 + 3 + L, base - 10, x1 + 3, base - 10, 'var(--c-grav)');
+        s += sv.text(x1 + d + 5, top + 24, `W y/h = ${sig(C, 3)}`, { size: 11, c: 'var(--c-grav)' });
+      }
+    } else {
+      s += sv.text(Wp / 2, 12, 'no equilibrium: k − W/h ≤ 0', { size: 13, anchor: 'middle', c: 'var(--uh)', weight: 600 });
+    }
+    s += sv.text(4, 12, ok ? `sway ×${Math.round(mag * h / (top ? base - top : 1))}` : '', { size: 11, c: 'var(--muted)' });
+    setSvg(el, s);
+  }
+  // the force-displacement plot
+  const xm = 1, Y = [0, xm];
+  const tr = [
+    { x: Y, y: Y.map(v => k * v), mode: 'lines', line: { color: css('--ink'), width: 2 }, name: 'ky', hoverinfo: 'skip' },
+    { x: Y, y: Y.map(v => W / h * v), mode: 'lines', line: { color: css('--c-grav'), width: 2 }, name: '(W/h)y', hoverinfo: 'skip' },
+    { x: Y, y: Y.map(v => net * v), mode: 'lines', line: { color: css('--c-net'), width: 3 }, name: '(k − W/h)y', hovertemplate: 'y = %{x:.3f} in, %{y:.1f} kip<extra></extra>' },
+    { x: Y, y: [H, H], mode: 'lines', line: { color: css('--uh'), width: 2, dash: 'dash' }, name: 'H', hoverinfo: 'skip' },
+  ];
+  if (ok && y <= xm) tr.push({ x: [y], y: [H], mode: 'markers', marker: { size: 11, color: css('--c-net'), line: { color: css('--panel'), width: 2 } }, showlegend: false, hovertemplate: 'y = %{x:.3f} in<extra></extra>' });
+  Plotly.react('p3plot', tr, lay({ showlegend: true, legend: { orientation: 'h', y: 1.14, x: 0, font: { size: 11 } }, margin: { l: 44, r: 8, t: 22, b: 34 },
+    xaxis: ax('y (in)', { range: [0, xm] }), yaxis: ax('force (kip)', { range: [0, 50] }) }), cfg);
+}
+
+function renderP4() {
+  const b = SB, n = b.k.length, u = unitsOf(b), { lamCr, story } = critical(b), lam = lamOf(), F = curLoadB();
+  const first = leaned(b, 0, F), cur = leaned(b, lam, F), P = above(b.W), over = B.r >= 1;
+  let yShow = cur.y;
+  if (B.step) { const st = stepRun(); yShow = st.Y[Math.round(B.tf * (st.Y.length - 1))]; }
+  $('bStepCtl').hidden = !B.step;
+  $('p4time').style.display = B.step ? '' : 'none';
+  // the building
+  const el = $('p4svg');
+  if (el.clientWidth) {
+    const g = geom(el, b, { mL: 48, mR: 80, mT: 30, frac: 0.02, bay: clamp(el.clientWidth * 0.22, 40, 80) });
+    const roomR = g.W - g.x1 - 70, sc = roomR / 7 / Math.max(...first.y.map(Math.abs), 1e-30);
+    let s = groundSvg(g, b);
+    s += frameSvg(g, b, first.y, sc, { c: 'var(--c-ghost)', w: 1.5, dash: '4 3', dots: false, girder: 2 });
+    const yd = yShow, col = over && !B.step ? 'var(--uh)' : 'var(--ink)';
+    s += frameSvg(g, b, yd, sc, { c: col });
+    const Wm = Math.max(...b.W), Fm = Math.max(...F.map(Math.abs));
+    for (let i = 0; i < n; i++) {
+      const dx = off(sc, yd[i]), yc = g.zs[i + 1], xm = (g.x0 + g.x1) / 2 + dx;
+      // gravity
+      const La = 4 + 26 * (lam * b.W[i]) / (1.2 * lamCr * Wm);
+      if (lam > 0) s += sv.arrow(xm, yc - La - 5, xm, yc - 5, 'var(--c-grav)', 2);
+      // load
+      const onPage = g.x1 + dx + 6 <= g.W - 70 && g.x0 + dx >= 0;
+      if (F[i] > 0 && onPage) { const L = 10 + 24 * F[i] / Fm, tip = g.x0 + dx - 3; s += sv.arrow(tip - L, yc, tip, yc, 'var(--uh)'); s += sv.text(tip - L - 2, yc - 8, sig(F[i], 3), { size: 10.5, c: 'var(--uh)', anchor: 'middle' }); }
+      // a floor off the page keeps its number at the edge
+      s += sv.text(clamp(g.x1 + dx + 6, 2, g.W - 70), yc + (B.couples && onPage ? 9 : 0), `y${sub(i + 1)} = ${sig(yd[i], 3)}${onPage ? '' : yd[i] > 0 ? ' →' : ' ←'}`, { size: 11, c: onPage ? 'var(--ink)' : 'var(--uh)' });
+    }
+    if (B.couples && (B.step || !over)) {
+      const Dshow = yd.map((v, i) => v - (i ? yd[i - 1] : 0));
+      const Fc = b.h.map((h, i) => lam * P[i] * Dshow[i] / h), Cm = Math.max(...Fc.map(Math.abs), 1e-30), q = Fc.map((v, i) => v - (i + 1 < n ? Fc[i + 1] : 0));
+      for (let i = 0; i < n; i++) {
+        const zT = g.zs[i + 1], zB = g.zs[i], L = 6 + 0.55 * g.bw * Math.abs(Fc[i]) / Cm;
+        const dT = off(sc, yd[i]), dB = i ? off(sc, yd[i - 1]) : 0, xM = (g.x0 + g.x1) / 2;
+        if (Number.isFinite(Fc[i]) && lam > 0 && g.x1 + dT + 6 <= g.W - 70 && g.x0 + dT >= 0) {
+          s += sv.arrow(xM + dT - L / 2, zT + 9, xM + dT + L / 2, zT + 9, 'var(--c-grav)', 1.8);
+          s += sv.arrow(xM + dB + L / 2, zB - 7, xM + dB - L / 2, zB - 7, 'var(--c-grav)', 1.8);
+          s += sv.text(clamp(g.x1 + off(sc, yd[i]) + 6, 2, g.W - 70), zT - 7, `q${sub(i + 1)} = ${sig(q[i], 3)}`, { size: 10.5, c: 'var(--c-grav)' });
+        }
+      }
+    }
+    if (over && !B.step) s += sv.text(g.W / 2, 11, 'no equilibrium: [K] − λ[K_G] is not positive definite', { size: 12, anchor: 'middle', c: 'var(--uh)', weight: 600 });
+    setSvg(el, s);
+  }
+  // the bars: stories run up the axis, as in the drawing
+  const th = P.map((p, i) => lam * p / (b.k[i] * b.h[i])), amp = th.map(t => (t < 1 ? 1 / (1 - t) : NaN));
+  const stories = b.k.map((_, i) => i + 1), base = css('--c-pos'), hot = css('--uh');
+  const colors = stories.map((_, i) => (i === story ? hot : base));
+  const margin = { l: 30, r: 34, t: 4, b: 32 };
+  Plotly.react('p4bar1', [{ type: 'bar', orientation: 'h', y: stories, x: th.map(t => Math.min(t, 1.25)), marker: { color: colors }, text: th.map(t => sig(t, 2)), textposition: 'outside', constraintext: 'none', cliponaxis: false, textfont: { size: 10.5 },
+      hovertemplate: 'story %{y}: θ = %{x:.4f}<extra></extra>' }],
+    lay({ margin, bargap: 0.3, shapes: [{ type: 'line', x0: 1, x1: 1, yref: 'paper', y0: 0, y1: 1, line: { color: hot, width: 1.5, dash: 'dash' } }],
+      xaxis: ax('θᵢ = λPᵢ/(kᵢhᵢ)', { range: [0, 1.25], titlefont: { size: 11 } }), yaxis: ax('story', { dtick: 1, range: [0.4, n + 0.6] }) }), cfg);
+  Plotly.react('p4bar2', [{ type: 'bar', orientation: 'h', y: stories, x: amp.map(a => (Number.isFinite(a) ? Math.min(a, 6) - 1 : 0)), base: 1, customdata: amp, marker: { color: colors }, text: amp.map(a => (Number.isFinite(a) ? '×' + sig(a, 3) : '—')), textposition: 'outside', constraintext: 'none', cliponaxis: false, textfont: { size: 10.5 },
+      hovertemplate: 'story %{y}: drift × %{customdata:.3f}<extra></extra>' }],
+    lay({ margin, bargap: 0.3,
+      xaxis: ax('drift ×1/(1 − θᵢ)', { range: [1, 6], titlefont: { size: 11 } }), yaxis: ax('story', { dtick: 1, range: [0.4, n + 0.6] }) }), cfg);
+  // the step load
+  if (B.step) renderStepPlot(first.y[n - 1], cur.y[n - 1]);
+  // readouts
+  const y0 = first.y[n - 1], yt = cur.y[n - 1];
+  $('p4read').innerHTML = over
+    ? `<span class="bad">λ = ${sig(lam, 3)} &gt; λ<sub>cr</sub>: the static “answer” points the wrong way</span>`
+    : `roof ${sigF(yt, 4)} ${u.y} (first order ${sigF(y0, 4)}, ×${sigF(yt / y0, 4)}); story ${story + 1} drift ×${sigF(cur.D[story] / first.D[story], 4)}`;
+  $('p4note').innerHTML = PRESETS[b.preset].note && !b.edited ? PRESETS[b.preset].note : '';
+  tex($('eq4'), B.step ? String.raw`[M]\{\ddot y\} + a_1[K]\{\dot y\} + \big([K] - \lambda[K_G]\big)\{y\} = \{F\}`
+    : String.raw`\big([K] - \lambda[K_G]\big)\{y\} = \{F\},\quad \theta_i = \frac{\lambda P_i}{k_i h_i}`);
+}
+// Step load: integrated on demand, cached until something it depends on changes
+let stepCache = null;
+function stepRun() {
+  const b = SB, u = unitsOf(b), F = curLoadB(), lam = lamOf();
+  const key = [b.k, b.h, b.W, F, lam, B.xi, b.units].join('|');
+  if (stepCache && stepCache.key === key) return stepCache;
+  let dt, tEnd;
+  if (u.real) { dt = 0.002; tEnd = 6; }
+  else { const T1 = 2 * Math.PI / omega1(b.k, b.W.map(w => w / u.g)); dt = T1 / 400; tEnd = 5 * T1; }
+  const r = stepLoad(b, lam, F, B.xi, u.g, dt, Math.round(tEnd / dt));
+  stepCache = { key, ...r, dt, tEnd, T1: 2 * Math.PI / r.w1 };
+  return stepCache;
+}
+function renderStepPlot(y0, ystat) {
+  const st = stepRun(), u = unitsOf(SB), n = SB.k.length, top = st.Y.map(y => y[n - 1]);
+  // above lambda_cr the plot clips at 5 times the static value at lambda = 0 and labels the runaway;
+  // below it the whole stable response shows, even when it is larger than that
+  const lim = B.r < 1 ? Math.max(5 * y0, 1.1 * Math.max(...top.map(Math.abs))) : 5 * y0, cut = top.map(v => (Math.abs(v) > lim ? NaN : v)), k = Math.round(B.tf * (st.T.length - 1));
+  const iOut = cut.findIndex(v => Number.isNaN(v));
+  const pk = Math.max(...top.map(Math.abs));
+  const t = st.T[k];
+  $('bTLbl').textContent = `${sig(t, 3)} ${u.t}`; $('bXiLbl').textContent = `${(100 * B.xi).toFixed(1)}%`;
+  const tr = [
+    { x: st.T, y: cut, mode: 'lines', line: { color: css('--c-pos'), width: 2 }, hovertemplate: `t = %{x:.2f} ${u.t}<br>top %{y:.4g} ${u.y}<extra></extra>` },
+  ];
+  const shapes = [];
+  if (B.r < 1) shapes.push({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: ystat, y1: ystat, line: { color: css('--ink'), dash: 'dash', width: 1.5 } });
+  shapes.push({ type: 'line', x0: t, x1: t, yref: 'paper', y0: 0, y1: 1, line: { color: css('--muted'), width: 1, dash: 'dot' } });
+  if (Math.abs(top[k]) <= lim) tr.push({ x: [t], y: [top[k]], mode: 'markers', marker: { size: 9, color: css('--c-pos') }, hoverinfo: 'skip' });
+  const ann = [];
+  if (B.r < 1) ann.push({ xref: 'paper', x: 1, y: ystat, text: `static ${sig(ystat, 3)}`, showarrow: false, xanchor: 'right', yanchor: 'bottom', font: { size: 11 } });
+  if (iOut >= 0) ann.push({ xref: 'paper', x: 1, yref: 'paper', y: 1, text: `runaway: off the plot at t = ${sig(st.T[iOut], 3)} ${u.t}`, showarrow: false, xanchor: 'right', yanchor: 'top', font: { size: 11, color: css('--uh') } });
+  else ann.push({ xref: 'paper', x: 0.01, yref: 'paper', y: 1, text: `peak ${sig(pk, 3)} ${u.y}`, showarrow: false, xanchor: 'left', yanchor: 'top', font: { size: 11 } });
+  Plotly.react('p4time', tr, lay({ shapes, annotations: ann, margin: { l: 44, r: 8, t: 4, b: 30 },
+    xaxis: ax(`t (${u.t})`, { range: [0, st.tEnd] }), yaxis: ax(`top y (${u.y})`, { range: [-0.4 * lim, 1.05 * lim] }) }), cfg);
+}
+
+const ROUNDS = 30;
+function renderP5() {
+  const b = SB, n = b.k.length, u = unitsOf(b), { lamCr, story, ratios } = critical(b), lam = lamOf(), F = curLoadB();
+  const IT = pdIteration(b, lam, F, ROUNDS), yT = IT.map(y => y[n - 1]), y0 = yT[0], exact = leaned(b, lam, F).y[n - 1];
+  const m = clamp(B.round, 0, ROUNDS);
+  $('b5Lbl').textContent = `round ${m}`;
+  const conv = B.r < 1, ceil = conv ? Math.max(exact * 1.15, y0 * 1.6) : y0 * 8;
+  const xs = [], ys = [];
+  for (let i = 0; i <= m; i++) { xs.push(i); ys.push(Math.abs(yT[i]) > ceil * 3 ? NaN : yT[i]); }
+  const tr = [
+    { x: xs, y: ys, mode: 'lines+markers', line: { color: css('--c-pos'), width: 2, shape: 'hv' }, marker: { size: 7, color: css('--c-pos') }, name: 'top y after each round', hovertemplate: `round %{x}: %{y:.4g} ${u.y}<extra></extra>` },
+  ];
+  const shapes = [], ann = [];
+  if (conv) {
+    shapes.push({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: exact, y1: exact, line: { color: css('--ink'), dash: 'dash', width: 1.5 } });
+    ann.push({ xref: 'paper', x: 1, y: exact, text: `exact ${sig(exact, 4)} ${u.y}`, showarrow: false, xanchor: 'right', yanchor: 'bottom', font: { size: 11 } });
+  } else {
+    ann.push({ xref: 'paper', x: 1, yref: 'paper', y: 0.98, text: 'λ ≥ λ<sub>cr</sub>: the rounds run away', showarrow: false, xanchor: 'right', yanchor: 'top', font: { size: 11, color: css('--uh') } });
+  }
+  Plotly.react('p5a', tr, lay({ shapes, annotations: ann, margin: { l: 48, r: 8, t: 6, b: 32 },
+    xaxis: ax('round', { range: [-0.3, Math.max(8, m + 0.5)], dtick: m > 15 ? 5 : 1 }), yaxis: ax(`top y (${u.y})`, { range: [0, ceil] }) }), cfg);
+  // top drift against lambda/lambda_cr, with its asymptote
+  const R = linspace(0, 1.2, 481), ymax = 8 * y0, ymin = -4 * y0;
+  const C = R.map(r => { const v = leaned(b, r * lamCr, F).y[n - 1]; return v > ymax || v < ymin ? NaN : v; });
+  const yNow = leaned(b, lam, F).y[n - 1];
+  const tr2 = [
+    { x: R, y: C, mode: 'lines', line: { color: css('--c-pos'), width: 2 }, hovertemplate: `λ/λ<sub>cr</sub> = %{x:.3f}<br>top %{y:.4g} ${u.y}<extra></extra>` },
+    { x: [B.r], y: [clamp(yNow, ymin, ymax)], mode: 'markers', marker: { size: 11, color: css('--uh'), line: { color: css('--panel'), width: 2 } }, hoverinfo: 'skip' },
+  ];
+  Plotly.react('p5b', tr2, lay({ margin: { l: 48, r: 8, t: 6, b: 32 },
+    shapes: [{ type: 'line', x0: 1, x1: 1, yref: 'paper', y0: 0, y1: 1, line: { color: css('--uh'), dash: 'dash', width: 1.5 } },
+             { type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y0, y1: y0, line: { color: css('--c-ghost'), dash: 'dot', width: 1.5 } }],
+    annotations: [{ x: 1, yref: 'paper', y: 1, text: ' det = 0', showarrow: false, xanchor: 'left', yanchor: 'top', font: { size: 11, color: css('--uh') } },
+                  { xref: 'paper', x: 0, y: y0, text: 'first order', showarrow: false, xanchor: 'left', yanchor: 'top', font: { size: 10.5, color: css('--muted') } }],
+    xaxis: ax('λ/λ<sub>cr</sub>', { range: [0, 1.2] }), yaxis: ax(`top y (${u.y})`, { range: [ymin, ymax] }) }), cfg);
+  // the factored determinant: the factor that vanishes first in red
+  const P = above(b.W), red = css('--uh');
+  const fac = i => { const a = sig(b.k[i], 4), c = sig(P[i] / b.h[i], 3), t = String.raw`(${a} - ${c}\,\lambda)`.replace(/−/g, '-');
+    return i === story ? String.raw`\textcolor{${red}}{${t}}` : t; };
+  const shown = n <= 3 ? b.k.map((_, i) => fac(i)).join('') : String.raw`${story > 0 ? String.raw`\cdots` : ''}${fac(story)}${story < n - 1 ? String.raw`\cdots` : ''}`;
+  tex($('eq5'), String.raw`\det\big([K] - \lambda[K_G]\big) = \prod_i \Big(k_i - \frac{\lambda P_i}{h_i}\Big),\quad \lambda_{cr} = \min_i \frac{k_i h_i}{P_i} = ${sig(lamCr, 4)}`);
+  tex($('eq5b'), String.raw`= ${shown}`);
+  // the buckled shape: one story racks, the floors above ride along, the floors below stay put
+  const el = $('p5svg');
+  if (el.clientWidth) {
+    const g = geom(el, b, { mL: 8, mR: 30, mT: 8, mB: 12, bay: Math.max(24, el.clientWidth * 0.42) });
+    const yb = b.k.map((_, i) => +(i >= story)), sc = 18;
+    let s = groundSvg(g, b);
+    s += frameSvg(g, b, yb, sc, { storyC: i => (i === story ? 'var(--uh)' : 'var(--ink)'), w: 1.5, dots: false, girder: 2.5 });
+    s += sv.text(g.x1 + sc + 2, (g.zs[story] + g.zs[story + 1]) / 2, sub(story + 1), { size: 11, c: 'var(--uh)' });
+    setSvg(el, s);
+  }
+}
+function renderBLabels() {
+  const b = SB, { lamCr, story } = critical(b), lam = lamOf();
+  $('bR').value = B.r; $('bN').value = b.k.length; $('bNLbl').textContent = b.k.length;
+  B.lamKeep = lam;
+  $('bRLbl').textContent = `${B.r.toFixed(3)}; λ = ${sig(lam, 3)}`;
+  $('bCr').innerHTML = `λ<sub>cr</sub> = ${sig(lamCr, 4)} (story ${story + 1})`;
+  const own = ownR();
+  $('bRTicks').innerHTML = own <= 1.2 ? `<option value="${own.toFixed(4)}"></option>` : '';
+  $('bOwn').disabled = own > 1.2;
+  $('bJWrap').style.display = B.load === 'unit' ? '' : 'none';
+}
+function renderB() { renderBLabels(); renderP3(); renderP4(); renderP5(); writeHash(); }
+
+// ============================ Tab C ============================
+const C = { u: Math.log10(0.25), ax: false, Ar: 550, load: 'uniform' };
+const RHO_RIGID = 2.1;
+const rhoOf = () => (C.u >= RHO_RIGID ? Infinity : 10 ** C.u);
+const hermite = (u1, s1, u2, s2, l, s) => (1 - 3 * s * s + 2 * s ** 3) * u1 + l * (s - 2 * s * s + s ** 3) * s1
+  + (3 * s * s - 2 * s ** 3) * u2 + l * (-s * s + s ** 3) * s2;
+// One deflected frame in a box, true to scale (bay L = 2h), so joints stay square on the page
+function drawFrameC(el, b, d, F, mag, fit, title, col) {
+  const n = b.k.length, W = el.clientWidth, H = el.clientHeight, { s0, xL, ground } = fit, L = 2 * b.h[0];
+  let z = 0; const zp = [ground]; b.h.forEach(h => { z += h; zp.push(ground - z * s0); });
+  const xR = xL + L * s0;
+  let s = sv.text(W / 2, 10, title, { size: 12, anchor: 'middle', weight: 600 });
+  s += sv.line(xL - 16, ground, xR + 16, ground, 'var(--muted)', 2);
+  for (let x = xL - 12; x < xR + 16; x += 9) s += sv.line(x, ground + 7, x + 6, ground + 1, 'var(--line)', 1);
+  // the undeformed frame
+  for (let i = 0; i < n; i++) {
+    s += sv.line(xL, zp[i], xL, zp[i + 1], 'var(--c-ghost)', 1, 'stroke-dasharray="3 3"') + sv.line(xR, zp[i], xR, zp[i + 1], 'var(--c-ghost)', 1, 'stroke-dasharray="3 3"');
+    s += sv.line(xL, zp[i + 1], xR, zp[i + 1], 'var(--c-ghost)', 1, 'stroke-dasharray="3 3"');
+  }
+  const qs = linspace(0, 1, 13);
+  for (let i = 0; i < n; i++) {
+    const ub = i ? d.u[i - 1] : 0, ut = d.u[i], h = b.h[i];
+    const col1 = (xc, tb, tt, vb, vt) => qs.map(q => [xc + mag * hermite(ub, tb, ut, tt, h, q), zp[i] + (zp[i + 1] - zp[i]) * q - mag * (vb + (vt - vb) * q)]);
+    s += sv.poly(col1(xL, i ? d.thL[i - 1] : d.baseL, d.thL[i], i ? d.vL[i - 1] : 0, d.vL[i]), col, 2);
+    s += sv.poly(col1(xR, i ? d.thR[i - 1] : d.baseR, d.thR[i], i ? d.vR[i - 1] : 0, d.vR[i]), col, 2);
+    // the beam; its slope dv/dx is -theta
+    const beam = qs.map(q => [xL + (xR - xL) * q + mag * ut, zp[i + 1] - mag * hermite(d.vL[i], -d.thL[i], d.vR[i], -d.thR[i], L, q)]);
+    s += sv.poly(beam, col, 3);
+    // joints: a dot and a tick along the joint's rotated axis
+    for (const [xc, th, v] of [[xL, d.thL[i], d.vL[i]], [xR, d.thR[i], d.vR[i]]]) {
+      const xj = xc + mag * ut, yj = zp[i + 1] - mag * v, a = Math.atan(th * mag / s0), r = 9;
+      s += sv.line(xj - r * Math.cos(a), yj - r * Math.sin(a), xj + r * Math.cos(a), yj + r * Math.sin(a), 'var(--uh)', 2);
+      s += sv.circle(xj, yj, 3, col);
+    }
+    if (F[i] > 0) { const Fm = Math.max(...F), Lf = 8 + 18 * F[i] / Fm, tip = xL + mag * ut - 12; s += sv.arrow(tip - Lf, zp[i + 1], tip, zp[i + 1], 'var(--uh)', 2); }
+  }
+  s += sv.text(xR + mag * d.u[n - 1] + 12, zp[n] + 2, sig(d.u[n - 1], 3), { size: 11.5 });
+  setSvg(el, s);
+}
+function mapColor(lo, mid, hi) { return [[0, lo], [0.5, mid], [1, hi]]; }
+function renderC() {
+  const b = SC, n = b.k.length, u = unitsOf(b), rho = rhoOf(), F = loadVector(b, C.load);
+  const K = stiffness(b.k), Rs = flexibility(b.k);
+  const FR = frameModel(b, { rho, axial: C.ax, Ar: C.Ar });   // the frame as set
+  const FB = C.ax ? frameModel(b, { rho }) : FR;              // no axial strain
+  const FX = C.ax ? FR : frameModel(b, { rho, axial: true, Ar: C.Ar });   // with axial strain
+  const dS = shearDeflect(b, F), dF = FR.deflect(F);
+  $('cN').value = n; $('cNLbl').textContent = n;
+  $('cRho').value = C.u; $('cRhoLbl').textContent = rho === Infinity ? 'rigid' : sig(rho, 2);
+  $('cA').value = C.Ar; $('cALbl').textContent = C.ax ? C.Ar : `${C.Ar}, off`;
+  // panel 6: two frames on one scale
+  const a = $('c6a'), c = $('c6b');
+  if (a.clientWidth && c.clientWidth) {
+    const Wb = a.clientWidth, Hb = a.clientHeight, mT = 28, mB = 14, L = 2 * b.h[0], tot = sum(b.h);
+    const s0 = Math.min((Hb - mT - mB) / tot, (Wb * 0.46) / L), xL = 30;
+    const room = Wb - xL - L * s0 - 44, yS = dS.u[n - 1], yF = Math.max(...dF.u.map(Math.abs));
+    // the same scale for both, and no story drawn with a drift beyond 0.6 of its height
+    const drifts = dF.u.map((v, i) => Math.abs(v - (i ? dF.u[i - 1] : 0)) / (b.h[i] * s0));
+    const mag = Math.min(room * 0.35 / yS, room * 0.95 / yF, 0.6 / Math.max(...drifts));
+    // centered in the box when the width sets the scale
+    const fit = { s0, xL, ground: mT + (Hb - mT - mB + tot * s0) / 2 };
+    drawFrameC(a, b, dS, F, mag, fit, 'shear building: rigid beams', 'var(--ink)');
+    drawFrameC(c, b, dF, F, mag, fit, `frame: ρ = ${rho === Infinity ? 'rigid' : sig(rho, 2)}${C.ax ? `, axial ${C.Ar}` : ''}`, 'var(--c-pos)');
+  }
+  const yS = dS.u[n - 1], yFr = dF.u[n - 1];
+  $('c6read').innerHTML = `top drift: shear ${sigF(yS, 4)} ${u.y}, frame ${sigF(yFr, 4)} ${u.y}; frame/shear <b>×${sigF(yFr / yS, 3)}</b>`
+    + (n === 1 ? `; k = ${sigF(FR.Khat[0][0], 4)} ${u.k} against ${sigF(b.k[0], 4)}` : '');
+  // many stories: fewer digits, tiny entries as zero, and the frame alone (the heat maps show both)
+  const big = Math.max(...FR.Khat.flat().map(Math.abs));
+  const fm = n <= 4 ? x => sig(x, 4) : n <= 6 ? x => sig(x, 3) : x => (Math.abs(x) < 5e-4 * big ? '0' : sig(x, 2));
+  $('c6mats').innerHTML = `<div>${matHTML(FR.Khat, { title: `frame, condensed [K̂] (${u.k})`, f: fm, size: Math.min(12, matSize(n)) })}</div>`
+    + (n <= 6 ? `<div>${matHTML(K, { title: `shear building [K] (${u.k})`, f: fm, size: Math.min(12, matSize(n)) })}</div>` : '');
+  tex($('eq6'), String.raw`[\hat K] = [K_{tt}] - [K_{t0}][K_{00}]^{-1}[K_{0t}],\quad \rho = \frac{EI_b/L}{2EI_c/h},\quad L = 2h`);
+  // panel 7: heat maps, one color scale for each pair
+  const Rf = FR.R(), kMax = Math.max(...K.flat().map(Math.abs), ...FR.Khat.flat().map(Math.abs));
+  const rMax = Math.max(...Rs.flat(), ...Rf.flat().map(Math.abs));
+  const cs = mapColor(css('--c-neg'), css('--panel'), css('--c-pos'));
+  const hm = (id, Z, zm, ttl) => Plotly.react(id, [{ type: 'heatmap', z: Z, x: Z.map((_, i) => i + 1), y: Z.map((_, i) => i + 1), zmin: -zm, zmax: zm, colorscale: cs, showscale: false, xgap: 1, ygap: 1,
+      hovertemplate: `${ttl}<sub>%{y},%{x}</sub> = %{z:.4g}<extra></extra>` }],
+    lay({ margin: { l: 20, r: 4, t: 2, b: 18 }, xaxis: { dtick: n > 5 ? 2 : 1, side: 'bottom', tickfont: { size: 10 }, showgrid: false, zeroline: false }, yaxis: { dtick: n > 5 ? 2 : 1, autorange: 'reversed', tickfont: { size: 10 }, showgrid: false, zeroline: false } }), cfg);
+  hm('h1', K, kMax, 'k'); hm('h2', FR.Khat, kMax, 'k'); hm('h3', Rs, rMax, 'r'); hm('h4', Rf, rMax, 'r');
+  const fill = n >= 3 ? `|k₁₃|/k₁₁ = ${sigF(Math.abs(FR.Khat[0][2]) / Math.abs(FR.Khat[0][0]), 2)} in the frame, 0 in the shear building` : 'n ≥ 3 shows the fill-in';
+  $('c7read').innerHTML = fill + '<br><span class="note">Blue positive, orange negative; one color scale for each pair.</span>';
+  // the profiles: shear building, frame, frame with axial strain, on one axis
+  let z = 0; const Z = [0, ...b.h.map(h => (z += h))];
+  const yB = FB.deflect(F).u, yX = FX.deflect(F).u, yR = dS.u;
+  const drift = y => y.map((v, i) => (v - (i ? y[i - 1] : 0)) / b.h[i]);
+  const series = [
+    { name: 'shear', y: yR, c: css('--ink'), dash: 'solid' },
+    { name: 'frame', y: yB, c: css('--c-pos'), dash: 'solid' },
+    { name: 'frame + axial', y: yX, c: css('--c-neg'), dash: 'dash' },
+  ];
+  const zu = u.real ? `height (${u.h})` : `height (${u.h})`;
+  Plotly.react('c7a', series.map(q => ({ x: [0, ...q.y], y: Z, mode: 'lines+markers', name: q.name, line: { color: q.c, width: 2, dash: q.dash }, marker: { size: 6, color: q.c }, hovertemplate: `${q.name}<br>y = %{x:.4g} ${u.y}<extra></extra>` })),
+    lay({ showlegend: true, legend: { orientation: 'h', y: 1.12, x: 0, font: { size: 11 } }, margin: { l: 44, r: 8, t: 22, b: 34 }, xaxis: ax(`y (${u.y})`, { rangemode: 'tozero' }), yaxis: ax(zu, { rangemode: 'tozero' }) }), cfg);
+  const step = y => { const X = [], W = []; y.forEach((v, i) => { X.push(v, v); W.push(Z[i], Z[i + 1]); }); return { X, W }; };
+  Plotly.react('c7b', series.map(q => { const d = step(drift(q.y)); return { x: d.X, y: d.W, mode: 'lines', line: { color: q.c, width: 2, dash: q.dash }, name: q.name, hovertemplate: `${q.name}<br>drift %{x:.3g}<extra></extra>` }; }),
+    lay({ margin: { l: 44, r: 8, t: 22, b: 34 }, xaxis: ax(`story drift (yᵢ − yᵢ₋₁)/hᵢ`, { rangemode: 'tozero', tickformat: '.2~g' }), yaxis: ax(zu, { rangemode: 'tozero' }) }), cfg);
+  writeHash();
+}
+
+// ============================ The story table ============================
+let popFor = null, popSweeps = [];
+const COLC = (b, i) => (b.pinned && i === 0 ? 3 : 12);
+function closePop() { popSweeps.forEach(sw => { sw.stop(); SWEEPS.splice(SWEEPS.indexOf(sw), 1); }); popSweeps = []; $('pop').style.display = 'none'; popFor = null; }
+function openPop(which) {
+  closePop(); popFor = which;
+  const pop = $('pop'), b = cur(), n = b.k.length, u = unitsOf(b);
+  const ref = b.ref ?? (b.ref = { k: b.k.slice(), h: b.h.slice(), W: b.W.slice() });
+  ['k', 'h', 'W'].forEach(key => { while (ref[key].length < n) ref[key].push(ref[key][ref[key].length - 1]); });
+  let h = `<div style="display:flex;gap:12px;align-items:baseline;margin-bottom:4px"><b>Stories</b>
+    <label class="chk" title="k = c ΣEI / h³: a taller story or a pinned base softens it"><input type="checkbox" id="popHold" ${A_HOLD.v ? 'checked' : ''}>hold ΣEI when h or the ends change</label>
+    <span class="note">k = 12ΣEI/h³ (both ends fixed, Paz 7.1a), 3ΣEI/h³ (one end pinned, 7.1b)</span>
+    <button id="popClose" style="margin-left:auto">close</button></div>
+    <table><tr><th>story</th><th>k (${u.k})</th><th>h (${u.h})</th><th>W (${u.w})</th><th>ends</th><th>ΣEI (${u.EI})</th></tr>`;
+  for (let i = n - 1; i >= 0; i--) {
+    const sl = (key, lo, hi, step) => `<button class="play" id="pp${key}${i}">▶</button><input type="range" id="ps${key}${i}" min="${lo}" max="${hi}" step="${step}"><span class="val" id="pv${key}${i}"></span>`;
+    h += `<tr><td>${i + 1}</td><td>${sl('k', -1, 1, 0.005)}</td><td>${sl('h', 0.5, 2, 0.005)}</td><td>${sl('W', -1, 1, 0.005)}</td>`
+      + `<td>${i === 0 ? `<select id="pEnds"><option value="f">both fixed</option><option value="p">base pinned</option></select>` : 'both fixed'}</td>`
+      + `<td class="val" id="pEI${i}"></td></tr>`;
+  }
+  pop.innerHTML = h + '</table>';
+  pop.style.display = 'block';
+  const sync = () => {
+    const bb = cur();
+    for (let i = 0; i < n; i++) {
+      $(`pvk${i}`).textContent = sig(bb.k[i], 4); $(`pvh${i}`).textContent = sig(bb.h[i], 4); $(`pvW${i}`).textContent = sig(bb.W[i], 4);
+      $(`pEI${i}`).textContent = sig(bb.k[i] * bb.h[i] ** 3 / COLC(bb, i), 4);
+      $(`psk${i}`).value = Math.log10(bb.k[i] / ref.k[i]); $(`psh${i}`).value = bb.h[i] / ref.h[i]; $(`psW${i}`).value = Math.log10(bb.W[i] / ref.W[i]);
+    }
+    $('pEnds').value = bb.pinned ? 'p' : 'f';
+  };
+  sync();
+  for (let i = 0; i < n; i++) {
+    $(`psk${i}`).addEventListener('input', e => { cur().k[i] = ref.k[i] * 10 ** +e.target.value; edited(); sync(); });
+    $(`psW${i}`).addEventListener('input', e => { cur().W[i] = ref.W[i] * 10 ** +e.target.value; edited(); sync(); });
+    $(`psh${i}`).addEventListener('input', e => { const bb = cur(), hn = ref.h[i] * +e.target.value;
+      if (A_HOLD.v) bb.k[i] *= (bb.h[i] / hn) ** 3; bb.h[i] = hn; edited(); sync(); });
+    for (const key of ['k', 'h', 'W']) popSweeps.push(sweeper($(`pp${key}${i}`), $(`ps${key}${i}`)));
+  }
+  $('pEnds').addEventListener('change', e => { const bb = cur(), p = e.target.value === 'p';
+    if (A_HOLD.v && p !== bb.pinned) bb.k[0] *= p ? 0.25 : 4; bb.pinned = p; edited(); sync(); });
+  $('popHold').addEventListener('change', e => { A_HOLD.v = e.target.checked; });
+  $('popClose').addEventListener('click', closePop);
+}
+const A_HOLD = { v: true };
+const cur = () => (tab === 'c' ? SC : SB);
+function keepLambda() { if (B.lamKeep != null) B.r = clamp(B.lamKeep / critical(SB).lamCr, 0, 1.2); }
+// an edit keeps lambda, not lambda/lambda_cr, so a heavier or softer story shows up as more drift
+function edited() { cur().edited = true; stepCache = null; if (cur() === SB) keepLambda(); render[tab](); }
+
+// ============================ Wiring ============================
+if (typeof Plotly === 'undefined' || typeof katex === 'undefined') $('loaderr').style.display = 'block';
+let tab = 'a';
+const render = { a: renderA, b: renderB, c: renderC };
+function showTab(t) {
+  tab = t;
+  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
+  ['a', 'b', 'c'].forEach(x => { $('sec-' + x).hidden = x !== t; });
+  render[t]();
+}
+// Presets
+const presetOptions = Object.entries(PRESETS).map(([id, P]) => `<option value="${id}">${P.label}</option>`).join('');
+document.querySelectorAll('.presetAB, #cPreset').forEach(s => { s.innerHTML = presetOptions; });
+function loadsAB() { A.load = fillLoad($('aLoad'), ['unit', 'wind', 'uniform', 'tri'], SB, A.load);
+  B.load = fillLoad($('bLoad'), ['wind', 'uniform', 'tri', 'unit'], SB, B.load);
+  $('bJ').innerHTML = SB.k.map((_, i) => `<option value="${i}">${i + 1}</option>`).join(''); B.j = Math.min(B.j, SB.k.length - 1); $('bJ').value = B.j; }
+function setBuildingAB(id, n = null) {
+  SB = makeBuilding(id, n); A.j = Math.min(A.j, SB.k.length - 1); A.seen = new Set([A.j]); A.guess = []; A.rev = false; A.g2 = []; A.rev2 = false;
+  B.load = SB.F ? 'wind' : 'uniform'; B.round = 0; B.r = clamp(ownR(), 0, 1.2); B.lamKeep = null; stepCache = null;
+  $('aPreset').value = id; $('bPreset').value = id; loadsAB();
+}
+function setBuildingC(id, n = null) {
+  SC = makeBuilding(id, n, true); const P = PRESETS[id];
+  if (P.rho !== undefined) C.u = P.rho === Infinity ? 2.2 : Math.log10(P.rho);
+  if (P.axial !== undefined) { C.ax = true; C.Ar = P.axial; }
+  else if (id === 'ex91') C.ax = false;
+  $('cPreset').value = id; $('cAx').checked = C.ax;
+  C.load = fillLoad($('cLoad'), ['uniform', 'tri', 'top', 'wind'], SC, SC.F ? 'wind' : 'uniform');
+}
+function changeN(which, n) {
+  const b = which === 'c' ? SC : SB; if (b.k.length === n) return;
+  const r = { ...resized(b, n), preset: b.preset, edited: b.edited, ref: undefined };
+  if (which === 'c') { SC = r; C.load = fillLoad($('cLoad'), ['uniform', 'tri', 'top', 'wind'], SC, C.load); if (popFor) openPop(popFor); renderC(); return; }
+  SB = r; A.j = Math.min(A.j, n - 1); A.seen = new Set([...A.seen].filter(j => j < n)); A.seen.add(A.j); A.guess = []; A.rev = false; A.g2 = []; A.rev2 = false; stepCache = null; loadsAB();
+  keepLambda(); if (popFor) openPop(popFor); render[tab]();
+}
+// Tab A
+for (const id of ['aPreset', 'bPreset']) $(id).addEventListener('change', e => { closePop(); setBuildingAB(e.target.value); $('aN').value = SB.k.length; render[tab](); });
+$('aN').addEventListener('input', e => changeN('ab', +e.target.value));
+sweeper($('aNPlay'), $('aN'), 9000);
+$('aTbl').addEventListener('click', () => (popFor ? closePop() : openPop('ab')));
+$('aJ').addEventListener('input', e => setJ(+e.target.value - 1));
+$('aNext').addEventListener('click', () => setJ(A.j + 1));
+$('aPrev').addEventListener('click', () => setJ(A.j - 1));
+player($('aPlay'), { next: () => setJ(A.j + 1), atEnd: () => A.j >= SB.k.length - 1,
+  toStart: () => { A.seen = new Set([0]); setJ(0); renderA(); }, ms: 1300 });
+$('aPlay').addEventListener('click', () => { if ($('aPlay').classList.contains('on') && A.j === 0) { A.seen = new Set([0]); renderA(); } });
+$('aAllK').addEventListener('change', e => { A.allK = e.target.checked; renderA(); });
+$('aPred').addEventListener('change', e => { A.pred = e.target.checked; A.guess = []; A.rev = false; renderA(); });
+$('aReveal').addEventListener('click', () => { A.rev = true; A.seen.add(A.j); renderA(); animateA(); });
+$('aPred2').addEventListener('change', e => { A.pred2 = e.target.checked; A.g2 = []; A.rev2 = false; renderA(); });
+$('aReveal2').addEventListener('click', () => { A.rev2 = true; renderA(); animateA(); });
+$('aLoad').addEventListener('change', e => { A.load = e.target.value; renderA(); });
+$('a1svg').addEventListener('click', e => {
+  const ch = e.target.closest('[data-chip]');
+  if (ch) { const i = +ch.dataset.chip, order = ['+', MINUS, '0'], k = order.indexOf(A.guess[i]);
+    A.guess[i] = order[(k + 1) % 3]; renderA(); return; }
+  const f = e.target.closest('[data-floor]'); if (f) setJ(+f.dataset.floor);
+});
+$('a2svg').addEventListener('click', e => { const f = e.target.closest('[data-floor]'); if (f) setJ(+f.dataset.floor); });
+// dragging a guess: the box captures the pointer, since the drawing is redrawn underneath
+(() => {
+  const el = $('a2svg'); let idx = -1;
+  el.addEventListener('pointerdown', e => { const h = e.target.closest('[data-handle]'); if (!h) return;
+    idx = +h.dataset.handle; el.setPointerCapture(e.pointerId); e.preventDefault(); });
+  el.addEventListener('pointermove', e => { if (idx < 0) return;
+    const x = e.clientX - el.getBoundingClientRect().left;
+    A.g2[idx] = Math.max(0, (x - el._x1) / el._sc); drawA2(); });
+  const up = () => { idx = -1; };
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+})();
+// Tab B
+$('bN').addEventListener('input', e => changeN('ab', +e.target.value));
+sweeper($('bNPlay'), $('bN'), 9000);
+$('bTbl').addEventListener('click', () => (popFor ? closePop() : openPop('ab')));
+$('bLoad').addEventListener('change', e => { B.load = e.target.value; renderB(); });
+$('bJ').addEventListener('change', e => { B.j = +e.target.value; renderB(); });
+$('bR').addEventListener('input', e => { B.r = +e.target.value; renderB(); });
+sweeper($('bRPlay'), $('bR'), 12000);
+$('bOwn').addEventListener('click', () => { B.r = ownR(); renderB(); });
+$('pH').addEventListener('input', e => { B.H = +e.target.value; renderP3(); writeHash(); });
+$('pTh').addEventListener('input', e => { B.th = +e.target.value; renderP3(); writeHash(); });
+sweeper($('pHPlay'), $('pH')); sweeper($('pThPlay'), $('pTh'), 10000);
+$('pCouple').addEventListener('change', e => { B.couple = e.target.checked; renderP3(); writeHash(); });
+$('bCouples').addEventListener('change', e => { B.couples = e.target.checked; renderP4(); writeHash(); });
+$('bStep').addEventListener('change', e => { B.step = e.target.checked; renderP4(); writeHash(); });
+$('bXi').addEventListener('input', e => { B.xi = +e.target.value; renderP4(); writeHash(); });
+sweeper($('bXiPlay'), $('bXi'));
+$('bT').addEventListener('input', e => { B.tf = +e.target.value; renderP4(); writeHash(); });
+player($('bTPlay'), { next: () => { B.tf = Math.min(1, B.tf + 0.006); $('bT').value = B.tf; renderP4(); }, atEnd: () => B.tf >= 1,
+                      toStart: () => { B.tf = 0; $('bT').value = 0; renderP4(); }, ms: 40 });
+$('b5Next').addEventListener('click', () => { B.round = Math.min(B.round + 1, ROUNDS); renderP5(); writeHash(); });
+$('b5First').addEventListener('click', () => { B.round = 0; renderP5(); writeHash(); });
+player($('b5Play'), { next: () => { B.round++; renderP5(); writeHash(); }, atEnd: () => B.round >= ROUNDS,
+                      toStart: () => { B.round = 0; renderP5(); }, ms: 450 });
+// Tab C
+$('cPreset').addEventListener('change', e => { closePop(); setBuildingC(e.target.value); renderC(); });
+$('cN').addEventListener('input', e => changeN('c', +e.target.value));
+sweeper($('cNPlay'), $('cN'), 9000);
+$('cTbl').addEventListener('click', () => (popFor ? closePop() : openPop('c')));
+$('cLoad').addEventListener('change', e => { C.load = e.target.value; renderC(); });
+$('cRho').addEventListener('input', e => { C.u = +e.target.value; renderC(); });
+sweeper($('cRhoPlay'), $('cRho'), 10000);
+$('cAx').addEventListener('change', e => { C.ax = e.target.checked; renderC(); });
+$('cA').addEventListener('input', e => { C.Ar = +e.target.value; renderC(); });
+sweeper($('cAPlay'), $('cA'), 8000);
+
+// ---- State in the URL hash: the open tab and its controls, e.g. #tab=b&preset=demo&r=0.5
+const fmtN = x => +(+x).toPrecision(5);
+const DEF = { A: { ...A, seen: new Set(A.seen) }, B: { ...B }, C: { ...C } };
+function buildingHash(b) {
+  const p = { preset: b.preset, n: b.k.length };
+  if (b.edited) Object.assign(p, { k: b.k.map(fmtN).join(','), hh: b.h.map(fmtN).join(','), W: b.W.map(fmtN).join(','), pin: +b.pinned });
+  return p;
+}
+function hashOf() {
+  const p = { tab };
+  if (tab === 'a') Object.assign(p, buildingHash(SB), { j: A.j + 1, load: A.load, all: +A.allK });
+  if (tab === 'b') Object.assign(p, buildingHash(SB), { load: B.load, j: B.j + 1, r: +B.r.toFixed(4), couples: +B.couples, step: +B.step, xi: B.xi, t: +B.tf.toFixed(3), round: B.round, H: B.H, theta: B.th, couple: +B.couple });
+  if (tab === 'c') Object.assign(p, buildingHash(SC), { load: C.load, rho: rhoOf() === Infinity ? 'rigid' : +rhoOf().toPrecision(4), axial: +C.ax, Ar: C.Ar });
+  return Object.entries(p).map(([k, v]) => k + '=' + v).join('&');
+}
+let hashTimer = null;   // debounced: Safari limits history.replaceState to about 100 calls in 30 s
+function writeHash() {
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => history.replaceState(null, '', '#' + hashOf()), 300);
+}
+function readBuilding(p, t) {
+  const isC = t === 'c', get = () => (isC ? SC : SB), set = isC ? setBuildingC : setBuildingAB;
+  const nn = p.n != null && Number.isFinite(+p.n) ? clamp(Math.round(+p.n), 1, 10) : null;
+  if (PRESETS[p.preset] && (p.preset !== get().preset || (nn != null && nn !== get().k.length) || p.k)) set(p.preset, nn);
+  else if (nn != null && nn !== get().k.length) { const b = get(); const r = { ...resized(b, nn), preset: b.preset, edited: b.edited };
+    if (isC) SC = r; else { SB = r; A.j = Math.min(A.j, nn - 1); loadsAB(); } }
+  if (p.k && p.hh && p.W) {
+    const b = get(), v = s => s.split(',').map(Number);
+    const k = v(p.k), h = v(p.hh), W = v(p.W);
+    if ([k, h, W].every(a => a.length === b.k.length && a.every(x => x > 0))) Object.assign(b, { k, h, W, pinned: p.pin === '1', edited: true });
+  }
+}
+function readHash() {
+  const p = Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
+  const num = (k, lo, hi) => { const v = parseFloat(p[k]); return Number.isFinite(v) ? clamp(v, lo, hi) : null; };
+  const bool = k => (p[k] == null ? null : p[k] === '1');
+  const t = ['a', 'b', 'c'].includes(p.tab) ? p.tab : 'a';
+  readBuilding(p, t);
+  if (t === 'a') {
+    if (num('j', 1, 10) != null) { A.j = clamp(Math.round(num('j', 1, 10)) - 1, 0, SB.k.length - 1); A.seen.add(A.j); }
+    if (['unit', 'wind', 'uniform', 'tri'].includes(p.load)) A.load = p.load;
+    if (bool('all') != null) A.allK = bool('all');
+  } else if (t === 'b') {
+    if (['wind', 'uniform', 'tri', 'unit'].includes(p.load)) B.load = p.load;
+    if (num('j', 1, 10) != null) B.j = clamp(Math.round(num('j', 1, 10)) - 1, 0, SB.k.length - 1);
+    if (num('r', 0, 1.2) != null) B.r = num('r', 0, 1.2);
+    for (const k of ['couples', 'step', 'couple']) if (bool(k) != null) B[k] = bool(k);
+    if (num('xi', 0, 0.1) != null) B.xi = num('xi', 0, 0.1);
+    if (num('t', 0, 1) != null) B.tf = num('t', 0, 1);
+    if (num('round', 0, ROUNDS) != null) B.round = Math.round(num('round', 0, ROUNDS));
+    if (num('H', 0, 30) != null) B.H = num('H', 0, 30);
+    if (num('theta', 0, 1.1) != null) B.th = num('theta', 0, 1.1);
+  } else {
+    if (['uniform', 'tri', 'top', 'wind'].includes(p.load)) C.load = p.load;
+    if (p.rho === 'rigid') C.u = 2.2; else if (num('rho', 0.01, 100) != null) C.u = Math.log10(num('rho', 0.01, 100));
+    if (bool('axial') != null) C.ax = bool('axial');
+    if (num('Ar', 100, 2000) != null) C.Ar = Math.round(num('Ar', 100, 2000));
+  }
+  return t;
+}
+function syncControls() {
+  const id = SB.preset;
+  $('aPreset').value = id; $('bPreset').value = id; $('cPreset').value = SC.preset;
+  loadsAB();
+  A.load = fillLoad($('aLoad'), ['unit', 'wind', 'uniform', 'tri'], SB, A.load);
+  C.load = fillLoad($('cLoad'), ['uniform', 'tri', 'top', 'wind'], SC, C.load);
+  $('aAllK').checked = A.allK; $('aPred').checked = A.pred; $('aPred2').checked = A.pred2;
+  $('bR').value = B.r; $('pH').value = B.H; $('pTh').value = B.th; $('pCouple').checked = B.couple;
+  $('bCouples').checked = B.couples; $('bStep').checked = B.step; $('bXi').value = B.xi; $('bT').value = B.tf;
+  $('bXiLbl').textContent = `${(100 * B.xi).toFixed(1)}%`;
+  $('cAx').checked = C.ax; $('cRho').value = C.u; $('cA').value = C.Ar;
+}
+function stopAll() { SWEEPS.slice().forEach(sw => sw.stop()); }
+function applyHash() { stopAll(); closePop(); const t = readHash(); syncControls(); showTab(t); }
+window.addEventListener('hashchange', applyHash);
+$('reset').addEventListener('click', () => {
+  stopAll(); closePop();
+  Object.assign(A, DEF.A, { seen: new Set(DEF.A.seen), guess: [], g2: [] }); Object.assign(B, DEF.B); Object.assign(C, DEF.C);
+  $('speed').value = '1';
+  setBuildingAB('demo'); setBuildingC('uniform');
+  C.u = DEF.C.u; C.ax = DEF.C.ax; C.Ar = DEF.C.Ar;
+  syncControls(); render[tab]();
+});
+
+// Header buttons: dark colors and captions, for this visit only; a theme change redraws
+$('theme').addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme !== 'dark';
+  if (dark) document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme;
+  $('theme').textContent = dark ? '☀ light' : '☾ dark';
+});
+$('caps').addEventListener('click', () => {
+  $('caps').classList.toggle('on', document.body.classList.toggle('nocap') === false);
+});
+new MutationObserver(() => render[tab]()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+setBuildingAB('demo'); setBuildingC('uniform');
+applyHash();
+// Plotly sizes a plot once; follow later changes of its box. The drawings redraw at their new size.
+if (typeof Plotly !== 'undefined' && 'ResizeObserver' in window) {
+  const ro = new ResizeObserver(entries => entries.forEach(e => { if (e.target.data && e.target.offsetParent && e.contentRect.width > 0) Plotly.Plots.resize(e.target).catch(() => {}); }));
+  document.querySelectorAll('.plot').forEach(el => ro.observe(el));
+  let pend = false;
+  const so = new ResizeObserver(() => { if (pend) return; pend = true;
+    requestAnimationFrame(() => { pend = false; render[tab](); }); });
+  document.querySelectorAll('.svgbox').forEach(el => so.observe(el));
+}
+</script>
+</body>
+</html>

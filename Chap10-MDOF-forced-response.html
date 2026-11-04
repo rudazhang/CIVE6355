@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Forced Motion of Shear Buildings — CIVE 6355</title>
+<!-- CIVE 6355 Structural Dynamics, deck 10 (Paz Ch. 8), from 202603/src/Chap10-animation-spec.md, all nine
+     panels without the optional modes. Tab A: modal superposition and the peaks; tab B: closely spaced
+     modes; tab C: base motion; tab D: harmonic forcing. The app computes modes but does not teach them
+     (decks 08, 09). Open this file directly in a browser (internet needed for Plotly and KaTeX).
+     The state is in the URL hash, e.g. #tab=c&p=pB&n=5&xi=0.05. -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.3/plotly.min.js"></script>
+<style>
+  /* Layout: header with tabs, one control bar per tab, panels in a grid (same as the deck 07 app) */
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1f; --muted: #66666c; --line: #d9d9de;
+    --grid: #ececef; --uh: #c8102e; --hl: #fff4d6;
+    --c-pos: #1f5fbf; --c-neg: #d9621c; --c-net: #188a4a; --c-grav: #7a3fb0; --c-ghost: #9a9aa2;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color-scheme: light;
+  }
+  /* Light by default, whatever the system setting (projectors); the header button sets dark */
+  :root[data-theme="dark"] {
+    --bg: #17181b; --panel: #202226; --ink: #e8e8ea; --muted: #a0a0a8; --line: #3a3c42;
+    --grid: #2c2e33; --uh: #ff5a6e; --hl: #3a3420;
+    --c-pos: #6aa5ff; --c-neg: #ff9b5c; --c-net: #4cc77f; --c-grav: #b88cf0; --c-ghost: #8a8a92;
+    color-scheme: dark }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  /* No double-tap zoom on the iPad when something is tapped repeatedly */
+  html, body, button, input, select, label, nav a, .svgbox { touch-action: manipulation; }
+  button, nav a, label, .svgbox { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--ink);
+         font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         padding-left: max(16px, env(safe-area-inset-left, 0px));
+         padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 8px 24px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; padding-block: 4px 8px; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .sub { color: var(--muted); }
+  nav { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  nav a { padding: 6px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0;
+          color: var(--muted); text-decoration: none; }
+  nav a.on { background: var(--panel); border-color: var(--line); color: var(--ink); font-weight: 600;
+             margin-bottom: -1px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; }
+  .bar label, .bar .grp, .ctl label, .ctl .grp { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; white-space: nowrap; }
+  .bar input[type=range], .ctl input[type=range] { width: 130px; }
+  .val { font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 3em; }
+  .sym { font-style: italic; font-family: "Times New Roman", serif; font-size: 16px; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+           border-radius: 4px; padding: 2px 9px; cursor: pointer; }
+  button.on { background: var(--uh); border-color: var(--uh); color: #fff; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, select:focus-visible, input:focus-visible, nav a:focus-visible { outline: 2px solid var(--uh); outline-offset: 1px; }
+  select { font: inherit; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; max-width: 190px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px 8px;
+           min-width: 0; display: flex; flex-direction: column; gap: 4px; position: relative; }
+  .panel h2 { font-size: 15px; margin: 2px 0 0; }
+  .panel h2 .ref { font-weight: 400; color: var(--muted); font-size: 13px; }
+  .see { color: var(--muted); font-size: 13px; margin: 0; }
+  .see b { color: var(--ink); font-weight: 600; }
+  .plot { width: 100%; min-width: 0; }
+  .svgbox { position: relative; width: 100%; min-width: 0; overflow: hidden; }
+  .svgbox svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .svgbox svg * { pointer-events: none; }
+  .svgbox [data-floor], .svgbox [data-chip], .svgbox [data-chip] *, .svgbox [data-handle] { pointer-events: auto; cursor: pointer; }
+  .svgbox [data-handle] { cursor: ew-resize; }
+  .svgbox.drag { touch-action: none; }
+  .h130 { height: 130px; } .h170 { height: 170px; } .h220 { height: 220px; } .h300 { height: 300px; } .h420 { height: 420px; }
+  .duo { display: flex; gap: 8px; flex-wrap: wrap; }
+  .duo > * { min-width: 0; }
+  .f1 { flex: 1 1 260px; } .f2 { flex: 2 1 260px; } .fnone { flex: none; }
+  .col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .ctl { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 13px; }
+  .readout { font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; overflow-x: auto; }
+  .note { font-size: 12.5px; color: var(--muted); font-family: inherit; }
+  .bad { color: var(--uh); font-weight: 600; }
+  .chk { display: inline-flex; gap: 4px; align-items: center; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 2px; }
+  .tools { margin-left: auto; display: inline-flex; gap: 10px; align-items: center; color: var(--muted); }
+  .eq { text-align: center; font-size: 14px; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+  .eq .katex-html { white-space: nowrap; }
+  #loaderr { display: none; margin: 12px 0; padding: 12px; background: var(--hl); border: 1px solid var(--uh); }
+  /* matrices as grids of cells */
+  .matT { font-size: 12.5px; color: var(--muted); margin-bottom: 2px; }
+  table.mat { border-collapse: collapse; font-family: var(--mono); font-variant-numeric: tabular-nums;
+              border-left: 2px solid var(--ink); border-right: 2px solid var(--ink); }
+  table.mat td { padding: 3px 4px; text-align: right; white-space: nowrap; min-width: 2em; border: 1px solid var(--grid); }
+  table.mat td.cj { border-left: 2px solid var(--uh); border-right: 2px solid var(--uh); font-weight: 600; }
+  table.mat td.cj.t { border-top: 2px solid var(--uh); }
+  table.mat td.cj.b { border-bottom: 2px solid var(--uh); }
+  table.mat td.ri { border-top: 2px dotted var(--uh); border-bottom: 2px dotted var(--uh); }
+  table.mat td.empty { color: var(--line); text-align: center; }
+  /* the story table floats over the panels, so opening it does not move them */
+  #pop { display: none; position: fixed; z-index: 20; left: 50%; top: 96px; transform: translateX(-50%);
+         max-width: calc(100vw - 24px); max-height: calc(100vh - 110px); overflow: auto; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+  #pop table { border-collapse: collapse; font-size: 13px; }
+  #pop td, #pop th { padding: 2px 6px; text-align: left; white-space: nowrap; }
+  #pop th { color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); }
+  #pop input[type=range] { width: 92px; vertical-align: middle; }
+  #pop .val { display: inline-block; min-width: 4.2em; text-align: right; }
+  #pop button.play { padding: 0 5px; }
+  .hmrow { display: flex; gap: 4px; }
+  .hm { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+  .hmt { font-size: 12.5px; color: var(--muted); text-align: center; }
+  body.nocap .see { display: none; }
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+    .bar input[type=range] { width: 110px; }
+    .tools { margin-left: 0; }
+  }
+  /* Landscape screens (the iPad in class): the open tab fills the screen and the drawings and plots
+     take the height left over, so nothing needs scrolling. */
+  @media (min-width: 1000px) and (min-height: 600px) and (orientation: landscape) {
+    body { height: 100vh; height: 100dvh; margin: 0; display: flex; flex-direction: column;
+           padding-block: 4px 8px; overflow: hidden; }
+    header, nav, .bar { flex: none; }
+    section:not([hidden]) { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+    section > .grid { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+    .panel { min-height: 0; overflow: hidden; }
+    .plot, .svgbox { flex: 1 1 0; height: auto; min-height: 60px; overflow: hidden; }
+    .plot.h130, .svgbox.h130 { flex: 0.7 1 0; }
+    .duo { flex: 1 1 0; min-height: 0; flex-wrap: nowrap; }
+    .duo.slim { flex: 0 1 auto; }
+    .col { min-height: 0; }
+    .hmrow { flex: 0.75 1 0; min-height: 0; }
+    .hm .plot { flex: 1 1 0; }
+  }
+  /* Chapter 10 additions */
+  .plot { position: relative; }
+  .tcursor { position: absolute; width: 1.5px; background: var(--uh); pointer-events: none; z-index: 5; }
+  .phiover { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 4; }
+  #sec-a .grid { grid-template-columns: 1fr 1fr 1fr; }
+  #sec-c .grid { grid-template-columns: 1.15fr 1fr; }
+  #sec-c #p6 { grid-row: 1 / span 2; }
+  #sec-d .grid { grid-template-columns: 1fr; }
+  table.est { border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; }
+  table.est td, table.est th { padding: 1px 10px 1px 0; text-align: right; white-space: nowrap; font-weight: 400; color: var(--ink); }
+  table.est th { color: var(--muted); }
+  table.est td:first-child, table.est th:first-child { text-align: left; }
+  table.err { border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; width: 100%; }
+  table.err.tiny { font-size: 10.5px; }
+  table.err td, table.err th { border: 1px solid var(--grid); padding: 2px 4px; text-align: right; white-space: nowrap; font-weight: 400; }
+  table.err th { color: var(--muted); }
+  table.err td:first-child, table.err th:first-child { text-align: left; font-family: system-ui, sans-serif; }
+  #c6chips { display: grid; gap: 2px; }
+  .chip { font-size: 11.5px; line-height: 1.2; text-align: center; white-space: nowrap; overflow: hidden; }
+  .chip span { color: var(--muted); }
+  .pophead { display: flex; gap: 12px; align-items: baseline; margin-bottom: 4px; }
+  @media (max-width: 1000px) { #sec-a .grid, #sec-c .grid { grid-template-columns: 1fr; } #sec-c #p6 { grid-row: auto; } }
+  @media (min-width: 1000px) and (min-height: 600px) and (orientation: landscape) {
+    #sec-c > .grid { grid-template-rows: auto minmax(0, 1fr); }
+    .plot.fx05, .svgbox.fx05 { flex: 0.55 1 0; } .plot.fx2, .svgbox.fx2 { flex: 2 1 0; } .plot.fx3, .svgbox.fx3 { flex: 3 1 0; }
+    .duo.fx1 { flex: 1 1 0; } .duo.fx2 { flex: 2 1 0; }
+    .see { font-size: 12.5px; line-height: 1.3; }
+    .svgbox.fx1, .plot.fx1 { flex: 1 1 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Forced motion of shear buildings</h1>
+  <span class="sub">CIVE 6355 · deck 10 · Paz Ch. 8</span>
+  <span class="tools">
+    <label>speed <select id="speed">
+      <option value="0.25">¼×</option><option value="0.5">½×</option>
+      <option value="1" selected>1×</option><option value="2">2×</option>
+    </select></label>
+    <button id="caps" class="on" title="show or hide the explanations under the panel titles">captions</button>
+    <button id="theme" title="light or dark colors">☾ dark</button>
+    <button id="reset" title="all controls back to their defaults">Reset</button>
+  </span>
+</header>
+<div id="loaderr">Plotly/KaTeX could not be loaded from the CDN. This page needs an internet connection.</div>
+<nav id="tabs">
+  <a href="#tab=a" data-tab="a">A · Modal superposition and the peaks</a>
+  <a href="#tab=b" data-tab="b">B · Closely spaced modes</a>
+  <a href="#tab=c" data-tab="c">C · Base motion</a>
+  <a href="#tab=d" data-tab="d">D · Harmonic forcing</a>
+</nav>
+<div id="pop"></div>
+<datalist id="xiTicks"><option value="0"></option><option value="0.02"></option><option value="0.05"></option><option value="0.1"></option></datalist>
+
+<!-- ======================= Tab A ======================= -->
+<section id="sec-a" hidden>
+  <div class="bar">
+    <label>Case <select id="aCase"><option value="ex81">Paz Ex. 8.1: pulse</option><option value="ex82">Paz Ex. 8.2: step ÿₛ</option><option value="custom">your own load</option></select></label>
+    <label>Building <select id="aPreset" class="bPresets"></select></label>
+    <span class="grp"><span class="sym">n</span><button class="play" id="aNPlay" title="sweep n">▶</button><input type="range" id="aN" min="1" max="10" step="1" style="width:70px"><span class="val" id="aNLbl"></span></span>
+    <button id="aTbl" title="masses and story stiffnesses, one slider per story">stories…</button>
+    <button id="aLoads" title="the load vector, one slider per floor">loads…</button>
+    <label>f(t) <select id="aType"><option value="tri">triangular</option><option value="half">half-sine</option><option value="step">step</option></select></label>
+    <span class="grp" id="aTdWrap"><span class="sym">t<sub>d</sub>/T₁</span><button class="play" id="aTdPlay" title="sweep the pulse duration">▶</button><input type="range" id="aTd" min="-1.301" max="0.699" step="0.002" style="width:100px"><span class="val" id="aTdLbl"></span></span>
+    <span class="grp"><span class="sym">ξ</span><button class="play" id="aXiPlay" title="sweep ξ">▶</button><input type="range" id="aXi" min="0" max="0.2" step="0.005" list="xiTicks" style="width:90px"><span class="val" id="aXiLbl"></span></span>
+    <label>floor <span class="sym">i</span> <select id="aFloor"></select></label>
+    <span class="grp"><button class="play" id="aTPlay" title="run time">▶</button><span class="sym">t</span><input type="range" id="aT" min="0" max="1" step="0.0005" style="width:90px"><span class="val" id="aTLbl"></span></span>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>1 · One building, n independent oscillators <span class="ref">Paz 8.1</span></h2>
+      <p class="see">Each mode is its own oscillator, in its own hue. <b>The oscillators do not talk to each other; each only hears φ<sub>j</sub><sup>T</sup>{F}, the work of the load through its mode shape.</b> A load ∝ [M]φ<sub>j</sub> moves one oscillator and leaves the others still. Thin: modal parts; thick: their sum; dots: direct integration (deck 07).</p>
+      <div class="ctl">
+        <button id="aAll" title="the same force at every floor">all floors</button>
+        <button id="aOne" title="the whole load at floor i">one floor</button>
+        <span class="grp"><button id="aMphi">∝ [M]φ<sub>j</sub></button><label><span class="sym">j</span> <select id="aMj"></select></label></span>
+        <span class="note">damping: deck 11</span>
+      </div>
+      <div id="a1svg" class="svgbox h300 fx2" role="img" aria-label="building with forces beside one oscillator per mode"></div>
+      <div id="a1bar" class="plot h130 fx05"></div>
+      <div id="a1plot" class="plot h220"></div>
+    </div>
+    <div class="panel">
+      <h2>2 · The peaks do not coincide <span class="ref">Paz 8.6; 2024 L23</span></h2>
+      <p class="see"><b>Max of a sum is not the sum of the maxes.</b> SRSS is an estimate, not a bound: with ξ = 5%, Ex. 8.1 has it 9% low at floor 1 and 10% high at floor 2. In Ex. 8.2 mode 2 holds 1.3% of the mass, so all the rules agree. Peaks over a window of 6T₁.</p>
+      <div class="ctl"><label class="chk" title="y₁ = sin²t, y₂ = cos²t: no building"><input type="checkbox" id="aSin">sin² + cos²</label></div>
+      <div id="a2up" class="plot h220"></div>
+      <div id="a2low" class="plot h220"></div>
+      <div class="readout" id="a2tab"></div>
+    </div>
+    <div class="panel">
+      <h2>3 · The norm view <span class="ref">2024 L23 p. 61</span></h2>
+      <p class="see">Level curves through {m}<sub>i</sub>; each crosses the positive axis at its estimate. <b>All agree when one mode dominates. CQC is SRSS with a different ruler, and it reads the signs that SRSS and the 1-norm throw away.</b> Drag the point.</p>
+      <div class="ctl">
+        <span class="grp" id="a3modes"><label>modes <select id="a3j"></select></label><select id="a3k"></select></span>
+        <span class="grp"><span class="sym">ρ₁₂</span><button class="play" id="a3RhoPlay" title="sweep ρ">▶</button><input type="range" id="a3Rho" min="0" max="1" step="0.005" style="width:80px"><span class="val" id="a3RhoLbl"></span></span>
+        <label class="chk" title="ρ from ω and ξ"><input type="checkbox" id="a3Auto">from ω, ξ</label>
+        <label class="chk" title="the same curves at c = 1"><input type="checkbox" id="a3Unit">unit balls</label>
+        <button id="a3Back" title="the point back to the chosen floor">floor i</button>
+      </div>
+      <div id="a3svg" class="svgbox h300 drag fx3" role="img" aria-label="diamond, circle and ellipse through the modal point"></div>
+      <div class="readout" id="a3tab"></div>
+      <div id="a3bar" class="plot h130 fx05"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= Tab B ======================= -->
+<section id="sec-b" hidden>
+  <div class="bar">
+    <span class="grp"><span class="sym">ξ</span><button class="play" id="bXiPlay" title="sweep ξ">▶</button><input type="range" id="bXi" min="0" max="0.2" step="0.005" list="xiTicks" style="width:150px"><span class="val" id="bXiLbl"></span></span>
+    <span class="note">Under El Centro 1940 NS, first 10 s (Paz Table 5.3). Numbers differ from Chopra's 30-s record.</span>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>4 · ω₂/ω₁ toward 1 <span class="ref">Paz 8.6; Chopra 13.7; L23 p. 61</span></h2>
+      <p class="see">Two oscillators under one ground motion, each scaled to a unit peak, so that only the timing is in play. <b>As r → 1 they fall into step: the sum grows toward ‖m‖₁ for like signs and shrinks to nothing for opposite signs, while SRSS sits still.</b> "Closely spaced" depends on damping.</p>
+      <div class="ctl">
+        <span class="grp"><span class="sym">r</span><button class="play" id="b4RPlay" title="sweep r">▶</button><input type="range" id="b4R" min="0" max="0.4771" step="0.0005" style="width:130px"><span class="val" id="b4RLbl"></span></span>
+        <span class="grp"><span class="sym">m<sub>i2</sub>/m<sub>i1</sub></span><button class="play" id="b4APlay" title="sweep the modal ratio">▶</button><input type="range" id="b4A" min="-1" max="1" step="0.01" style="width:80px"><span class="val" id="b4ALbl"></span></span>
+        <button id="b4Like">same sign</button><button id="b4Opp">opposite</button>
+        <span class="grp"><span class="sym">T₁</span><button class="play" id="b4TPlay" title="sweep T₁">▶</button><input type="range" id="b4T" min="-0.699" max="0.602" step="0.002" style="width:80px"><span class="val" id="b4TLbl"></span></span>
+      </div>
+      <div id="b4up" class="plot h130"></div>
+      <div id="b4low" class="plot h170"></div>
+      <div class="readout" id="b4tab"></div>
+      <div id="b4rho" class="plot h220 fx2"></div>
+    </div>
+    <div class="panel">
+      <h2>5 · Why CQC, and how a building gets there <span class="ref">Chopra 13.7, 13.8.3; not in Paz</span></h2>
+      <p class="see">One record is jagged; the rules speak of a mean. Grey dots: 40 synthetic records (Kanai-Tajimi, not a real record). <b>On the mean, CQC tracks the truth where SRSS cannot.</b> Below: <b>one structure where SRSS errs both ways</b>: the main floors see two modal parts of one sign, the appendage two of opposite signs.</p>
+      <div class="ctl">
+        <button id="b5Add" title="ten more seeded records">add 10 records</button>
+        <label class="chk" title="the one real record, in place of the ensemble"><input type="checkbox" id="b5El">El Centro only</label>
+        <span class="note" id="b5Count"></span>
+      </div>
+      <div id="b5ens" class="plot h300 fx2"></div>
+      <div class="ctl">
+        <label>Building <select id="b5B"><option value="pC">Problem C: penthouse</option><option value="app">Main floor + tuned appendage</option></select></label>
+        <span class="grp" id="b5AppCtl"><span class="sym">μ</span><button class="play" id="b5MuPlay" title="sweep μ">▶</button><input type="range" id="b5Mu" min="-2.699" max="-0.523" step="0.002" style="width:90px"><span class="val" id="b5MuLbl"></span>
+          <span class="sym">ω<sub>a</sub>/ω<sub>main</sub></span><button class="play" id="b5TunePlay" title="sweep the tuning">▶</button><input type="range" id="b5Tune" min="0.8" max="1.2" step="0.002" style="width:80px"><span class="val" id="b5TuneLbl"></span></span>
+      </div>
+      <div class="duo fx2">
+        <div id="b5svg" class="svgbox f1 h220" role="img" aria-label="the building in its first two modes"></div>
+        <div class="col f1"><div class="readout" id="b5read"></div><div class="readout" id="b5tab"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= Tab C ======================= -->
+<section id="sec-c" hidden>
+  <div class="bar">
+    <label>Building <select id="cPreset" class="bPresets"></select></label>
+    <span class="grp"><span class="sym">n</span><button class="play" id="cNPlay" title="sweep n">▶</button><input type="range" id="cN" min="1" max="10" step="1" style="width:70px"><span class="val" id="cNLbl"></span></span>
+    <button id="cTbl" title="masses and story stiffnesses, one slider per story">stories…</button>
+    <label>Input <select id="cInput"><option value="record">El Centro 1940 NS, 10 s</option><option value="step">Step ÿₛ (Paz Ex. 8.2)</option></select></label>
+    <span class="grp"><span class="sym">A<sub>g</sub></span><button class="play" id="cAgPlay" title="sweep the scale">▶</button><input type="range" id="cAg" min="-1.301" max="0" step="0.002" style="width:90px"><span class="val" id="cAgLbl"></span></span>
+    <span class="grp"><span class="sym">ξ</span><button class="play" id="cXiPlay" title="sweep ξ">▶</button><input type="range" id="cXi" min="0" max="0.2" step="0.005" list="xiTicks" style="width:90px"><span class="val" id="cXiLbl"></span></span>
+    <span class="grp"><button class="play" id="cTPlay" title="run time">▶</button><span class="sym">t</span><input type="range" id="cT" min="0" max="1" step="0.0005" style="width:120px"><span class="val" id="cTLbl"></span></span>
+  </div>
+  <div class="grid">
+    <div class="panel" id="p6">
+      <h2>6 · The building shakes, mode by mode <span class="ref">Paz 8.2; Chopra 13.2; L24, L29</span></h2>
+      <p class="see"><b>Ground motion drives every mode with the same ÿ<sub>s</sub>; only Γ<sub>j</sub> decides how much each one takes.</b> Effective masses add up to the total. All the buildings are on one scale; grey ghost: the exact response. The record is Paz's Table 5.3, not Chopra's, so peaks differ from the handout.</p>
+      <div id="c6rec" class="plot h130 fx05"></div>
+      <div id="c6svg" class="svgbox h300 fx2" role="img" aria-label="one small building per mode and their sum"></div>
+      <div id="c6chips"></div>
+      <div class="readout" id="c6read"></div>
+      <div class="duo fx1">
+        <div id="c6mass" class="plot f1 h220"></div>
+        <div id="c6spec" class="plot f1 h220"></div>
+      </div>
+    </div>
+    <div class="panel" id="p7">
+      <h2>7 · How many modes? <span class="ref">not in Paz</span></h2>
+      <p class="see">Error of the exact history truncated to N modes. <b>Effective mass speaks for base shear. Local and acceleration quantities want more modes, and the error need not shrink steadily.</b></p>
+      <div id="c7tab"></div>
+    </div>
+    <div class="panel" id="p8">
+      <h2>8 · Combine last <span class="ref">not in Paz; 2024 L24</span></h2>
+      <p class="see"><b>Floor peaks have lost their signs, so their difference is no drift at any time.</b> Combine the modal shears, not the floor peaks. "One mode only": nothing to combine, every floor's peak exact, and combine first is still wrong.</p>
+      <div class="ctl">
+        <label>Case <select id="c8Case"><option value="tab">the building above</option><option value="ex81">Paz Ex. 8.1 pulse</option><option value="one">One mode only: ∝ [M]φ₂</option></select></label>
+        <label><select id="c8Resp"><option value="shear">story shear</option><option value="drift">story drift</option><option value="moment">base overturning</option></select></label>
+        <label id="c8StoryW">story <select id="c8Story"></select></label>
+        <label>rule <select id="c8Rule"><option value="srss">SRSS</option><option value="cqc">CQC</option></select></label>
+        <label class="chk" id="c8ColW" title="Paz's V_ij: half the story shear for two columns"><input type="checkbox" id="c8Col">per column</label>
+        <label class="chk" title="Paz's sum of the ends: k(‖m‖ + ‖m‖)"><input type="checkbox" id="c8Ends">sum of the ends</label>
+      </div>
+      <div class="note" id="c8b"></div>
+      <div class="duo fx1">
+        <div id="c8plot" class="plot h170" style="flex:3 1 220px"></div>
+        <div id="c8svg" class="svgbox h170" style="flex:2 1 120px" role="img" aria-label="the story between two floors"></div>
+      </div>
+      <div class="duo fx1">
+        <div id="c8modal" class="plot h170" style="flex:2 1 150px"></div>
+        <div id="c8bars" class="plot h170" style="flex:3 1 220px"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= Tab D ======================= -->
+<section id="sec-d" hidden>
+  <div class="bar">
+    <label>Building <select id="dPreset" class="bPresets"></select></label>
+    <span class="grp"><span class="sym">n</span><button class="play" id="dNPlay" title="sweep n">▶</button><input type="range" id="dN" min="1" max="10" step="1" style="width:70px"><span class="val" id="dNLbl"></span></span>
+    <button id="dTbl" title="masses and story stiffnesses, one slider per story">stories…</button>
+    <label>Load <select id="dLoad"><option value="force">force at a floor</option><option value="base">base acceleration, 0.1g</option></select></label>
+    <span class="grp"><span class="sym">ϖ</span><button class="play" id="dWPlay" title="sweep the load frequency">▶</button><input type="range" id="dW" min="0" max="1" step="0.0005" list="dTicks" style="width:240px"><span class="val" id="dWLbl"></span></span>
+    <datalist id="dTicks"></datalist>
+    <label>Damping <select id="dDamp"><option value="xi">ξ, all modes</option><option value="paz">a₀, a₁ (Paz 8.55)</option></select></label>
+    <span class="grp" id="dXiW"><span class="sym">ξ</span><button class="play" id="dXiPlay" title="sweep ξ">▶</button><input type="range" id="dXi" min="0" max="0.2" step="0.005" list="xiTicks" style="width:90px"><span class="val" id="dXiLbl"></span></span>
+    <span class="grp" id="dAW"><span class="sym">a₀</span><button class="play" id="dA0Play" title="sweep a₀">▶</button><input type="range" id="dA0" min="0" max="2" step="0.01" style="width:70px"><span class="val" id="dA0Lbl"></span>
+      <span class="sym">a₁</span><button class="play" id="dA1Play" title="sweep a₁">▶</button><input type="range" id="dA1" min="0" max="0.02" step="0.0001" style="width:70px"><span class="val" id="dA1Lbl"></span></span>
+    <button id="dEx84" title="F₂ = 10000 sin 20t lb, undamped">Ex. 8.4</button><button id="dEx85" title="the same with a₁ = 0.01">Ex. 8.5</button>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>9 · Frequency sweep <span class="ref">Paz 8.4, 8.5</span></h2>
+      <p class="see"><b>A resonance at each mode, and at each resonance the building takes that mode's shape.</b> Peaks shrink with ω<sub>j</sub>² and the shape is purest at the lowest modes. Below ω₁ the floors follow the load; just above it they swing against it. Between the peaks the loaded floor can stand still (a dip). Tap a floor to load it.</p>
+      <div class="duo fx1">
+        <div class="col" style="flex:1 1 280px">
+          <div class="ctl">
+            <button id="dPlay">▶ sway</button>
+            <label>magnification <select id="dMag"><option value="auto">auto: the shape</option><option value="fixed">fixed: the growth</option></select></label>
+          </div>
+          <div id="d9svg" class="svgbox h300 fx2" role="img" aria-label="building in steady state under the harmonic load"></div>
+          <div id="d9shape" class="svgbox h170 fx1" role="img" aria-label="the current amplitudes against the nearest mode shape"></div>
+          <div class="readout" id="d9read"></div>
+        </div>
+        <div class="col" style="flex:3 1 400px">
+          <div class="ctl">
+            <label class="chk" title="each mode's term for the top floor"><input type="checkbox" id="dModal">modal terms</label>
+            <label class="chk" title="the phases of the floors"><input type="checkbox" id="dPhase">phases</label>
+            <span class="note" id="d9note"></span>
+          </div>
+          <div id="d9frf" class="plot h420 fx2"></div>
+          <div id="d9ph" class="plot h170 fx1" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+"use strict";
+// CORE-BEGIN ---- Numbers only, no page: modes, integrator, combination rules (spec, Notes). -------
+const zeros = (r, c) => Array.from({ length: r }, () => new Array(c).fill(0));
+const sum = a => a.reduce((s, x) => s + x, 0);
+const matVec = (A, x) => A.map(r => r.reduce((s, v, j) => s + v * x[j], 0));
+const dot = (a, b) => a.reduce((s, v, i) => s + v * b[i], 0);
+const GRAV = 386;   // in/s², as the spec's presets
+const RECORD = {"t":[0.0,0.042,0.097,0.161,0.221,0.263,0.291,0.332,0.374,0.429,0.471,0.581,0.623,0.665,0.72,0.74,0.789,0.829,0.872,0.902,0.941,0.961,0.997,1.066,1.076,1.094,1.168,1.315,1.384,1.412,1.44,1.481,1.509,1.537,1.628,1.703,1.855,1.88,1.924,2.007,2.215,2.27,2.32,2.395,2.45,2.519,2.575,2.652,2.708,2.769,2.893,2.976,3.068,3.129,3.212,3.253,3.386,3.419,3.53,3.599,3.668,3.738,3.835,3.904,4.014,4.056,4.106,4.222,4.314,4.416,4.471,4.618,4.665,4.756,4.831,4.97,5.039,5.108,5.199,5.233,5.302,5.33,5.343,5.454,5.51,5.606,5.69,5.773,5.8,5.809,5.869,5.883,5.925,5.98,6.013,6.085,6.132,6.174,6.188,6.198,6.229,6.279,6.326,6.368,6.382,6.409,6.459,6.478,6.52,6.534,6.562,6.575,6.603,6.645,6.686,6.714,6.728,6.749,6.769,6.811,6.852,6.908,6.991,7.074,7.121,7.143,7.149,7.171,7.226,7.295,7.37,7.406,7.425,7.461,7.525,7.572,7.6,7.641,7.669,7.691,7.752,7.794,7.835,7.877,7.96,7.987,8.001,8.07,8.126,8.166,8.195,8.223,8.278,8.334,8.403,8.458,8.533,8.596,8.638,8.735,8.818,8.86,8.882,8.915,8.956,9.053,9.095,9.123,9.15,9.253,9.289,9.427,9.441,9.51,9.635,9.704,9.815,9.898,9.939,9.995,10.02,10.05,10.08,10.1,10.15,10.19],"a":[0.0108,0.002,0.0159,-0.0001,0.0189,0.0001,0.0059,-0.0012,0.02,-0.0237,0.0076,0.0425,0.0094,0.0138,-0.0088,-0.0256,-0.0387,-0.0568,-0.0232,-0.0343,-0.0402,-0.0603,-0.0789,-0.0666,-0.0381,-0.0429,0.0897,-0.1696,-0.0828,-0.0828,-0.0945,-0.0885,-0.108,-0.128,0.1144,0.2355,0.1428,0.1777,-0.261,-0.3194,0.2952,0.2634,-0.2984,0.0054,0.2865,-0.0469,0.1516,0.2077,0.1087,-0.0325,0.1033,-0.0803,0.052,-0.1547,0.0065,-0.206,0.1927,-0.0937,0.1708,-0.0359,0.0365,-0.0736,0.0311,-0.1833,0.0227,-0.0435,0.0216,-0.1972,-0.1762,0.146,-0.0047,0.2572,-0.2045,0.0608,-0.2733,0.1779,0.0301,0.2183,0.0267,0.1252,0.129,0.1089,-0.0239,0.1723,-0.1021,0.0141,-0.1949,-0.242,-0.005,-0.0275,-0.0573,-0.0327,0.0216,0.0108,0.0235,-0.0665,0.0014,0.0493,0.0149,-0.02,-0.0381,0.0207,-0.0058,-0.0603,-0.0162,0.02,-0.176,-0.0033,0.0043,-0.004,-0.0099,-0.0017,-0.017,0.0373,0.0457,0.0385,0.0009,-0.0288,0.0016,0.0113,0.0022,0.0092,-0.0996,0.036,0.0078,-0.0277,0.0026,0.0272,0.0576,-0.0492,0.0297,0.0109,0.0186,-0.253,-0.0347,0.0036,-0.0628,-0.028,-0.0196,0.0068,-0.0054,-0.0603,-0.0357,-0.0716,-0.014,-0.0056,0.0222,0.0468,0.026,-0.0335,-0.0128,0.0661,0.0305,0.0246,0.0347,-0.0369,-0.0344,-0.0104,-0.026,0.1534,-0.0028,0.0233,-0.0261,-0.0022,-0.1849,0.126,0.032,0.0955,0.1246,-0.0328,-0.0451,0.1301,-0.1657,0.0419,-0.0936,0.0816,-0.0881,0.0064,-0.0006,0.0586,-0.0713,-0.0448,-0.0221,0.0093,0.0024,0.051]};   // El Centro 1940 NS, first 10 s, Paz Table 5.3: t in s, a in g
+
+function luFactor(A0) {
+  const n = A0.length, A = A0.map(r => r.slice()), piv = A.map((_, i) => i);
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let i = c + 1; i < n; i++) if (Math.abs(A[i][c]) > Math.abs(A[p][c])) p = i;
+    if (p !== c) { [A[p], A[c]] = [A[c], A[p]]; [piv[p], piv[c]] = [piv[c], piv[p]]; }
+    for (let i = c + 1; i < n; i++) {
+      const f = A[i][c] / A[c][c]; A[i][c] = f;
+      if (f !== 0) for (let j = c + 1; j < n; j++) A[i][j] -= f * A[c][j];
+    }
+  }
+  return { A, piv };
+}
+function luSolve({ A, piv }, b) {
+  const n = A.length, x = piv.map(p => b[p]);
+  for (let i = 1; i < n; i++) for (let j = 0; j < i; j++) x[i] -= A[i][j] * x[j];
+  for (let i = n - 1; i >= 0; i--) { for (let j = i + 1; j < n; j++) x[i] -= A[i][j] * x[j]; x[i] /= A[i][i]; }
+  return x;
+}
+const solve = (A, b) => luSolve(luFactor(A), b);
+
+function stiffness(k) {
+  const n = k.length, K = zeros(n, n);
+  for (let i = 0; i < n; i++) {
+    K[i][i] = k[i] + (i + 1 < n ? k[i + 1] : 0);
+    if (i + 1 < n) K[i][i + 1] = K[i + 1][i] = -k[i + 1];
+  }
+  return K;
+}
+// Modes of a shear building: [M] diagonal, so reduce to M^-1/2 K M^-1/2 and run Jacobi. Returns omega
+// ascending and Phi[i][j] (floor i, mode j), M-normalized, phi_1j > 0 (as the check scripts).
+function modesOf(m, k) {
+  const n = m.length, K = stiffness(k), s = m.map(v => 1 / Math.sqrt(v));
+  const A = K.map((r, i) => r.map((v, j) => v * s[i] * s[j]));
+  const V = zeros(n, n); for (let i = 0; i < n; i++) V[i][i] = 1;
+  for (let sweep = 0; sweep < 60; sweep++) {
+    let off = 0; for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) off += A[p][q] ** 2;
+    if (off < 1e-26 * sum(A.map((r, i) => r[i] ** 2))) break;
+    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) {
+      if (Math.abs(A[p][q]) < 1e-300) continue;
+      const th = (A[q][q] - A[p][p]) / (2 * A[p][q]);
+      const t = (th >= 0 ? 1 : -1) / (Math.abs(th) + Math.sqrt(1 + th * th));
+      const c = 1 / Math.sqrt(1 + t * t), sn = t * c;
+      for (let i = 0; i < n; i++) { const a = A[i][p], b = A[i][q]; A[i][p] = c * a - sn * b; A[i][q] = sn * a + c * b; }
+      for (let i = 0; i < n; i++) { const a = A[p][i], b = A[q][i]; A[p][i] = c * a - sn * b; A[q][i] = sn * a + c * b; }
+      for (let i = 0; i < n; i++) { const a = V[i][p], b = V[i][q]; V[i][p] = c * a - sn * b; V[i][q] = sn * a + c * b; }
+    }
+  }
+  const ord = A.map((r, i) => [r[i], i]).sort((a, b) => a[0] - b[0]);
+  const w = ord.map(o => Math.sqrt(Math.max(o[0], 0)));
+  const Phi = zeros(n, n);
+  ord.forEach(([, c], j) => {
+    const sgn = V[0][c] * s[0] < 0 ? -1 : 1;
+    for (let i = 0; i < n; i++) Phi[i][j] = sgn * V[i][c] * s[i];
+  });
+  return { w, Phi, T: w.map(x => 2 * Math.PI / x) };
+}
+const column = (Phi, j) => Phi.map(r => r[j]);
+// Paz's sign (8.38): Gamma_j = -phi_j^T [M] {1}
+const gammaOf = (Phi, m) => Phi[0].map((_, j) => -sum(Phi.map((r, i) => r[j] * m[i])));
+
+// Z'' + 2 xi w Z' + w^2 Z = p(t), p piecewise linear on the grid t (uneven allowed): the exact
+// recurrence (Chopra Sec. 5.2), from rest. Returns Z and Z'.
+function sdofPL(t, p, w, xi) {
+  const N = t.length, z = new Float64Array(N), v = new Float64Array(N);
+  const sg = xi * w, wd = w * Math.sqrt(Math.max(1 - xi * xi, 1e-12)), w2 = w * w;
+  let last = -1, E = 1, C = 1, S = 0, zi = 0, vi = 0;
+  for (let i = 0; i < N - 1; i++) {
+    const h = t[i + 1] - t[i];
+    if (Math.abs(h - last) > 1e-12) { last = h; E = Math.exp(-sg * h); C = Math.cos(wd * h); S = Math.sin(wd * h) / wd; }
+    const al = (p[i + 1] - p[i]) / h, shift = 2 * xi * al / (w2 * w);
+    const a = zi - (p[i] / w2 - shift), b = vi - al / w2;
+    zi = E * (a * C + (b + sg * a) * S) + p[i + 1] / w2 - shift;
+    vi = E * (b * C - (sg * b + w2 * a) * S) + al / w2;
+    z[i + 1] = zi; v[i + 1] = vi;
+  }
+  return { z, v };
+}
+function peakAbs(a) { let m = 0; for (let i = 0; i < a.length; i++) { const x = Math.abs(a[i]); if (x > m) m = x; } return m; }
+// the first local peak of |a| at its largest value (undamped, the same peak comes back every cycle)
+function peakTime(t, a) {
+  const m = peakAbs(a) * (1 - 1e-3);
+  for (let i = 1; i < a.length - 1; i++) { const x = Math.abs(a[i]);
+    if (x >= m && x >= Math.abs(a[i - 1]) && x >= Math.abs(a[i + 1])) return t[i]; }
+  return t[a.length - 1];
+}
+
+// Der Kiureghian, Chopra (13.7.10), one damping ratio. Paz's printed (8.58), (8.59) are wrong.
+function rhoOf(r, xi) {
+  if (Math.abs(r - 1) < 1e-12) return 1;
+  if (xi <= 0) return 0;
+  return 8 * xi * xi * (1 + r) * r ** 1.5 / ((1 - r * r) ** 2 + 4 * xi * xi * r * (1 + r) ** 2);
+}
+const rhoMatrix = (w, xi) => w.map(a => w.map(b => rhoOf(b / a, xi)));
+function combos(m, R) {
+  let q = 0; const n = m.length;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) q += m[i] * R[i][j] * m[j];
+  return { l1: sum(m.map(Math.abs)), l2: Math.sqrt(dot(m, m)), lR: Math.sqrt(Math.max(q, 0)) };
+}
+
+// The record on a grid: at most 0.002 s, with the record's own points in the grid (spec, Notes).
+let recGridCache = null;
+function recordGrid(Tw = 25, dt = 0.002) {
+  if (recGridCache && recGridCache.Tw === Tw) return recGridCache;
+  const set = []; const Nu = Math.round(Tw / dt);
+  for (let i = 0; i <= Nu; i++) set.push(i * dt);
+  RECORD.t.forEach(x => set.push(x));
+  set.sort((a, b) => a - b);
+  const t = [set[0]]; for (let i = 1; i < set.length; i++) if (set[i] - t[t.length - 1] > 1e-9) t.push(set[i]);
+  const a = new Float64Array(t.length), last = RECORD.t[RECORD.t.length - 1];
+  let s = 0;
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] > last + 1e-9) { a[i] = 0; continue; }
+    while (s + 2 < RECORD.t.length && RECORD.t[s + 1] < t[i]) s++;
+    const f = (t[i] - RECORD.t[s]) / (RECORD.t[s + 1] - RECORD.t[s]);
+    a[i] = RECORD.a[s] + f * (RECORD.a[s + 1] - RECORD.a[s]);
+  }
+  return (recGridCache = { t: Float64Array.from(t), a, Tw });
+}
+const RECPEAK = Math.max(...RECORD.a.map(Math.abs));
+
+// A time-history run: every quantity below works on this form, for a load or a base motion.
+// P_j is what sets the sign of mode j: phi_j^T {F} for a load, Gamma_j for a base motion.
+function loadFn(type, td) {
+  if (type === 'step') return () => 1;
+  if (type === 'half') return x => (x <= td ? Math.sin(Math.PI * x / td) : 0);
+  return x => (x <= td ? 1 - x / td : 0);     // triangular, Paz Ex. 8.1
+}
+function forcedRun(b, F, type, td, xi) {
+  const { w, Phi, T } = modesOf(b.m, b.k), n = b.m.length;
+  const Tw = Math.max(6 * T[0], 3 * (type === 'step' ? 0 : td));
+  const dt = Math.max(T[n - 1] / 100, Tw / 24000);
+  const set = []; const Nu = Math.round(Tw / dt);
+  for (let i = 0; i <= Nu; i++) set.push(i * dt);
+  if (type !== 'step') { set.push(td); set.sort((p, q) => p - q); }
+  const t = [set[0]]; for (let i = 1; i < set.length; i++) if (set[i] - t[t.length - 1] > 1e-10) t.push(set[i]);
+  const tt = Float64Array.from(t), fn = loadFn(type, td), f = tt.map(fn);
+  const P = Phi[0].map((_, j) => dot(column(Phi, j), F));
+  const Z = [], Zd = [];
+  for (let j = 0; j < n; j++) { const s = sdofPL(tt, f.map(v => P[j] * v), w[j], xi); Z.push(s.z); Zd.push(s.v); }
+  return { kind: 'load', t: tt, f, w, Phi, T, P, Z, Zd, xi, m: b.m, k: b.k, F, a: null };
+}
+// Base motion: a = record or a step, in in/s². {u} = [Phi]{Z}, Z_j = Gamma_j g_j (Paz (8.38)).
+function baseRun(b, xi, input = 'record', Ag = RECPEAK) {
+  const { w, Phi, T } = modesOf(b.m, b.k), n = b.m.length, G = gammaOf(Phi, b.m);
+  let t, a;
+  if (input === 'step') {
+    const Tw = 6 * T[0], dt = Math.max(T[n - 1] / 100, Tw / 24000), Nu = Math.round(Tw / dt);
+    t = Float64Array.from({ length: Nu + 1 }, (_, i) => i * dt);
+    a = new Float64Array(t.length).fill(Ag * GRAV);
+  } else {
+    const g = recordGrid(); t = g.t; const s = Ag / RECPEAK * GRAV; a = g.a.map(v => v * s);
+  }
+  const Z = [], Zd = [];
+  for (let j = 0; j < n; j++) {
+    const s = sdofPL(t, a, w[j], xi);
+    Z.push(s.z.map(v => G[j] * v)); Zd.push(s.v.map(v => G[j] * v));
+  }
+  return { kind: 'base', t, w, Phi, T, G, P: G, Z, Zd, xi, m: b.m, k: b.k, a };
+}
+// Signed peak of each modal coordinate: the sign of P_j, as the deck's "Combining Maximum Values: CQC"
+const zPeaks = run => run.Z.map((z, j) => (run.P[j] < 0 ? -1 : 1) * peakAbs(z));
+const floorParts = (run, i, ZP = zPeaks(run)) => ZP.map((z, j) => run.Phi[i][j] * z);
+function floorHistory(run, i, keep = null) {
+  const y = new Float64Array(run.t.length);
+  run.Z.forEach((z, j) => { if (keep && !keep[j]) return; const c = run.Phi[i][j]; for (let q = 0; q < y.length; q++) y[q] += c * z[q]; });
+  return y;
+}
+// One floor's three estimates and its true peak
+function floorEstimates(run, i, ZP = zPeaks(run)) {
+  const m = floorParts(run, i, ZP), R = rhoMatrix(run.w, run.xi), e = combos(m, R);
+  return { m, ...e, true: peakAbs(floorHistory(run, i)) };
+}
+// r = b^T {y} (spec, panel 8): a story's shear or drift, the overturning moment.
+function responseOf(run, bv, ZP = zPeaks(run)) {
+  const n = run.w.length, R = rhoMatrix(run.w, run.xi);
+  const modal = ZP.map((z, j) => z * dot(bv, column(run.Phi, j)));
+  const h = new Float64Array(run.t.length);
+  run.Z.forEach((z, j) => { const c = dot(bv, column(run.Phi, j)); for (let q = 0; q < h.length; q++) h[q] += c * z[q]; });
+  const yS = Array.from({ length: n }, (_, i) => Math.sqrt(dot(floorParts(run, i, ZP), floorParts(run, i, ZP))));
+  const last = combos(modal, R);
+  return { modal, exact: peakAbs(h), srss: last.l2, cqc: last.lR, abs: last.l1,
+    first: Math.abs(dot(bv, yS)), ends: sum(bv.map((v, i) => Math.abs(v) * yS[i])) };
+}
+function storyVector(k, s) { const b = k.map(() => 0); b[s] = k[s]; if (s > 0) b[s - 1] = -k[s]; return b; }
+function driftVector(n, s) { const b = new Array(n).fill(0); b[s] = 1; if (s > 0) b[s - 1] = -1; return b; }
+// M_b = sum over stories of V_s h: every story's shear acts over its height
+function momentVector(k, h) { const n = k.length, b = new Array(n).fill(0);
+  for (let s = 0; s < n; s++) { const c = k[s] * h; b[s] += c; if (s > 0) b[s - 1] -= c; }
+  return b; }
+const effMass = (G, m) => G.map(g => g * g / sum(m));
+// Truncation error of the exact history, keeping N modes, per quantity (panel 7, in %).
+function truncation(run) {
+  const n = run.w.length, N = run.t.length, { Phi, w, Z, Zd, xi, k, a, G } = run;
+  const qs = [
+    { key: 'roof', part: j => Z[j].map(v => Phi[n - 1][j] * v) },
+    { key: 'base', part: j => Z[j].map(v => k[0] * Phi[0][j] * v) },
+    { key: 'top', part: j => { const c = k[n - 1] * (Phi[n - 1][j] - (n > 1 ? Phi[n - 2][j] : 0)); return Z[j].map(v => c * v); } },
+    { key: 'acc', part: j => { const c = Phi[n - 1][j], o = Float64Array.from({ length: N }, (_, q) =>
+        c * (-2 * xi * w[j] * Zd[j][q] - w[j] * w[j] * Z[j][q] + G[j] * a[q])); return o; } },
+  ];
+  const out = {};
+  for (const q of qs) {
+    const cum = new Float64Array(N); if (q.key === 'acc') for (let s = 0; s < N; s++) cum[s] = a[s];
+    const pk = [];
+    for (let j = 0; j < n; j++) { const p = q.part(j); for (let s = 0; s < N; s++) cum[s] += p[s]; pk.push(peakAbs(cum)); }
+    out[q.key] = { peak: pk[n - 1], err: pk.map(v => 100 * (v / pk[n - 1] - 1)) };
+  }
+  return out;
+}
+// Direct integration of [M]y'' + [C]y' + [K]y = {F} f(t) by average acceleration (deck 07), to compare
+// with the modal sum. [C] = M Phi diag(2 xi w) Phi^T M, so that it is the same damping.
+function directRun(b, F, fn, xi, Tw, dt) {
+  const n = b.m.length, K = stiffness(b.k), { w, Phi } = modesOf(b.m, b.k);
+  const C = zeros(n, n);
+  for (let i = 0; i < n; i++) for (let l = 0; l < n; l++) { let s = 0;
+    for (let j = 0; j < n; j++) s += Phi[i][j] * 2 * xi * w[j] * Phi[l][j];
+    C[i][l] = s * b.m[i] * b.m[l]; }
+  const c2 = 2 / dt, c4 = 4 / (dt * dt);
+  const Kh = K.map((r, i) => r.map((v, j) => v + c2 * C[i][j] + (i === j ? c4 * b.m[i] : 0)));
+  const fa = luFactor(Kh), Ns = Math.round(Tw / dt);
+  let y = new Array(n).fill(0), v = new Array(n).fill(0), a = F.map((x, i) => x * fn(0) / b.m[i]);
+  const T = [0], Y = [y.slice()];
+  for (let s = 1; s <= Ns; s++) {
+    const f = fn(s * dt);
+    const cv = matVec(C, y.map((yi, i) => c2 * yi + v[i]));
+    const rhs = F.map((Fi, i) => Fi * f + b.m[i] * (c4 * y[i] + 2 * c2 * v[i] + a[i]) + cv[i]);
+    const y1 = luSolve(fa, rhs);
+    for (let i = 0; i < n; i++) {
+      const dy = y1[i] - y[i], v1 = c2 * dy - v[i];
+      a[i] = c4 * dy - 2 * c2 * v[i] - a[i]; v[i] = v1; y[i] = y1[i];
+    }
+    T.push(s * dt); Y.push(y.slice());
+  }
+  return { T, Y };
+}
+// Steady state under {F} sin(varpi t): U_i sin(varpi t + theta_i), by the modal sum (spec, Notes).
+function frf(md, F, wb, xis) {
+  const n = md.w.length, re = new Array(n).fill(0), im = new Array(n).fill(0);
+  for (let j = 0; j < n; j++) {
+    const c = dot(column(md.Phi, j), F), dr = md.w[j] ** 2 - wb * wb, di = 2 * xis[j] * md.w[j] * wb, d = dr * dr + di * di;
+    if (d === 0) { for (let i = 0; i < n; i++) re[i] = Infinity; continue; }
+    for (let i = 0; i < n; i++) { const a = md.Phi[i][j] * c; re[i] += a * dr / d; im[i] -= a * di / d; }
+  }
+  return { re, im, abs: re.map((r, i) => Math.hypot(r, im[i])), th: re.map((r, i) => Math.atan2(im[i], r)) };
+}
+const cosine = (a, b) => Math.abs(dot(a, b)) / Math.sqrt(dot(a, a) * dot(b, b) || 1);
+
+// Synthetic ensemble (panel 5): Kanai-Tajimi filtered white noise, seeded (spec, Notes).
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const ENS = { dt: 0.01, N: 3000, wg: 15, xg: 0.6 };
+const ensT = Float64Array.from({ length: ENS.N }, (_, i) => i * ENS.dt);
+function ensembleRecord(rand) {
+  const n = new Float64Array(ENS.N);
+  for (let i = 0; i < ENS.N; i += 2) {
+    const u = Math.sqrt(-2 * Math.log(1 - rand())), v = 2 * Math.PI * rand();
+    n[i] = -u * Math.cos(v) / Math.sqrt(ENS.dt); if (i + 1 < ENS.N) n[i + 1] = -u * Math.sin(v) / Math.sqrt(ENS.dt);
+  }
+  const { z, v } = sdofPL(ensT, n, ENS.wg, ENS.xg);
+  return Float64Array.from({ length: ENS.N }, (_, i) => { const t = ensT[i];
+    const env = Math.min(t / 2, 1) * (t < 12 ? 1 : Math.exp(-0.25 * (t - 12)));
+    return env * (-2 * ENS.xg * ENS.wg * v[i] - ENS.wg * ENS.wg * z[i]); });
+}
+// Peak of s1/|s1| +- s2/|s2| for one record, T1 fixed: like and opposite signs
+function pairPeaks(t, a, w1, r, xi, s1 = null) {
+  const a1 = s1 ?? sdofPL(t, a, w1, xi).z, a2 = sdofPL(t, a, w1 * r, xi).z;
+  const S1 = peakAbs(a1), S2 = peakAbs(a2); let like = 0, opp = 0;
+  for (let i = 0; i < t.length; i++) { const p = a1[i] / S1, q = a2[i] / S2;
+    const x = Math.abs(p + q), y = Math.abs(p - q); if (x > like) like = x; if (y > opp) opp = y; }
+  return { like, opp, a1, a2, S1, S2 };
+}
+
+// Buildings: masses and story stiffnesses. Units with each; every preset switches them.
+const UNITS = {
+  lb: { m: 'lb·s²/in', k: 'lb/in', f: 'lb', v: 'lb', h: 'lb·in' },
+  kip: { m: 'kip·s²/in', k: 'kip/in', f: 'kip', v: 'kip', h: 'kip·in' },
+};
+const m0 = 100 / GRAV, rep = (v, n) => new Array(n).fill(v);
+function appendage(mu, tune = 1, Tmain = 1) {
+  const w = 2 * Math.PI / Tmain, M = m0;
+  return { units: 'kip', m: [M, mu * M], k: [M * w * w, mu * M * (tune * w) ** 2], h: [144, 144], pinned: false };
+}
+const BUILDINGS = {
+  paz: { label: 'Paz Ex. 7.1 frame', units: 'lb', m: [136, 66], k: [30700, 44300], F0: 10000 },
+  pB: { label: 'Problem B: five-story', units: 'kip', m: rep(m0, 5), k: rep(31.54, 5) },
+  pA: { label: 'Problem A: two-story', units: 'kip', m: [2 * m0, m0], k: [2 * 57.81, 57.81] },
+  pC: { label: 'Problem C: penthouse', units: 'kip', m: [...rep(m0, 4), 0.01 * m0], k: [...rep(22.599, 4), 0.00121 * 22.599] },
+  demo: { label: "Deck 08 code demo's building", units: 'kip', m: [621, 612, 360].map(v => v / GRAV), k: [119.2, 286.2, 190.2] },
+  p811: { label: 'Chopra Prob. 8.11 frame', units: 'kip', m: [100, 100, 50].map(v => v / GRAV), k: [326.3, 217.5, 108.8] },
+  soft: { label: 'Soft first story, k₁ = 0.3k', units: 'kip', m: rep(m0, 5), k: [0.3 * 31.54, ...rep(31.54, 4)] },
+  tall: { label: 'Tall: 10-story, T₁ = 1 s', units: 'kip', m: rep(m0, 10), k: rep(m0 * (2 * Math.PI / (2 * Math.sin(Math.PI / 42))) ** 2, 10) },
+};
+function makeBuilding(id, n = null) {
+  const P = BUILDINGS[id], nn = n ?? P.m.length;
+  const fit = a => { const r = a.slice(0, nn); while (r.length < nn) r.push(a[a.length - 1]); return r; };
+  return { preset: id, units: P.units, m: fit(P.m), k: fit(P.k), h: rep(144, nn), pinned: false, edited: false };
+}
+// CORE-END ----------------------------------------------------------------------------------------
+
+// ---- App -----------------------------------------------------------------------------------
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const cfg = { displayModeBar: false, responsive: true };
+function lay(extra = {}) {
+  return Object.assign({ paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: css('--ink'), size: 12 }, margin: { l: 50, r: 12, t: 6, b: 36 },
+    showlegend: false, hovermode: 'closest', autosize: true }, extra);
+}
+function ax(title, extra = {}) {
+  return Object.assign({ title: { text: title, standoff: 4, font: { size: 12 } }, gridcolor: css('--grid'),
+    zerolinecolor: css('--line'), linecolor: css('--line'), automargin: true }, extra);
+}
+const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+const MINUS = '−';
+// significant digits, with a true minus; thousands with commas
+function sig(x, d = 4) {
+  if (x === Infinity) return '∞'; if (x === -Infinity) return MINUS + '∞';
+  if (!Number.isFinite(x)) return '—';
+  if (Math.abs(x) < 1e-12) return '0';
+  const a = Math.abs(x);
+  const s = a >= 10 ** d ? Math.round(a).toLocaleString('en-US')
+          : a >= 1e-3 ? String(+a.toPrecision(d)) : a.toExponential(d - 1);
+  return (x < 0 ? MINUS : '') + s;
+}
+// fixed number of significant digits, for columns of numbers (0.8590, not 0.859)
+const sigF = (x, d = 4) => (!Number.isFinite(x) ? sig(x) : Math.abs(x) < 1e-12 ? '0'
+  : (x < 0 ? MINUS : '') + Math.abs(x).toPrecision(d));
+const SUB = '₀₁₂₃₄₅₆₇₈₉';
+const sub = i => String(i).split('').map(c => SUB[+c]).join('');
+const sub2 = (i, j) => (i > 9 || j > 9 ? sub(i) + ',' + sub(j) : sub(i) + sub(j));
+const speed = () => +$('speed').value || 1;
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+const shapeFixed = s => 3 * s * s - 2 * s ** 3, shapePinned = s => (3 * s - s ** 3) / 2;
+
+// Sweep a range input back and forth (the ▶ next to a slider); the speed menu scales it.
+// The position is kept as a float, so coarse slider steps do not stall the sweep.
+const SWEEPS = [];
+function sweeper(btn, input, period = 6000) {
+  let on = false, dir = 1, last = 0, cur = 0;
+  const lo = +input.min, hi = +input.max;
+  function tick(ts) {
+    if (!on) return;
+    const dt = last ? ts - last : 16; last = ts;
+    cur += dir * (hi - lo) * dt * speed() / period;
+    if (cur >= hi) { cur = hi; dir = -1; } if (cur <= lo) { cur = lo; dir = 1; }
+    input.value = cur; input.dispatchEvent(new Event('input'));
+    requestAnimationFrame(tick);
+  }
+  function set(v) {
+    on = v; btn.classList.toggle('on', on); btn.textContent = on ? '❚❚' : '▶'; last = 0;
+    if (on) { cur = +input.value; requestAnimationFrame(tick); }
+  }
+  btn.addEventListener('click', () => set(!on));
+  const sw = { stop() { if (on) set(false); } };
+  SWEEPS.push(sw);
+  return sw;
+}
+// Step a panel forward on a timer (the ▶ play next to a Step button); from the last step it
+// starts over at the first.
+function player(btn, { next, atEnd, toStart, ms = 400 }) {
+  let timer = null;
+  const stop = () => { clearTimeout(timer); timer = null; btn.classList.remove('on'); btn.textContent = '▶ play'; };
+  const tick = () => { if (atEnd()) { stop(); return; } next(); timer = setTimeout(tick, ms / speed()); };
+  btn.addEventListener('click', () => {
+    if (timer) { stop(); return; }
+    btn.classList.add('on'); btn.textContent = '❚❚ pause';
+    if (atEnd()) toStart();
+    timer = setTimeout(tick, ms / speed());
+  });
+  const pl = { stop() { if (timer) stop(); } };
+  SWEEPS.push(pl);
+  return pl;
+}
+function tex(el, s) {
+  if (typeof katex === 'undefined') { el.textContent = s; return; }
+  katex.render(s, el, { throwOnError: false, displayMode: false });
+}
+
+// ---- SVG drawing. Sizes are the box's own pixels, so type stays the same size at any scale. ---
+const n1 = x => (Number.isFinite(x) ? x.toFixed(1) : '0');
+const sv = {
+  line: (x1, y1, x2, y2, c = 'var(--ink)', w = 1.5, extra = '') =>
+    `<line x1="${n1(x1)}" y1="${n1(y1)}" x2="${n1(x2)}" y2="${n1(y2)}" style="stroke:${c};stroke-width:${w}" ${extra}/>`,
+  poly: (pts, c = 'var(--ink)', w = 2, extra = '') =>
+    `<polyline points="${pts.map(p => n1(p[0]) + ',' + n1(p[1])).join(' ')}" style="fill:none;stroke:${c};stroke-width:${w};stroke-linejoin:round" ${extra}/>`,
+  text: (x, y, s, { c = 'var(--ink)', size = 12, anchor = 'start', weight = 400, base = 'middle', cls = '' } = {}) =>
+    `<text x="${n1(x)}" y="${n1(y)}" text-anchor="${anchor}" dominant-baseline="${base}" font-size="${size}" font-weight="${weight}" class="${cls}" style="fill:${c}">${s}</text>`,
+  rect: (x, y, w, h, fill, extra = '') => `<rect x="${n1(x)}" y="${n1(y)}" width="${n1(w)}" height="${n1(h)}" style="fill:${fill}" ${extra}/>`,
+  circle: (x, y, r, fill, stroke = 'none', sw = 0, extra = '') =>
+    `<circle cx="${n1(x)}" cy="${n1(y)}" r="${r}" style="fill:${fill};stroke:${stroke};stroke-width:${sw}" ${extra}/>`,
+  arrow(x1, y1, x2, y2, c = 'var(--uh)', w = 2.5) {
+    const L = Math.hypot(x2 - x1, y2 - y1); if (L < 1) return '';
+    const ux = (x2 - x1) / L, uy = (y2 - y1) / L, hl = Math.min(9, L * 0.6), hw = 4.5;
+    const bx = x2 - ux * hl, by = y2 - uy * hl;
+    return sv.line(x1, y1, bx, by, c, w)
+      + `<polygon points="${n1(x2)},${n1(y2)} ${n1(bx - uy * hw)},${n1(by + ux * hw)} ${n1(bx + uy * hw)},${n1(by - ux * hw)}" style="fill:${c}"/>`;
+  },
+};
+function setSvg(el, body) {
+  const W = el.clientWidth, H = el.clientHeight;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
+}
+// Geometry of a building in a box: floor heights in px, the bay, ground
+function geom(el, b, { mL = 40, mR = 110, mT = 16, mB = 24, bay = null, frac = 0 } = {}) {
+  const W = el.clientWidth, H = el.clientHeight, n = b.k.length;
+  const tot = sum(b.h), sz = (H - mT - mB) / tot;
+  let z = 0; const zs = [H - mB];
+  b.h.forEach(h => { z += h; zs.push(H - mB - z * sz); });
+  const avail = W - mL - mR, bw = bay ?? clamp(avail * 0.42, 40, 130);
+  const x0 = mL + frac * Math.max(0, avail - bw);
+  return { W, H, n, zs, bw, x0, x1: x0 + bw, ground: H - mB };
+}
+// Offsets in px are clamped, so a runaway stays finite on the page
+const off = (sc, y) => (Number.isFinite(sc * y) ? clamp(sc * y, -3000, 3000) : (y > 0 ? 3000 : -3000));
+// One bent column from floor displacement ya to yb (shape in the story)
+function columnPts(xc, za, zb, ya, yb, sc, shape) {
+  const P = [];
+  for (let s = 0; s <= 1.0001; s += 0.1) {
+    const d = (Number.isFinite(ya) ? ya : 0) + ((Number.isFinite(yb) ? yb : 0) - (Number.isFinite(ya) ? ya : 0)) * shape(s);
+    P.push([xc + off(sc, Number.isFinite(ya) && Number.isFinite(yb) ? d : yb > 0 ? 1e9 : -1e9), za + (zb - za) * s]);
+  }
+  return P;
+}
+// The building: columns, girders, floor dots. style: { c, w, dash, storyC(i), dots }
+function frameSvg(g, b, y, sc, { c = 'var(--ink)', w = 2, dash = '', storyC = null, dots = true, girder = 3.5 } = {}) {
+  let s = '';
+  const yy = i => (i < 0 ? 0 : y[i]), ex = dash ? `stroke-dasharray="${dash}"` : '';
+  for (let i = 0; i < g.n; i++) {
+    const shape = b.pinned && i === 0 ? shapePinned : shapeFixed, col = storyC ? storyC(i) : c;
+    s += sv.poly(columnPts(g.x0, g.zs[i], g.zs[i + 1], yy(i - 1), yy(i), sc, shape), col, w, ex);
+    s += sv.poly(columnPts(g.x1, g.zs[i], g.zs[i + 1], yy(i - 1), yy(i), sc, shape), col, w, ex);
+  }
+  for (let i = 0; i < g.n; i++) {
+    const d = off(sc, y[i]);
+    s += sv.line(g.x0 + d, g.zs[i + 1], g.x1 + d, g.zs[i + 1], c, girder, ex);
+    if (dots) s += sv.circle((g.x0 + g.x1) / 2 + d, g.zs[i + 1], 4, c);
+  }
+  return s;
+}
+function groundSvg(g, b) {
+  let s = sv.line(g.x0 - 18, g.ground, g.x1 + 18, g.ground, 'var(--muted)', 2);
+  for (let x = g.x0 - 14; x < g.x1 + 18; x += 9) s += sv.line(x, g.ground + 7, x + 6, g.ground + 1, 'var(--line)', 1);
+  if (b.pinned) for (const x of [g.x0, g.x1]) s += sv.circle(x, g.ground - 3, 3.2, 'var(--panel)', 'var(--ink)', 1.5);
+  return s;
+}
+function hitBands(g) {   // tap a floor: a band around it
+  let s = '';
+  for (let i = 0; i < g.n; i++) {
+    const hi = i + 2 <= g.n ? (g.zs[i + 1] + g.zs[i + 2]) / 2 : 0, lo = i === 0 ? g.H : (g.zs[i] + g.zs[i + 1]) / 2;
+    s += `<rect data-floor="${i}" x="0" y="${n1(hi)}" width="${g.W}" height="${n1(lo - hi)}" style="fill:transparent"/>`;
+  }
+  return s;
+}
+// ============================ Shared ============================
+const MODE = ['#1f5fbf', '#d9621c', '#188a4a', '#7a3fb0', '#0f8c8c', '#a8572c', '#c43d86', '#7c8a1c', '#3a8fc9', '#6a6a72'];
+// One fixed style per estimate in every tab; the true peak is solid ink
+const EST = { l1: { c: '#c8102e', n: '‖m‖₁' }, l2: { c: '#b8860b', n: '‖m‖₂ SRSS' }, lR: { c: '#00897b', n: '‖m‖_R CQC' } };
+const unitsOf = b => UNITS[b.units];
+const pct = (v, t) => { if (!Number.isFinite(v) || !t) return '—'; const e = 100 * (v / t - 1), a = Math.abs(e);
+  if (a < 0.05) return '0.0%';
+  return (e < 0 ? MINUS : '+') + (a >= 10 ? a.toFixed(0) : a.toFixed(1)) + '%'; };
+function strided(t, Tmax = Infinity, maxN = 1400) { let N = t.length; while (N > 1 && t[N - 1] > Tmax) N--;
+  const st = Math.max(1, Math.ceil(N / maxN)), idx = []; for (let i = 0; i < N; i += st) idx.push(i); return idx; }
+const pick = (a, idx) => idx.map(i => a[i]);
+function react(el, data, layout) { if (typeof Plotly !== 'undefined') Plotly.react(el, data, layout, cfg); }
+function idxAt(t, x) { let a = 0, b = t.length - 1; while (b - a > 1) { const m = (a + b) >> 1; if (t[m] <= x) a = m; else b = m; } return a; }
+// A time cursor over a plot, without redrawing the plot
+function cursor(el, t) {
+  const fl = el._fullLayout; if (!fl || !fl.xaxis || !fl.xaxis.l2p) return;
+  let c = el.querySelector(':scope > .tcursor');
+  if (!c) { c = document.createElement('div'); c.className = 'tcursor'; el.appendChild(c); }
+  c.style.left = (fl.xaxis._offset + fl.xaxis.l2p(t)) + 'px'; c.style.top = fl.yaxis._offset + 'px'; c.style.height = fl.yaxis._length + 'px';
+}
+function vline(x, c, dash = 'dot', w = 1.2) { return { type: 'line', x0: x, x1: x, yref: 'paper', y0: 0, y1: 1, line: { color: c, width: w, dash } }; }
+function hline(y, c, dash = 'dash', w = 1.4) { return { type: 'line', y0: y, y1: y, xref: 'paper', x0: 0, x1: 1, line: { color: c, width: w, dash } }; }
+// Run time forward and wrap at the end (the ▶ next to t)
+function looper(btn, input, period = 12000) {
+  let on = false, last = 0, cur = 0;
+  function tick(ts) { if (!on) return;
+    const dt = last ? ts - last : 16; last = ts;
+    cur += dt * speed() / period; if (cur > 1) cur = 0;
+    input.value = cur; input.dispatchEvent(new Event('input')); requestAnimationFrame(tick); }
+  function set(v) { on = v; btn.classList.toggle('on', on); btn.textContent = on ? '❚❚' : '▶'; last = 0;
+    if (on) { cur = +input.value >= 1 ? 0 : +input.value; requestAnimationFrame(tick); } }
+  btn.addEventListener('click', () => set(!on));
+  const sw = { stop() { if (on) set(false); } }; SWEEPS.push(sw); return sw;
+}
+function bindRange(id, lblId, get, set, fmt) {
+  const el = $(id);
+  el.addEventListener('input', () => { set(+el.value); if (lblId) $(lblId).textContent = fmt(+el.value); render[tab](); });
+  return () => { el.value = get(); if (lblId) $(lblId).textContent = fmt(+el.value); };
+}
+const fmtXi = v => `${(100 * v).toFixed(1)}%`;
+function fillFloors(sel, n, cur, word = '') { sel.innerHTML = Array.from({ length: n }, (_, i) => `<option value="${i}">${word}${i + 1}</option>`).join(''); const v = Math.min(cur, n - 1); sel.value = v; return v; }
+// Geometry of a building at a place in a box
+function geomBox(b, x, w, H, mT = 14, mB = 20) { const n = b.k.length, tot = sum(b.h), sz = (H - mT - mB) / tot;
+  let z = 0; const zs = [H - mB]; b.h.forEach(h => { z += h; zs.push(H - mB - z * sz); });
+  return { W: x + w, H, n, zs, bw: w, x0: x, x1: x + w, ground: H - mB }; }
+function defaultF(b) { if (b.preset === 'paz' && b.m.length === 2) return [1e4, 2e4]; return b.m.map(v => 0.1 * v * GRAV); }
+
+// ============================ Tab A ============================
+let SA = makeBuilding('paz');
+const A = { case: 'ex81', type: 'tri', F: [1e4, 2e4], Fmax: 3e4, tdT: 0, xi: 0, floor: 1, tf: 0, mj: 1, j: 0, k: 1, rho: 0.5, auto: true, unit: false, pt: null, sin: false };
+const firstT = b => modesOf(b.m, b.k).T[0];
+A.tdT = 0.1 / firstT(SA);
+let aC = { key: null };
+function aData() {
+  const b = SA, key = JSON.stringify([b.m, b.k, A.F, A.type, A.tdT, A.xi]);
+  if (aC.key === key) return aC;
+  const T1 = firstT(b), td = A.tdT * T1, run = forcedRun(b, A.F, A.type, td, A.xi), N = run.t.length, Tw = run.t[N - 1];
+  const dt = Math.max(run.T[b.m.length - 1] / 40, Tw / 3000);
+  const dir = directRun(b, A.F, loadFn(A.type, td), A.xi, Tw, dt);
+  return (aC = { key, run, dir, td, ZP: zPeaks(run), Tw });
+}
+const aVar = () => (A.case === 'ex82' ? 'u' : 'y');
+// a mass on a spring, moving Z, pushed by its force bar
+function oscillator(x, y, L, j, z, zs, pf, maxBar) {
+  const c = MODE[j], wall = x + 34, m0x = wall + L * 0.42, xm = m0x + zs * z, seg = 7;
+  let s = sv.text(x, y, `Z${sub(j + 1)}`, { c, weight: 600 }) + sv.line(wall, y - 11, wall, y + 11, 'var(--muted)', 2);
+  const P = [[wall, y]]; for (let i = 1; i < seg * 2; i++) P.push([wall + (xm - wall) * i / (seg * 2), y + (i % 2 ? 5 : -5)]); P.push([xm, y]);
+  s += sv.poly(P, c, 1.4) + sv.rect(xm, y - 9, 24, 18, c, 'rx="3"');
+  const bar = pf * maxBar; if (Math.abs(bar) > 1) s += sv.arrow(xm + (bar > 0 ? 24 : 0), y, xm + (bar > 0 ? 24 : 0) + bar, y, 'var(--uh)', 2);
+  return s;
+}
+function drawA1() {
+  const { run } = aData(), el = $('a1svg'), W = el.clientWidth, H = el.clientHeight, n = SA.k.length; if (!W) return;
+  const q = idxAt(run.t, A.tf * run.t[run.t.length - 1]), t = run.t[q], f = run.f[q];
+  const y = SA.k.map((_, i) => run.Phi[i].reduce((s, p, j) => s + p * run.Z[j][q], 0));
+  const peak = Math.max(...SA.k.map((_, i) => peakAbs(floorHistory(run, i))), 1e-12);
+  const bw = Math.min(W * 0.17, 70), g = geomBox(SA, 34, bw, H), sc = Math.min(W * 0.1, 36) / peak;
+  let s = groundSvg(g, SA) + frameSvg(g, SA, y, sc, { dots: false, w: 1.8 });
+  const Fm = Math.max(...A.F.map(Math.abs), 1e-12);
+  y.forEach((yi, i) => { const a = 34 * A.F[i] * f / Fm, xe = g.x1 + sc * yi + 4;
+    if (Math.abs(a) > 1) s += sv.arrow(xe, g.zs[i + 1], xe + a, g.zs[i + 1], 'var(--uh)', 2.2);
+    if (i === A.floor) s += sv.circle((g.x0 + g.x1) / 2 + sc * yi, g.zs[i + 1], 4.5, 'var(--ink)'); });
+  s += hitBands({ ...g, W: g.x1 + 60 });
+  // one oscillator per mode, all on one scale, so a mode the load leaves alone stands still
+  const xo = g.x1 + 66, L = W - xo - 6, rh = (H - 8) / n, Zm = Math.max(...run.Z.map(peakAbs), 1e-12), zs = Math.min(L * 0.3, 54) / Zm, Pm = Math.max(...run.P.map(Math.abs), 1e-12);
+  for (let j = n - 1, r = 0; j >= 0; j--, r++)
+    s += oscillator(xo, 4 + rh * (j === n - 1 ? 0.5 : r + 0.5), L - 30, j, run.Z[j][q], zs, run.P[j] * f / Pm, Math.min(L * 0.2, 34));
+  setSvg(el, s);
+  $('aTLbl').textContent = `${t.toFixed(2)} s`;
+  cursor($('a1plot'), t); cursor($('a2up'), t); cursor($('a2low'), t);
+}
+function renderA1() {
+  const { run, dir } = aData(), n = SA.k.length, i = A.floor, v = aVar();
+  const idx = strided(run.t), T = pick(run.t, idx), data = [];
+  for (let j = 0; j < n; j++) { const c = run.Phi[i][j]; data.push({ x: T, y: idx.map(q => c * run.Z[j][q]), mode: 'lines', line: { color: MODE[j], width: 1 }, hoverinfo: 'skip' }); }
+  const yy = floorHistory(run, i);
+  data.push({ x: T, y: pick(yy, idx), mode: 'lines', line: { color: css('--ink'), width: 2.2 }, name: 'sum' });
+  const dI = strided(dir.T, Infinity, 70);
+  data.push({ x: pick(dir.T, dI), y: dI.map(q => dir.Y[q][i]), mode: 'markers', marker: { color: css('--panel'), size: 5, line: { color: css('--ink'), width: 1.2 } }, name: 'direct' });
+  react($('a1plot'), data, lay({ xaxis: ax('t (s)'), yaxis: ax(`${v}${sub(i + 1)} (in)`), margin: { l: 52, r: 8, t: 4, b: 34 } }));
+  react($('a1bar'), [{ x: run.P.map((_, j) => `P${sub(j + 1)}`), y: run.P, type: 'bar', marker: { color: run.P.map((_, j) => MODE[j]) }, hovertemplate: '%{y:.4~g}<extra></extra>' }],
+    lay({ xaxis: { automargin: true, fixedrange: true }, yaxis: ax('φⱼᵀ{F}', { zeroline: true }), margin: { l: 56, r: 8, t: 2, b: 20 } }));
+}
+function renderA2() {
+  const { run, ZP } = aData(), i = A.floor, n = SA.k.length, ink = css('--ink'), v = aVar();
+  let data1 = [], data2 = [], shapes1 = [], shapes2 = [], E, tTrue, T;
+  if (A.sin) {
+    T = linspace(0, 2 * Math.PI, 400);
+    const a = T.map(t => Math.sin(t) ** 2), b = T.map(t => Math.cos(t) ** 2);
+    data1 = [{ x: T, y: a, mode: 'lines', line: { color: MODE[0], width: 1.6 } }, { x: T, y: b, mode: 'lines', line: { color: MODE[1], width: 1.6 } },
+      { x: [Math.PI / 2, 0], y: [1, 1], mode: 'markers', marker: { color: [MODE[0], MODE[1]], size: 8 } }];
+    data2 = [{ x: T, y: T.map(() => 1), mode: 'lines', line: { color: ink, width: 2.2 } }];
+    shapes1 = [vline(Math.PI / 2, MODE[0]), vline(0, MODE[1])]; shapes2 = shapes1.slice();
+    E = { l1: 2, l2: Math.SQRT2, lR: null, true: 1 };
+  } else {
+    const idx = strided(run.t); T = pick(run.t, idx);
+    for (let j = 0; j < n; j++) {
+      const c = run.Phi[i][j], tp = peakTime(run.t, run.Z[j]), yp = c * run.Z[j][idxAt(run.t, tp + 1e-12)];
+      data1.push({ x: T, y: idx.map(q => c * run.Z[j][q]), mode: 'lines', line: { color: MODE[j], width: 1.4 }, hoverinfo: 'skip' });
+      data1.push({ x: [tp], y: [yp], mode: 'markers', marker: { color: MODE[j], size: 8 }, hovertemplate: `mode ${j + 1}: t = %{x:.3f} s<extra></extra>` });
+      shapes1.push(vline(tp, MODE[j])); shapes2.push(vline(tp, MODE[j]));
+    }
+    const yy = floorHistory(run, i); tTrue = peakTime(run.t, yy); E = floorEstimates(run, i, ZP);
+    data2 = [{ x: T, y: pick(yy, idx), mode: 'lines', line: { color: ink, width: 2 }, hoverinfo: 'skip' },
+      { x: [tTrue], y: [yy[idxAt(run.t, tTrue + 1e-12)]], mode: 'markers', marker: { color: ink, size: 9, symbol: 'diamond' }, hovertemplate: 'true peak: t = %{x:.3f} s<extra></extra>' }];
+  }
+  for (const k of ['l1', 'l2', 'lR']) if (E[k] != null) { shapes2.push(hline(E[k], EST[k].c), hline(-E[k], EST[k].c)); }
+  const top = Math.max(E.l1, E.true) * 1.08;
+  react($('a2up'), data1, lay({ shapes: shapes1, xaxis: ax('', { showticklabels: false, title: '' }), yaxis: ax(A.sin ? 'parts' : `φᵢⱼZⱼ (in)`), margin: { l: 52, r: 8, t: 4, b: 6 } }));
+  react($('a2low'), data2, lay({ shapes: shapes2, xaxis: ax(A.sin ? 't' : 't (s)'), yaxis: ax(A.sin ? 'sum' : `${v}${sub(i + 1)} (in)`, { range: [-top, top] }), margin: { l: 52, r: 8, t: 4, b: 34 } }));
+  const row = (k, val) => `<tr><td><span class="sw" style="background:${EST[k].c}"></span>${EST[k].n}</td><td>${sigF(val, 4)}</td><td>${pct(val, E.true)}</td></tr>`;
+  $('a2tab').innerHTML = `<table class="est"><tr><th></th><th>in</th><th>against true</th></tr>`
+    + `<tr><td><b>true peak</b></td><td><b>${sigF(E.true, 4)}</b></td><td></td></tr>` + row('l1', E.l1) + row('l2', E.l2) + (E.lR != null ? row('lR', E.lR) : '') + '</table>';
+}
+let a3map = null;
+function renderA3() {
+  const { run, ZP } = aData(), n = SA.k.length, el = $('a3svg'), W = el.clientWidth, H = el.clientHeight; if (!W) return;
+  const j = Math.min(A.j, n - 1), k = Math.min(A.k, n - 1), two = n >= 2;
+  const parts = floorParts(run, A.floor, ZP), E = floorEstimates(run, A.floor, ZP);
+  const rho = !two ? 0 : A.auto ? (j === k ? 1 : rhoOf(run.w[Math.max(j, k)] / run.w[Math.min(j, k)], A.xi)) : A.rho;
+  $('a3Rho').value = rho; $('a3RhoLbl').textContent = rho.toFixed(3); $('a3Rho').disabled = A.auto;
+  const p = A.pt ?? [parts[j], two ? parts[k] : 0];
+  const c1 = Math.abs(p[0]) + Math.abs(p[1]), c2 = Math.hypot(p[0], p[1]), cR = Math.sqrt(Math.max(p[0] ** 2 + p[1] ** 2 + 2 * rho * p[0] * p[1], 0));
+  const unit = A.unit, S = Math.min(W, H) / 2 - 16, dragV = a3map && a3map.dragging ? a3map.view : null;
+  const view = dragV ?? (unit ? 1.6 : 1.3 * Math.max(c1, c2, 1e-12));
+  const px = x => W / 2 + x / view * S, py = y => H / 2 - y / view * S;
+  a3map = { W, H, S, view, dragging: a3map && a3map.dragging };
+  const ink = 'var(--ink)', cc = { d: unit ? 1 : c1, c: unit ? 1 : c2, e: unit ? 1 : cR };
+  let s = sv.line(px(-view), py(0), px(view), py(0), 'var(--line)', 1.2) + sv.line(px(0), py(-view), px(0), py(view), 'var(--line)', 1.2);
+  s += sv.text(W - 4, py(0) - 9, `m${sub2(A.floor + 1, j + 1)}`, { anchor: 'end', c: 'var(--muted)', size: 12 }) + sv.text(px(0) + 5, 8, `m${sub2(A.floor + 1, k + 1)}`, { c: 'var(--muted)', size: 12 });
+  s += `<clipPath id="a3c"><rect x="${n1(px(-view))}" y="${n1(py(view))}" width="${n1(2 * S)}" height="${n1(2 * S)}"/></clipPath><g clip-path="url(#a3c)">`;
+  s += `<polygon points="${[[cc.d, 0], [0, cc.d], [-cc.d, 0], [0, -cc.d]].map(q => n1(px(q[0])) + ',' + n1(py(q[1]))).join(' ')}" style="fill:none;stroke:${EST.l1.c};stroke-width:1.8;stroke-dasharray:5 3"/>`;
+  s += `<circle cx="${n1(px(0))}" cy="${n1(py(0))}" r="${n1(cc.c / view * S)}" style="fill:none;stroke:${EST.l2.c};stroke-width:1.8;stroke-dasharray:5 3"/>`;
+  const r = Math.min(rho, 0.99995), a = cc.e / Math.sqrt(1 + r), b = cc.e / Math.sqrt(1 - r), P = [];
+  for (let t = 0; t <= 200; t++) { const th = 2 * Math.PI * t / 200, u = a * Math.cos(th), w = b * Math.sin(th); P.push([px((u + w) / Math.SQRT2), py((u - w) / Math.SQRT2)]); }
+  s += sv.poly(P, EST.lR.c, 1.8, 'stroke-dasharray="5 3"') + '</g>';
+  if (!unit) {
+    const tick = (x, c, lab, up) => sv.line(px(x), py(0) - 7, px(x), py(0) + 7, c, 2.4) + sv.text(px(x), py(0) + (up ? -14 : 15), lab, { c, size: 11, anchor: 'middle' });
+    s += tick(c1, EST.l1.c, '1', true) + tick(c2, EST.l2.c, '2', false) + tick(cR, EST.lR.c, 'R', true);
+    if (!A.pt && n === 2) s += tick(E.true, ink, 'true', false);
+    s += sv.line(px(p[0]), py(p[1]), px(p[0]), py(0), 'var(--line)', 1, 'stroke-dasharray="2 2"') + sv.line(px(p[0]), py(p[1]), px(0), py(p[1]), 'var(--line)', 1, 'stroke-dasharray="2 2"');
+    s += `<circle data-handle="1" cx="${n1(px(p[0]))}" cy="${n1(py(p[1]))}" r="9" style="fill:var(--uh);fill-opacity:.9;stroke:var(--panel);stroke-width:2"/>`;
+  }
+  setSvg(el, s);
+  const tt = `<table class="est"><tr><th>${A.pt ? 'dragged point' : `floor ${A.floor + 1}`}</th><th>${n > 2 && !A.pt ? `modes ${j + 1}, ${k + 1}` : 'in'}</th>${n > 2 && !A.pt ? '<th>all modes</th>' : ''}</tr>`
+    + [['l1', c1], ['l2', c2], ['lR', cR]].map(([key, val]) => `<tr><td><span class="sw" style="background:${EST[key].c}"></span>${EST[key].n}</td><td>${sigF(val, 4)}</td>${n > 2 && !A.pt ? `<td>${sigF(E[key], 4)}</td>` : ''}</tr>`).join('')
+    + (A.pt ? '' : `<tr><td><b>true peak</b></td><td><b>${sigF(E.true, 4)}</b></td>${n > 2 ? '<td></td>' : ''}</tr>`) + '</table>';
+  $('a3tab').innerHTML = tt;
+  $('a3modes').hidden = n <= 2;
+  const bar = $('a3bar');
+  bar.style.display = n > 2 ? '' : 'none';
+  if (n > 2) react(bar, [{ x: parts.map((_, q) => `m${sub2(A.floor + 1, q + 1)}`), y: parts, type: 'bar', marker: { color: parts.map((_, q) => MODE[q]) }, hovertemplate: '%{y:.4~g}<extra></extra>' }],
+    lay({ xaxis: { automargin: true, fixedrange: true }, yaxis: ax('in'), margin: { l: 44, r: 8, t: 2, b: 20 } }));
+}
+function renderA() {
+  const n = SA.k.length;
+  $('aCase').value = A.case; $('aPreset').value = SA.preset; $('aType').value = A.type; $('aN').value = n; $('aNLbl').textContent = n;
+  $('aTd').value = Math.log10(A.tdT); $('aTdLbl').textContent = A.tdT.toFixed(3); $('aTdWrap').hidden = A.type === 'step';
+  $('aXi').value = A.xi; $('aXiLbl').textContent = fmtXi(A.xi); $('aT').value = A.tf;
+  A.floor = fillFloors($('aFloor'), n, A.floor); A.mj = fillFloors($('aMj'), n, A.mj);
+  A.j = fillFloors($('a3j'), n, A.j, 'j = '); A.k = fillFloors($('a3k'), n, A.k, 'k = ');
+  $('aSin').checked = A.sin; $('a3Auto').checked = A.auto; $('a3Unit').checked = A.unit; $('a3Back').disabled = !A.pt;
+  renderA1(); renderA2(); renderA3(); drawA1(); writeHash();
+}
+function aCustom() { A.case = 'custom'; A.pt = null; }
+function setBuildingA(id, n = null) { SA = makeBuilding(id, n); A.F = defaultF(SA); A.Fmax = 1.5 * Math.max(...A.F.map(Math.abs)); A.pt = null; if (A.k >= SA.k.length) A.k = Math.min(1, SA.k.length - 1); }
+function setCase(id) {
+  A.case = id; A.pt = null;
+  if (id === 'custom') return;
+  setBuildingA('paz'); A.xi = 0; A.floor = 1;
+  if (id === 'ex81') { A.type = 'tri'; A.F = [1e4, 2e4]; A.tdT = 0.1 / firstT(SA); }
+  else { A.type = 'step'; A.F = SA.m.map(v => -v * 0.28 * GRAV); }
+  A.Fmax = 1.5 * Math.max(...A.F.map(Math.abs));
+}
+
+// ============================ Tab B ============================
+const B = { xi: 0.05, r: 1.5, ratio: 1, T1: 1, nrec: 40, el: false, close: 'pC', mu: 0.01, tune: 1 };
+let b4c = { key: null };
+function renderB4() {
+  const g = recordGrid(), w1 = 2 * Math.PI / B.T1, key = `${B.T1}|${B.xi}`;
+  if (b4c.key !== key) { const a = g.a.map(v => v * GRAV); b4c = { key, a, s1: sdofPL(g.t, a, w1, B.xi).z }; }
+  const p = pairPeaks(g.t, b4c.a, w1, B.r, B.xi, b4c.s1), a = B.ratio;
+  const y = new Float64Array(g.t.length); for (let i = 0; i < y.length; i++) y[i] = p.a1[i] / p.S1 + a * p.a2[i] / p.S2;
+  const tr = peakAbs(y), rho = rhoOf(B.r, B.xi), l1 = 1 + Math.abs(a), l2 = Math.hypot(1, a), lR = Math.sqrt(Math.max(1 + a * a + 2 * a * rho, 0));
+  const idx = strided(g.t, 15), T = pick(g.t, idx), ink = css('--ink'), tp = peakTime(g.t, y);
+  react($('b4up'), [{ x: T, y: idx.map(q => p.a1[q] / p.S1), mode: 'lines', line: { color: MODE[0], width: 1.2 }, hoverinfo: 'skip' },
+    { x: T, y: idx.map(q => a * p.a2[q] / p.S2), mode: 'lines', line: { color: MODE[1], width: 1.2 }, hoverinfo: 'skip' }],
+    lay({ xaxis: ax('', { showticklabels: false, title: '', range: [0, 15] }), yaxis: ax('scaled parts', { range: [-1.1, 1.1] }), margin: { l: 50, r: 8, t: 4, b: 6 } }));
+  const top = Math.max(l1, tr) * 1.08;
+  react($('b4low'), [{ x: T, y: pick(y, idx), mode: 'lines', line: { color: ink, width: 1.6 }, hoverinfo: 'skip' },
+    { x: [tp], y: [y[idxAt(g.t, tp + 1e-12)]], mode: 'markers', marker: { color: ink, size: 9, symbol: 'diamond' }, hoverinfo: 'skip' }],
+    lay({ shapes: [hline(l1, EST.l1.c), hline(-l1, EST.l1.c), hline(l2, EST.l2.c), hline(-l2, EST.l2.c), hline(lR, EST.lR.c), hline(-lR, EST.lR.c)],
+      xaxis: ax('t (s)', { range: [0, 15] }), yaxis: ax('sum', { range: [-top, top] }), margin: { l: 50, r: 8, t: 4, b: 32 } }));
+  const cell = (k, v) => `<td><span class="sw" style="background:${EST[k].c}"></span>${sigF(v, 3)} (${pct(v, tr)})</td>`;
+  $('b4tab').innerHTML = `<table class="est"><tr><th>ρ₁₂</th><th>true peak</th><th>‖m‖₁</th><th>‖m‖₂ SRSS</th><th>‖m‖_R CQC</th></tr><tr><td>${rho.toFixed(3)}</td><td><b>${sigF(tr, 3)}</b></td>${cell('l1', l1)}${cell('l2', l2)}${cell('lR', lR)}</tr></table>`;
+  const R = Array.from({ length: 160 }, (_, i) => 3 ** (i / 159));
+  const curves = [0.02, 0.05, 0.1, 0.2].map((x, i) => ({ x: R, y: R.map(r => rhoOf(r, x)), mode: 'lines', name: `${100 * x}%`,
+    line: { color: css('--c-ghost'), width: Math.abs(x - B.xi) < 1e-9 ? 2.4 : 1.1 }, hovertemplate: `ξ = ${100 * x}%: r %{x:.3f}, ρ %{y:.3f}<extra></extra>` }));
+  if (![0.02, 0.05, 0.1, 0.2].some(x => Math.abs(x - B.xi) < 1e-9)) curves.push({ x: R, y: R.map(r => rhoOf(r, B.xi)), mode: 'lines', line: { color: css('--c-ghost'), width: 2.4, dash: 'dot' }, hoverinfo: 'skip' });
+  curves.push({ x: [B.r], y: [rho], mode: 'markers', marker: { color: css('--uh'), size: 11 }, hoverinfo: 'skip' });
+  react($('b4rho'), curves, lay({ shapes: [vline(1.1, css('--muted'))], xaxis: ax('r = ω₂/ω₁', { type: 'log', range: [0, Math.log10(3)], tickvals: [1, 1.1, 1.25, 1.5, 2, 3], tickangle: 0 }), yaxis: ax('ρ₁₂', { range: [0, 1.04] }), margin: { l: 44, r: 8, t: 4, b: 34 },
+    annotations: [{ x: Math.log10(1.1), y: 1, yref: 'paper', text: "Paz's 10%: r = 1.1", showarrow: false, xanchor: 'left', xshift: 4, yshift: -6, font: { size: 11, color: css('--muted') } },
+      ...[0.02, 0.05, 0.1, 0.2].map(x => ({ x: Math.log10(1.25), y: rhoOf(1.25, x), text: `${100 * x}%`, showarrow: false, xanchor: 'left', yshift: 8, font: { size: 11, color: css('--muted') } }))] }));
+}
+// The ensemble is seeded: the curve is the same on every visit. Grows with "add 10 records".
+const ENSR = [1.02, 1.03, 1.05, 1.08, 1.1, 1.15, 1.2, 1.25, 1.35, 1.5, 1.7, 2, 2.3, 2.6, 3];
+const ensC = { rand: mulberry32(7), recs: [], res: {} , el: {} };
+function ensemble(xi) {
+  while (ensC.recs.length < B.nrec) ensC.recs.push(ensembleRecord(ensC.rand));
+  const w1 = 2 * Math.PI, res = ensC.res[xi] ?? (ensC.res[xi] = { n: 0, s1: [], like: ENSR.map(() => []), opp: ENSR.map(() => []) });
+  for (let q = res.n; q < B.nrec; q++) {
+    const s1 = sdofPL(ensT, ensC.recs[q], w1, xi).z;
+    ENSR.forEach((r, i) => { const p = pairPeaks(ensT, ensC.recs[q], w1, r, xi, s1); res.like[i].push(p.like); res.opp[i].push(p.opp); });
+    res.n = q + 1;
+  }
+  return res;
+}
+function elCentroPeaks(xi) {
+  if (ensC.el[xi]) return ensC.el[xi];
+  const g = recordGrid(), a = g.a.map(v => v * GRAV), s1 = sdofPL(g.t, a, 2 * Math.PI, xi).z;
+  const out = { like: [], opp: [] }; ENSR.forEach(r => { const p = pairPeaks(g.t, a, 2 * Math.PI, r, xi, s1); out.like.push(p.like); out.opp.push(p.opp); });
+  return (ensC.el[xi] = out);
+}
+function renderB5ens() {
+  const xi = B.xi, R = Array.from({ length: 100 }, (_, i) => 3 ** (i / 99)), like = css('--c-pos'), opp = css('--c-neg'), sq = Math.SQRT2, data = [];
+  if (B.el) {
+    const e = elCentroPeaks(xi);
+    data.push({ x: ENSR, y: e.like.map(v => v / sq), mode: 'lines+markers', line: { color: like, width: 2 }, marker: { size: 6 }, hovertemplate: 'like signs: %{y:.2f}<extra></extra>' },
+      { x: ENSR, y: e.opp.map(v => v / sq), mode: 'lines+markers', line: { color: opp, width: 2 }, marker: { size: 6 }, hovertemplate: 'opposite: %{y:.2f}<extra></extra>' });
+    $('b5Count').textContent = 'one real record';
+  } else {
+    const e = ensemble(xi), mean = a => sum(a) / a.length;
+    const dots = (arr, c) => ({ x: ENSR.flatMap((r, i) => arr[i].map(() => r)), y: arr.flatMap(a => a.map(v => v / sq)), mode: 'markers', marker: { color: c, size: 3, opacity: 0.35 }, hoverinfo: 'skip' });
+    data.push(dots(e.like, css('--c-ghost')), dots(e.opp, css('--c-ghost')));
+    data.push({ x: ENSR, y: e.like.map(a => mean(a) / sq), mode: 'lines', line: { color: like, width: 2.4 }, hovertemplate: 'mean, like signs: %{y:.2f}<extra></extra>' },
+      { x: ENSR, y: e.opp.map(a => mean(a) / sq), mode: 'lines', line: { color: opp, width: 2.4 }, hovertemplate: 'mean, opposite: %{y:.2f}<extra></extra>' });
+    $('b5Count').textContent = `${B.nrec} synthetic records`;
+  }
+  data.push({ x: R, y: R.map(r => Math.sqrt(2 + 2 * rhoOf(r, xi)) / sq), mode: 'lines', line: { color: EST.lR.c, width: 1.8, dash: 'dash' }, hoverinfo: 'skip' },
+    { x: R, y: R.map(r => Math.sqrt(Math.max(2 - 2 * rhoOf(r, xi), 0)) / sq), mode: 'lines', line: { color: EST.lR.c, width: 1.8, dash: 'dash' }, hoverinfo: 'skip' });
+  const lab = (x, y, text, c) => ({ x: Math.log10(x), y, text, showarrow: false, xanchor: 'left', font: { size: 11, color: c } });
+  react($('b5ens'), data, lay({ shapes: [hline(1, EST.l2.c)], xaxis: ax('r = ω₂/ω₁', { type: 'log', range: [Math.log10(1.01), Math.log10(3)], tickvals: [1.02, 1.1, 1.25, 1.5, 2, 3], tickangle: 0 }), yaxis: ax('peak / ‖m‖₂', { range: [0, 1.6] }), margin: { l: 46, r: 8, t: 4, b: 34 },
+    annotations: [lab(2.05, 1.5, 'like signs (blue)', like), lab(2.05, 1.38, 'opposite (orange)', opp), lab(2.05, 0.78, 'CQC: dashed; SRSS: 1', css('--muted'))] }));
+}
+let b5c = { key: null };
+function renderB5b() {
+  const b = B.close === 'pC' ? makeBuilding('pC') : appendage(B.mu, B.tune), n = b.m.length, key = JSON.stringify([b.m, b.k, B.xi]);
+  if (b5c.key !== key) b5c = { key, run: baseRun(b, B.xi) };
+  const run = b5c.run, ZP = zPeaks(run), r = run.w[1] / run.w[0], rho = rhoOf(r, B.xi), eff = effMass(run.G, b.m), el = $('b5svg'), W = el.clientWidth, H = el.clientHeight;
+  $('b5AppCtl').hidden = B.close === 'pC'; $('b5B').value = B.close;
+  $('b5Mu').value = Math.log10(B.mu); $('b5MuLbl').textContent = B.mu.toFixed(3); $('b5Tune').value = B.tune; $('b5TuneLbl').textContent = B.tune.toFixed(3);
+  $('b5read').innerHTML = `r = ${r.toFixed(3)}, ρ₁₂ = ${rho.toFixed(2)}<br>effective mass: mode 1 ${(100 * eff[0]).toFixed(1)}%, mode 2 ${(100 * eff[1]).toFixed(1)}%`;
+  if (W) {
+    let s = '';
+    for (let j = 0; j < 2; j++) {
+      const phi = column(run.Phi, j), mx = Math.max(...phi.map(Math.abs)), bw = W * 0.14, x = W * (0.13 + j * 0.5), g = geomBox(b, x, bw, H, 22, 18);
+      s += groundSvg(g, b) + frameSvg(g, b, phi.map(v => v / mx), W * 0.1, { c: MODE[j], w: 1.8, dots: false }) + sv.text(x + bw / 2, 10, `T${sub(j + 1)} = ${sigF(run.T[j], 3)} s`, { anchor: 'middle', c: MODE[j], size: 12, weight: 600 });
+    }
+    setSvg(el, s);
+  }
+  let t = `<table class="est"><tr><th>floor</th><th>true (in)</th><th>SRSS</th><th>CQC</th></tr>`;
+  for (let i = n - 1; i >= 0; i--) { const e = floorEstimates(run, i, ZP);
+    t += `<tr><td>${B.close === 'app' ? (i ? 'appendage' : 'main') : (i === n - 1 ? 'penthouse' : i + 1)}</td><td><b>${sig(e.true, 3)}</b></td><td>${sig(e.l2, 3)} (${pct(e.l2, e.true)})</td><td>${sig(e.lR, 3)} (${pct(e.lR, e.true)})</td></tr>`; }
+  $('b5tab').innerHTML = t + '</table>';
+}
+function renderB() {
+  $('bXi').value = B.xi; $('bXiLbl').textContent = fmtXi(B.xi);
+  $('b4R').value = Math.log10(B.r); $('b4RLbl').textContent = B.r.toFixed(3); $('b4A').value = B.ratio; $('b4ALbl').textContent = (B.ratio < 0 ? MINUS : '') + Math.abs(B.ratio).toFixed(2);
+  $('b4T').value = Math.log10(B.T1); $('b4TLbl').textContent = `${B.T1.toFixed(2)} s`; $('b5El').checked = B.el;
+  $('b5Add').disabled = B.el;
+  renderB4(); renderB5ens(); renderB5b(); writeHash();
+}
+
+// ============================ Tab C ============================
+let SC = makeBuilding('pB');
+const C = { input: 'record', Ag: RECPEAK, xi: 0.05, tf: 0, on: [], story: 4, resp: 'shear', rule: 'srss', col: false, ends: false, case8: 'tab' };
+let cC = { key: null };
+function cData() {
+  const b = SC, key = JSON.stringify([b.m, b.k, C.xi, C.input, C.Ag]);
+  if (cC.key === key) return cC;
+  const run = baseRun(b, C.xi, C.input, C.Ag);
+  return (cC = { key, run, ZP: zPeaks(run), trunc: truncation(run) });
+}
+// The ground: the record integrated twice, with a quadratic taken out so that it does not drift away
+let groundC = null;
+function groundDisp() {
+  if (groundC) return groundC;
+  const g = recordGrid(), N = g.t.length, d = new Float64Array(N), s = GRAV; let v = 0;
+  for (let i = 1; i < N; i++) { const h = g.t[i] - g.t[i - 1], a0 = g.a[i - 1] * s, a1 = g.a[i] * s;
+    d[i] = d[i - 1] + v * h + h * h * (2 * a0 + a1) / 6; v += h * (a0 + a1) / 2; }
+  const end = RECORD.t[RECORD.t.length - 1]; let M = zeros(3, 3), r = [0, 0, 0], last = 0;
+  for (let i = 0; i < N && g.t[i] <= end; i += 5) { const t = g.t[i], b = [1, t, t * t]; last = i;
+    for (let p = 0; p < 3; p++) { r[p] += b[p] * d[i]; for (let q = 0; q < 3; q++) M[p][q] += b[p] * b[q]; } }
+  const co = solve(M, r); const out = new Float64Array(N);
+  for (let i = 0; i < N; i++) { const t = Math.min(g.t[i], end); out[i] = d[Math.min(i, last)] - (co[0] + co[1] * t + co[2] * t * t); }
+  return (groundC = out);
+}
+let specC = {};
+function spectrum(xi) {
+  if (specC[xi]) return specC[xi];
+  const Ts = Array.from({ length: 34 }, (_, i) => 0.05 * 100 ** (i / 33)), g = recordGrid(), a = g.a.map(v => v * GRAV / RECPEAK);
+  return (specC[xi] = { Ts, S: Ts.map(T => peakAbs(sdofPL(g.t, a, 2 * Math.PI / T, xi).z)) });
+}
+function drawC6() {
+  const { run } = cData(), el = $('c6svg'), W = el.clientWidth, H = el.clientHeight, n = SC.k.length; if (!W) return;
+  const Tw = run.t[run.t.length - 1], q = idxAt(run.t, C.tf * Tw), slot = W / (n + 2), floors = SC.k.map((_, i) => i);
+  const yAll = floors.map(i => run.Phi[i].reduce((s, p, j) => s + p * run.Z[j][q], 0));
+  const yOn = floors.map(i => run.Phi[i].reduce((s, p, j) => s + (C.on[j] !== false ? p * run.Z[j][q] : 0), 0));
+  const roofPk = peakAbs(floorHistory(run, n - 1)), grd = C.input === 'record' ? groundDisp() : null;
+  const gs = grd ? grd[q] * C.Ag / RECPEAK : 0, gPk = grd ? peakAbs(grd) * C.Ag / RECPEAK : 0;
+  // one scale, set by the largest thing drawn: a modal part can exceed the sum (the penthouse)
+  const partPk = Math.max(...run.Z.map((z, j) => peakAbs(z) * Math.max(...floors.map(i => Math.abs(run.Phi[i][j])))));
+  const sc = 0.3 * slot / Math.max(roofPk, partPk, gPk, 1e-12);
+  const shift = g => ({ ...g, x0: g.x0 + sc * gs, x1: g.x1 + sc * gs });
+  let s = '';
+  for (let j = 0; j < n; j++) {
+    const bw = slot * 0.42, x = slot * (j + 0.29), g = shift(geomBox(SC, x, bw, H, 8, 16));
+    const y = floors.map(i => run.Phi[i][j] * run.Z[j][q]);
+    s += groundSvg(g, SC) + frameSvg(g, SC, y, sc, { c: C.on[j] === false ? 'var(--line)' : MODE[j], w: 1.5, dots: false, girder: 2.5 });
+  }
+  const bw = slot * 0.9, x = slot * (n + 0.55), g = shift(geomBox(SC, x, bw, H, 8, 16));
+  s += groundSvg(g, SC) + frameSvg(g, SC, yAll, sc, { c: 'var(--c-ghost)', w: 2.6, dots: false, girder: 5 }) + frameSvg(g, SC, yOn, sc, { w: 1.8, dots: false });
+  setSvg(el, s);
+  $('cTLbl').textContent = `${run.t[q].toFixed(2)} s`;
+  cursor($('c6rec'), run.t[q]); cursor($('c8plot'), C.tf * c8Tw());
+}
+function renderC6() {
+  const { run } = cData(), n = SC.k.length, u = unitsOf(SC), ink = css('--ink'), eff = effMass(run.G, SC.m);
+  const idx = strided(run.t, 15);
+  react($('c6rec'), [{ x: pick(run.t, idx), y: idx.map(i => run.a[i] / GRAV), mode: 'lines', line: { color: ink, width: 1 }, hoverinfo: 'skip' }],
+    lay({ xaxis: ax('t (s)', { range: [0, Math.min(15, run.t[run.t.length - 1])] }), yaxis: ax('ÿₛ (g)'), margin: { l: 46, r: 8, t: 2, b: 30 } }));
+  $('c6chips').style.gridTemplateColumns = `repeat(${n}, 1fr) 2fr`;
+  $('c6chips').innerHTML = run.w.map((_, j) => `<label class="chip" style="color:${MODE[j]}"><input type="checkbox" data-mode="${j}" ${C.on[j] !== false ? 'checked' : ''}> ${n > 6 ? j + 1 : `mode ${j + 1}`}<br><span>${sigF(run.T[j], 3)} s<br>Γ ${sigF(run.G[j], 3)}</span></label>`).join('') + '<div class="chip" style="color:var(--ink)"><b>the modes on</b><br><span>grey: all modes</span></div>';
+  const cum = []; eff.reduce((s, v) => { cum.push(100 * (s + v)); return s + v; }, 0);
+  const lbl = eff.map((_, j) => j + 1);
+  react($('c6mass'), [{ x: lbl, y: eff.map(v => 100 * v), type: 'bar', marker: { color: lbl.map((_, j) => MODE[j]) }, hovertemplate: 'mode %{x}: %{y:.1f}%<extra></extra>' },
+    { x: lbl, y: cum, mode: 'lines+markers', line: { color: ink, width: 1.6 }, marker: { size: 5 }, hovertemplate: 'to mode %{x}: %{y:.1f}%<extra></extra>' }],
+    lay({ shapes: [hline(90, css('--muted'), 'dot')], annotations: [{ x: 1, xref: 'paper', y: 90, xanchor: 'right', yanchor: 'top', text: '90%: usual code limit', showarrow: false, font: { size: 11, color: css('--muted') } }],
+      xaxis: ax('mode', { dtick: 1, range: [0.4, n + 0.6] }), yaxis: ax('effective mass (%)', { range: [0, 105] }), margin: { l: 44, r: 6, t: 4, b: 34 } }));
+  const gm = run.Z.map((z, j) => peakAbs(z) / Math.abs(run.G[j]));
+  let sp;
+  if (C.input === 'record') { const e = spectrum(C.xi); sp = { x: e.Ts, y: e.S.map(v => v * C.Ag) }; }
+  else { const Ts = Array.from({ length: 60 }, (_, i) => 0.05 * 100 ** (i / 59)), fac = 1 + Math.exp(-Math.PI * C.xi / Math.sqrt(1 - C.xi ** 2));
+    sp = { x: Ts, y: Ts.map(T => fac * C.Ag * GRAV / (2 * Math.PI / T) ** 2) }; }
+  react($('c6spec'), [{ ...sp, mode: 'lines', line: { color: css('--c-ghost'), width: 1.8 }, hoverinfo: 'skip' },
+    { x: run.T, y: gm, mode: 'markers', marker: { color: run.T.map((_, j) => MODE[j]), size: 9 }, hovertemplate: 'T = %{x:.3f} s: %{y:.3f} in<extra></extra>' }],
+    lay({ xaxis: ax('T (s)', { type: 'log', range: [Math.log10(0.05), Math.log10(5)], tickvals: [0.05, 0.1, 0.2, 0.5, 1, 2, 5], tickangle: 0 }), yaxis: ax('S_D (in)', { type: 'log' }), margin: { l: 44, r: 6, t: 4, b: 34 } }));
+  // kept modes against all modes
+  const keep = run.w.map((_, j) => C.on[j] !== false), roofK = peakAbs(floorHistory(run, n - 1, keep)), roofA = peakAbs(floorHistory(run, n - 1));
+  const baseK = SC.k[0] * peakAbs(floorHistory(run, 0, keep)), baseA = SC.k[0] * peakAbs(floorHistory(run, 0));
+  $('c6read').innerHTML = `peak roof ${sig(roofK, 4)} in of ${sig(roofA, 4)} (${pct(roofK, roofA)}), base shear ${sig(baseK, 4)} ${u.v} of ${sig(baseA, 4)} (${pct(baseK, baseA)}): the modes on, against all`;
+}
+function renderC7() {
+  const { run, trunc } = cData(), n = SC.k.length, eff = effMass(run.G, SC.m);
+  const shade = e => { const a = Math.min(Math.abs(e) / 30, 1), good = Math.abs(e) < 5; return good ? `background:color-mix(in srgb, ${css('--c-net')} 22%, transparent)` : `background:color-mix(in srgb, ${css('--uh')} ${Math.round(14 + 50 * a)}%, transparent)`; };
+  const rows = [['roof', 'roof displacement'], ['base', 'base shear'], ['top', 'top-story shear'], ['acc', 'roof abs. acceleration']];
+  let t = `<table class="err${n > 6 ? ' tiny' : ''}"><tr><th>N modes kept</th>${run.w.map((_, j) => `<th>${j + 1}</th>`).join('')}</tr>`;
+  let c = 0; t += `<tr><td>cum. eff. mass</td>${eff.map(v => { c += v; return `<td>${(100 * c).toFixed(1)}%</td>`; }).join('')}</tr>`;
+  for (const [k, name] of rows) t += `<tr><td>${name}</td>${trunc[k].err.map(e => `<td style="${shade(e)}">${Math.abs(e) < 0.05 ? '0.0' : (e < 0 ? MINUS : '+') + Math.abs(e).toFixed(1)}%</td>`).join('')}</tr>`;
+  $('c7tab').innerHTML = t + '</table>';
+}
+// Panel 8 can run its own cases; everything else in it is r = b^T {y}
+let c8c = { key: null };
+function c8Data() {
+  const key = C.case8 === 'tab' ? 'tab' + cData().key : C.case8 + C.xi;
+  if (c8c.key === key) return c8c;
+  let b, run;
+  if (C.case8 === 'ex81') { b = makeBuilding('paz'); run = forcedRun(b, [1e4, 2e4], 'tri', 0.1, C.xi); }
+  else if (C.case8 === 'one') { b = makeBuilding('pB'); const md = modesOf(b.m, b.k), f = b.m.map((v, i) => v * md.Phi[i][1]), fm = Math.max(...f.map(Math.abs));
+    run = forcedRun(b, f.map(v => 10 * v / fm), 'tri', 0.5, C.xi); }
+  else { b = SC; run = cData().run; }
+  return (c8c = { key, b, run, ZP: zPeaks(run) });
+}
+const c8Tw = () => { const r = c8Data().run; const Tw = r.t[r.t.length - 1]; return Tw; };
+function drawC8() {
+  const { b, run } = c8Data(), el = $('c8svg'), W = el.clientWidth, H = el.clientHeight; if (!W) return;
+  const s0 = C.story, q = idxAt(run.t, C.tf * c8Tw());
+  const yAt = i => (i < 0 ? 0 : run.Phi[i].reduce((s, p, j) => s + p * run.Z[j][q], 0));
+  const pk = Math.max(peakAbs(floorHistory(run, s0)), s0 > 0 ? peakAbs(floorHistory(run, s0 - 1)) : 0, 1e-12);
+  const y0 = yAt(s0 - 1), y1 = yAt(s0), sc = 0.2 * W / pk, x0 = W * 0.28, x1 = W * 0.72, zb = H - 22, zt = 24;
+  let s = sv.line(x0 - 14 + sc * y0, zb, x1 + 14 + sc * y0, zb, s0 > 0 ? 'var(--ink)' : 'var(--muted)', s0 > 0 ? 3.5 : 2)
+    + sv.line(x0 - 14 + sc * y1, zt, x1 + 14 + sc * y1, zt, 'var(--ink)', 3.5);
+  for (const x of [x0, x1]) s += sv.poly(columnPts(x, zb, zt, y0, y1, sc, shapeFixed), 'var(--ink)', 2);
+  s += sv.text(W / 2 + sc * y1, zt - 11, `floor ${s0 + 1}`, { anchor: 'middle', size: 11, c: 'var(--muted)' }) + sv.text(W / 2 + sc * y0, zb + 12, s0 ? `floor ${s0}` : 'ground', { anchor: 'middle', size: 11, c: 'var(--muted)' });
+  setSvg(el, s);
+}
+function renderC8() {
+  const { b, run, ZP } = c8Data(), n = b.k.length, u = unitsOf(b), ink = css('--ink');
+  C.story = fillFloors($('c8Story'), n, C.story);
+  $('c8Case').value = C.case8; $('c8Resp').value = C.resp; $('c8Rule').value = C.rule; $('c8Col').checked = C.col; $('c8Ends').checked = C.ends;
+  $('c8StoryW').hidden = C.resp === 'moment'; $('c8ColW').hidden = C.resp !== 'shear';
+  const s0 = C.story, kol = C.col && C.resp === 'shear' ? 0.5 : 1;
+  const bv = C.resp === 'shear' ? storyVector(b.k, s0) : C.resp === 'drift' ? driftVector(n, s0) : momentVector(b.k, b.h[0]);
+  const R = responseOf(run, bv.map(v => v * kol), ZP), unit = C.resp === 'shear' ? u.v : C.resp === 'drift' ? 'in' : u.h, last = C.rule === 'cqc' ? R.cqc : R.srss;
+  const name = { shear: `V${sub(s0 + 1)}`, drift: `Δ${sub(s0 + 1)}`, moment: 'M_b' }[C.resp];
+  $('c8b').textContent = `${name} = bᵀ{y}, b = (${bv.map(v => sig(v * kol, 3)).join(', ')})${C.resp === 'moment' ? `; h = ${b.h[0] / 12} ft per story, assumed` : ''}`;
+  const cats = ['exact', `combine last, ${C.rule.toUpperCase()}`, 'combine first'], vals = [R.exact, last, R.first];
+  if (C.ends) { cats.push('sum of the ends'); vals.push(R.ends); }
+  react($('c8bars'), [{ y: cats, x: vals, type: 'bar', orientation: 'h', marker: { color: [ink, EST.lR.c, css('--uh'), css('--c-ghost')] },
+    text: vals.map((v, i) => `${sig(v, 4)}${i ? ` (${pct(v, R.exact)})` : ''}`), textposition: 'auto', cliponaxis: false, hoverinfo: 'skip' }],
+    lay({ xaxis: ax(`peak ${name} (${unit})`, { rangemode: 'tozero' }), yaxis: { automargin: true, autorange: 'reversed', fixedrange: true }, margin: { l: 96, r: 10, t: 4, b: 36 } }));
+  react($('c8modal'), [{ x: R.modal.map((_, j) => j + 1), y: R.modal, type: 'bar', marker: { color: R.modal.map((_, j) => MODE[j]) }, hovertemplate: 'mode %{x}: %{y:.4~g}<extra></extra>' }],
+    lay({ xaxis: ax('mode', { dtick: 1 }), yaxis: ax(`modal ${name}`), margin: { l: 50, r: 4, t: 4, b: 32 } }));
+  const hi = floorHistory(run, s0), lo = s0 > 0 ? floorHistory(run, s0 - 1) : null, Tw = c8Tw(), Tmax = run.kind === 'base' && run.t[run.t.length - 1] > 20 ? 15 : Tw;
+  const idx = strided(run.t, Tmax), T = pick(run.t, idx), th = peakTime(run.t, hi), data = [{ x: T, y: pick(hi, idx), mode: 'lines', line: { color: ink, width: 1.6 }, hoverinfo: 'skip' }];
+  const yh = hi[idxAt(run.t, th + 1e-12)]; let tl = th, yl = 0;
+  if (lo) { tl = peakTime(run.t, lo); yl = lo[idxAt(run.t, tl + 1e-12)]; data.unshift({ x: T, y: pick(lo, idx), mode: 'lines', line: { color: css('--c-ghost'), width: 1.4 }, hoverinfo: 'skip' }); }
+  data.push({ x: lo ? [tl, th] : [th], y: lo ? [yl, yh] : [yh], mode: lo ? 'lines+markers' : 'markers', line: { color: css('--uh'), width: 1.4, dash: 'dot' }, marker: { color: css('--uh'), size: 8 }, hovertemplate: 't = %{x:.3f} s: %{y:.3f} in<extra></extra>' });
+  react($('c8plot'), data, lay({ xaxis: ax('t (s)', { range: [0, Tmax] }), yaxis: ax(`floor ${s0 + 1} (dark)${lo ? `, ${s0} (grey)` : ''}`), margin: { l: 52, r: 6, t: 4, b: 32 } }));
+  drawC8();
+}
+function renderC() {
+  const n = SC.k.length;
+  $('cPreset').value = SC.preset; $('cN').value = n; $('cNLbl').textContent = n; $('cInput').value = C.input;
+  $('cAg').value = Math.log10(C.Ag); $('cAgLbl').textContent = `${C.Ag.toFixed(3)} g`; $('cXi').value = C.xi; $('cXiLbl').textContent = fmtXi(C.xi); $('cT').value = C.tf;
+  renderC6(); renderC7(); renderC8(); drawC6(); writeHash();
+}
+
+// ============================ Tab D ============================
+let SD = makeBuilding('paz');
+const D = { load: 'force', floor: 1, wb: 20, damp: 'xi', xi: 0.02, a0: 0, a1: 0.01, mag: 'auto', modal: false, phase: false, play: false, ph: 0 };
+const dMd = () => modesOf(SD.m, SD.k);
+const dF0 = () => (SD.preset === 'paz' ? 10000 : 0.1 * sum(SD.m) * GRAV);
+function dForce() { return D.load === 'base' ? SD.m.map(v => -v * 0.1 * GRAV) : SD.m.map((_, i) => (i === D.floor ? dF0() : 0)); }
+function dXis(md) { return D.damp === 'xi' ? md.w.map(() => D.xi) : md.w.map(w => D.a0 / (2 * w) + D.a1 * w / 2); }
+let d9c = { key: null };
+function dCurves() {
+  const md = dMd(), F = dForce(), xis = dXis(md), key = JSON.stringify([SD.m, SD.k, F, xis, D.modal]);
+  if (d9c.key === key) return d9c;
+  const n = md.w.length, top = 1.3 * md.w[n - 1], set = [];
+  for (let i = 0; i <= 900; i++) set.push(top * i / 900);
+  md.w.forEach((w, j) => { const x = Math.max(xis[j], 0.004); for (const s of [-8, -4, -2.5, -1.5, -1, -0.6, -0.3, -0.1, 0.1, 0.3, 0.6, 1, 1.5, 2.5, 4, 8]) set.push(w * (1 + s * x)); set.push(w); });
+  const X = set.filter(v => v >= 0 && v <= top).sort((a, b) => a - b);
+  const st = solve(stiffness(SD.k), F).map(Math.abs);
+  const Ys = X.map(x => frf(md, F, x, xis)); let hi = 0;
+  const big = Math.max(...st, 1e-12);
+  Ys.forEach(u => u.abs.forEach(v => { if (Number.isFinite(v) && v < 3000 * big && v > hi) hi = v; }));
+  const cap = hi * 1.5, floorV = hi * 1e-4;
+  const fx = v => clamp(Number.isFinite(v) ? v : cap, floorV, cap);
+  return (d9c = { key, md, F, xis, X, Ys, st, hi, cap, floorV, fx });
+}
+function dAt() {
+  const { md, F, xis } = dCurves(), U = frf(md, F, D.wb, xis);
+  let near = 0; md.w.forEach((w, j) => { if (Math.abs(w - D.wb) < Math.abs(md.w[near] - D.wb)) near = j; });
+  return { U, near, md };
+}
+function dShapes(md) { return [vline(D.wb, css('--uh'), 'solid', 1.8), ...md.w.map((w, j) => vline(w, MODE[j], 'dot', 1))]; }
+function renderD9plots() {
+  const c = dCurves(), { md, X, Ys, st, cap, floorV, fx } = c, n = md.w.length, data = [];
+  // floors in ink, light (floor 1) to dark (the top): the mode hues stay for the modes
+  const inkO = i => (n === 1 ? 1 : 0.3 + 0.7 * i / (n - 1));
+  if (D.modal) for (let j = 0; j < n; j++) { const c0 = dot(column(md.Phi, j), c.F) * md.Phi[n - 1][j];
+    data.push({ x: X, y: X.map(x => fx(Math.abs(c0) / Math.hypot(md.w[j] ** 2 - x * x, 2 * c.xis[j] * md.w[j] * x))), mode: 'lines', line: { color: MODE[j], width: 1, dash: 'dot' }, hoverinfo: 'skip' }); }
+  for (let i = 0; i < n; i++) data.push({ x: X, y: Ys.map(u => fx(u.abs[i])), mode: 'lines', opacity: inkO(i), line: { color: css('--ink'), width: i === n - 1 ? 2.2 : 1.6 }, hovertemplate: `floor ${i + 1}: ϖ %{x:.2f}, |U| %{y:.3~g}<extra></extra>` });
+  data.push({ x: st.map(() => 0), y: st.map(fx), mode: 'markers', marker: { color: css('--ink'), symbol: 'line-ew-open', size: 11, line: { width: 2, color: css('--ink') } }, hovertemplate: 'static: %{y:.3~g}<extra></extra>' });
+  const fr = $('d9frf'), top = X[X.length - 1];
+  react(fr, data, lay({ shapes: dShapes(md), xaxis: ax('load frequency ϖ (rad/s)', { range: [0, top] }), yaxis: ax('|U_i| (in)', { type: 'log', range: [Math.log10(floorV), Math.log10(cap)] }), margin: { l: 56, r: 10, t: 58, b: 36 } }));
+  // a small drawing of each mode over its frequency
+  const fl = fr._fullLayout;
+  if (fl && fl.xaxis && fl.xaxis.l2p) {
+    let o = fr.querySelector(':scope > .phiover'); if (!o) { o = document.createElement('div'); o.className = 'phiover'; fr.appendChild(o); }
+    const wd = fr.clientWidth; let s = '';
+    md.w.forEach((w, j) => { const px = fl.xaxis._offset + fl.xaxis.l2p(w), phi = column(md.Phi, j), mx = Math.max(...phi.map(Math.abs)), h = 40, sw = n > 6 ? 7 : 14;
+      const P = [[px, 50]].concat(phi.map((v, i) => [px + sw * v / mx, 50 - h * (i + 1) / n]));
+      s += sv.poly(P, MODE[j], 1.5) + sv.line(px, 50, px, 8, 'var(--line)', 0.7) + sv.text(px + 3, 56 - 2, n > 6 ? '' : `ω${sub(j + 1)}`, { c: MODE[j], size: 11 });
+    });
+    o.innerHTML = `<svg width="${wd}" height="60" style="display:block">${s}</svg>`;
+  }
+  const ph = $('d9ph'); ph.style.display = D.phase ? '' : 'none';
+  if (D.phase) react(ph, md.w.map((_, i) => ({ x: X, y: Ys.map((u, q) => { const d = (u.th[i] * 180) / Math.PI, p0 = q ? (Ys[q - 1].th[i] * 180) / Math.PI : d; return Math.abs(d - p0) > 200 ? null : d; }), connectgaps: false, mode: 'lines', opacity: inkO(i), line: { color: css('--ink'), width: 1.4 }, hoverinfo: 'skip' })),
+    lay({ shapes: dShapes(md), xaxis: ax('ϖ (rad/s)', { range: [0, top] }), yaxis: ax('θ (deg)', { range: [-185, 185], dtick: 90 }), margin: { l: 56, r: 10, t: 4, b: 34 } }));
+}
+function drawD9() {
+  const c = dCurves(), { U } = dAt(), el = $('d9svg'), W = el.clientWidth, H = el.clientHeight; if (!W) return;
+  const mx = Math.max(...U.abs.filter(Number.isFinite), 1e-12), scale = (D.mag === 'auto' ? 0.28 * W / mx : 0.28 * W / c.hi);
+  const ph = D.ph, bw = Math.min(W * 0.3, 90), x = (W - bw) / 2 - 14, g = geomBox(SD, x, bw, H, 12, 22);
+  const y = U.abs.map((a, i) => (Number.isFinite(a) ? a : 0) * Math.sin(ph + U.th[i]));
+  let s = groundSvg(g, SD) + frameSvg(g, SD, y, scale, { dots: false, w: 2 });
+  if (D.load === 'force') { const a = 34 * Math.sin(ph), xe = g.x1 + scale * y[D.floor] + 5;
+    if (Math.abs(a) > 1) s += sv.arrow(xe, g.zs[D.floor + 1], xe + a, g.zs[D.floor + 1], 'var(--uh)', 2.6);
+    s += sv.circle((g.x0 + g.x1) / 2 + scale * y[D.floor], g.zs[D.floor + 1], 4.5, 'var(--uh)');
+  }
+  s += hitBands({ ...g, W });
+  setSvg(el, s);
+}
+function renderD9read() {
+  const c = dCurves(), { U, near, md } = dAt(), n = md.w.length, phi = column(md.Phi, near);
+  const nu = Math.sqrt(dot(U.re, U.re) + dot(U.im, U.im)) || 1, cs = Math.hypot(dot(U.re, phi), dot(U.im, phi)) / nu / Math.sqrt(dot(phi, phi));
+  // the shape: amplitudes in the phase of the largest floor, against the nearest mode
+  let big = 0; U.abs.forEach((a, i) => { if (a > U.abs[big]) big = i; });
+  const sgnd = U.abs.map((a, i) => (Number.isFinite(a) ? a * Math.cos(U.th[i] - U.th[big]) : 0));
+  const mxU = Math.max(...sgnd.map(Math.abs), 1e-12), sa = dot(sgnd, phi) < 0 ? -1 : 1, mxP = Math.max(...phi.map(Math.abs));
+  const el = $('d9shape'), W = el.clientWidth, H = el.clientHeight;
+  if (W) { const px = v => W / 2 + v * (W * 0.38), py = i => H - 16 - (H - 30) * (i + 1) / n, base = H - 16;
+    let s = sv.line(W / 2, base, W / 2, 8, 'var(--line)', 1) + sv.text(6, 10, `{U} against φ${sub(near + 1)}`, { size: 12, c: 'var(--muted)' });
+    s += sv.poly([[px(0), base], ...phi.map((v, i) => [px(v * sa / mxP), py(i)])], MODE[near], 2.4, 'stroke-dasharray="5 3"');
+    s += sv.poly([[px(0), base], ...sgnd.map((v, i) => [px(v / mxU), py(i)])], 'var(--ink)', 1.8);
+    sgnd.forEach((v, i) => { s += sv.circle(px(v / mxU), py(i), 3, 'var(--ink)'); });
+    setSvg(el, s); }
+  const list = U.abs.map((a, i) => sig(Number.isFinite(a) ? a : Infinity, 3)).join(', ');
+  $('d9read').innerHTML = `|U| = {${list}} in<br>ϖ/ω${sub(near + 1)} = ${(D.wb / md.w[near]).toFixed(3)}, cos({U}, φ${sub(near + 1)}) = ${cs.toFixed(3)}`;
+  $('d9note').textContent = D.damp === 'paz' ? `floors: light (1) to dark (top). ξ = ${c.xis.map(x => `${(100 * x).toFixed(1)}%`).slice(0, 5).join(', ')}` : 'floors: light (1) to dark (top); ticks at ϖ = 0: static';
+  $('dWLbl').textContent = `${D.wb.toFixed(2)} rad/s`;
+}
+function renderD(full = true) {
+  const n = SD.k.length, md = dMd(), top = 1.3 * md.w[n - 1];
+  D.floor = Math.min(D.floor, n - 1);
+  $('dPreset').value = SD.preset; $('dN').value = n; $('dNLbl').textContent = n; $('dLoad').value = D.load; $('dDamp').value = D.damp; $('dMag').value = D.mag;
+  $('dXiW').hidden = D.damp !== 'xi'; $('dAW').hidden = D.damp !== 'paz';
+  $('dXi').value = D.xi; $('dXiLbl').textContent = fmtXi(D.xi); $('dA0').value = D.a0; $('dA0Lbl').textContent = D.a0.toFixed(2); $('dA1').value = D.a1; $('dA1Lbl').textContent = D.a1.toFixed(4);
+  $('dW').value = D.wb / top; $('dModal').checked = D.modal; $('dPhase').checked = D.phase;
+  $('dTicks').innerHTML = md.w.map(w => `<option value="${(w / top).toFixed(4)}"></option>`).join('');
+  renderD9plots(); renderD9read(); drawD9(); writeHash();
+}
+function moveWb() {   // the slider alone: no need to redraw the curves
+  const md = dMd(), layout = { shapes: dShapes(md) };
+  if (typeof Plotly !== 'undefined') { const a = $('d9frf'); if (a._fullLayout) Plotly.relayout(a, layout); if (D.phase && $('d9ph')._fullLayout) Plotly.relayout($('d9ph'), layout); }
+  renderD9read(); drawD9(); writeHash();
+}
+let dLast = 0;
+function dTick(ts) { if (!D.play) return; const dt = dLast ? ts - dLast : 16; dLast = ts;
+  D.ph += 2 * Math.PI * dt * speed() / 1400; drawD9(); requestAnimationFrame(dTick); }
+function setPlay(v) { D.play = v; dLast = 0; $('dPlay').classList.toggle('on', v); $('dPlay').textContent = v ? '❚❚ sway' : '▶ sway'; if (v) requestAnimationFrame(dTick); }
+SWEEPS.push({ stop() { setPlay(false); } });
+
+// ============================ Story and load tables ============================
+let popSweeps = [];
+function closePop() { popSweeps.forEach(sw => { sw.stop(); SWEEPS.splice(SWEEPS.indexOf(sw), 1); }); popSweeps = []; $('pop').style.display = 'none'; }
+const curB = () => (tab === 'a' ? SA : tab === 'c' ? SC : SD);
+function afterEdit() { const b = curB(); b.edited = true; if (tab === 'a') aCustom(); render[tab](); }
+function openStories() {
+  closePop();
+  const pop = $('pop'), b = curB(), n = b.k.length, u = unitsOf(b);
+  const ref = { k: b.k.slice(), m: b.m.slice() };
+  let h = `<div class="pophead"><b>Stories</b><span class="note">sliders: ×0.1 to ×10 of the values on opening</span><button id="popClose" style="margin-left:auto">close</button></div>
+    <table><tr><th>story</th><th>k (${u.k})</th><th>m (${u.m})</th></tr>`;
+  for (let i = n - 1; i >= 0; i--) { const sl = key => `<button class="play" id="pp${key}${i}">▶</button><input type="range" id="ps${key}${i}" min="-1" max="1" step="0.005" value="0"><span class="val" id="pv${key}${i}"></span>`;
+    h += `<tr><td>${i + 1}</td><td>${sl('k')}</td><td>${sl('m')}</td></tr>`; }
+  pop.innerHTML = h + '</table>'; pop.style.display = 'block';
+  for (let i = 0; i < n; i++) for (const key of ['k', 'm']) {
+    const lbl = () => { $(`pv${key}${i}`).textContent = sig(curB()[key][i], 4); }; lbl();
+    $(`ps${key}${i}`).addEventListener('input', e => { curB()[key][i] = ref[key][i] * 10 ** +e.target.value; lbl(); afterEdit(); });
+    popSweeps.push(sweeper($(`pp${key}${i}`), $(`ps${key}${i}`)));
+  }
+  $('popClose').addEventListener('click', closePop);
+}
+function openLoads() {
+  closePop();
+  const pop = $('pop'), n = SA.k.length, u = unitsOf(SA);
+  let h = `<div class="pophead"><b>Load vector {F}</b><button id="popClose" style="margin-left:auto">close</button></div><table><tr><th>floor</th><th>F (${u.f})</th></tr>`;
+  for (let i = n - 1; i >= 0; i--) h += `<tr><td>${i + 1}</td><td><button class="play" id="ppF${i}">▶</button><input type="range" id="psF${i}" min="${-A.Fmax}" max="${A.Fmax}" step="${A.Fmax / 200}" value="${A.F[i]}"><span class="val" id="pvF${i}"></span></td></tr>`;
+  pop.innerHTML = h + '</table>'; pop.style.display = 'block';
+  for (let i = 0; i < n; i++) { const lbl = () => { $(`pvF${i}`).textContent = sig(A.F[i], 4); }; lbl();
+    $(`psF${i}`).addEventListener('input', e => { A.F[i] = +e.target.value; lbl(); aCustom(); render.a(); });
+    popSweeps.push(sweeper($(`ppF${i}`), $(`psF${i}`))); }
+  $('popClose').addEventListener('click', closePop);
+}
+
+// ============================ Wiring ============================
+if (typeof Plotly === 'undefined' || typeof katex === 'undefined') $('loaderr').style.display = 'block';
+let tab = 'a';
+const render = { a: renderA, b: renderB, c: renderC, d: renderD };
+function showTab(t) {
+  tab = t;
+  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
+  ['a', 'b', 'c', 'd'].forEach(x => { $('sec-' + x).hidden = x !== t; });
+  render[t]();
+}
+const presetOptions = Object.entries(BUILDINGS).map(([id, P]) => `<option value="${id}">${P.label}</option>`).join('');
+document.querySelectorAll('.bPresets').forEach(s => { s.innerHTML = presetOptions; });
+// Tab A
+$('aCase').addEventListener('change', e => { setCase(e.target.value); renderA(); });
+$('aPreset').addEventListener('change', e => { setBuildingA(e.target.value); aCustom(); renderA(); });
+$('aN').addEventListener('input', e => { setBuildingA(SA.preset, +e.target.value); aCustom(); renderA(); });
+sweeper($('aNPlay'), $('aN'), 9000);
+$('aTbl').addEventListener('click', openStories); $('aLoads').addEventListener('click', openLoads);
+$('aType').addEventListener('change', e => { A.type = e.target.value; aCustom(); renderA(); });
+$('aTd').addEventListener('input', e => { A.tdT = 10 ** +e.target.value; aCustom(); renderA(); }); sweeper($('aTdPlay'), $('aTd'));
+$('aXi').addEventListener('input', e => { A.xi = +e.target.value; A.pt = null; renderA(); }); sweeper($('aXiPlay'), $('aXi'));
+$('aFloor').addEventListener('change', e => { A.floor = +e.target.value; A.pt = null; renderA(); });
+$('aT').addEventListener('input', e => { A.tf = +e.target.value; drawA1(); writeHash(); }); looper($('aTPlay'), $('aT'));
+$('a1svg').addEventListener('click', e => { const f = e.target.dataset && e.target.dataset.floor; if (f != null) { A.floor = +f; A.pt = null; renderA(); } });
+$('aAll').addEventListener('click', () => { const v = A.Fmax / 1.5; A.F = SA.m.map(() => v); aCustom(); closePop(); renderA(); });
+$('aOne').addEventListener('click', () => { const v = A.Fmax / 1.5; A.F = SA.m.map((_, i) => (i === A.floor ? v : 0)); aCustom(); closePop(); renderA(); });
+$('aMphi').addEventListener('click', () => { const md = modesOf(SA.m, SA.k), f = SA.m.map((v, i) => v * md.Phi[i][A.mj]), mx = Math.max(...f.map(Math.abs)), v = A.Fmax / 1.5;
+  A.F = f.map(x => x * v / mx); aCustom(); closePop(); renderA(); });
+$('aMj').addEventListener('change', e => { A.mj = +e.target.value; writeHash(); });
+$('aSin').addEventListener('change', e => { A.sin = e.target.checked; renderA(); });
+$('a3j').addEventListener('change', e => { A.j = +e.target.value; A.pt = null; renderA(); });
+$('a3k').addEventListener('change', e => { A.k = +e.target.value; A.pt = null; renderA(); });
+$('a3Rho').addEventListener('input', e => { A.rho = +e.target.value; renderA3(); writeHash(); }); 
+{ sweeper($('a3RhoPlay'), $('a3Rho')); $('a3RhoPlay').addEventListener('click', () => { if (A.auto) { A.rho = +$('a3Rho').value; A.auto = false; $('a3Auto').checked = false; $('a3Rho').disabled = false; } }); }
+$('a3Auto').addEventListener('change', e => { A.auto = e.target.checked; if (!A.auto) A.rho = +$('a3Rho').value; renderA(); });
+$('a3Unit').addEventListener('change', e => { A.unit = e.target.checked; renderA(); });
+$('a3Back').addEventListener('click', () => { A.pt = null; renderA(); });
+{ const box = $('a3svg'), at = e => { const r = box.getBoundingClientRect(), m = a3map;
+    return [(e.clientX - r.left - m.W / 2) / m.S * m.view, -(e.clientY - r.top - m.H / 2) / m.S * m.view]; };
+  box.addEventListener('pointerdown', e => { if (!e.target.dataset || !e.target.dataset.handle) return; a3map.dragging = true; try { box.setPointerCapture(e.pointerId); } catch (_) {} });
+  box.addEventListener('pointermove', e => { if (!a3map || !a3map.dragging) return; A.pt = at(e); renderA3(); $('a3Back').disabled = false; });
+  const end = () => { if (a3map) a3map.dragging = false; if (A.pt) renderA3(); writeHash(); };
+  box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
+}
+// Tab B
+$('bXi').addEventListener('input', e => { B.xi = +e.target.value; renderB(); }); sweeper($('bXiPlay'), $('bXi'));
+$('b4R').addEventListener('input', e => { B.r = 10 ** +e.target.value; renderB4(); $('b4RLbl').textContent = B.r.toFixed(3); writeHash(); }); sweeper($('b4RPlay'), $('b4R'), 10000);
+$('b4A').addEventListener('input', e => { B.ratio = +e.target.value; renderB(); }); sweeper($('b4APlay'), $('b4A'));
+$('b4Like').addEventListener('click', () => { B.ratio = 1; renderB(); }); $('b4Opp').addEventListener('click', () => { B.ratio = -1; renderB(); });
+$('b4T').addEventListener('input', e => { B.T1 = 10 ** +e.target.value; renderB(); }); sweeper($('b4TPlay'), $('b4T'));
+$('b5Add').addEventListener('click', () => { B.nrec += 10; renderB5ens(); writeHash(); });
+$('b5El').addEventListener('change', e => { B.el = e.target.checked; renderB(); });
+$('b5B').addEventListener('change', e => { B.close = e.target.value; renderB(); });
+$('b5Mu').addEventListener('input', e => { B.mu = 10 ** +e.target.value; renderB5b(); writeHash(); }); sweeper($('b5MuPlay'), $('b5Mu'));
+$('b5Tune').addEventListener('input', e => { B.tune = +e.target.value; renderB5b(); writeHash(); }); sweeper($('b5TunePlay'), $('b5Tune'));
+// Tab C
+function setBuildingC(id, n = null) { SC = makeBuilding(id, n); C.on = []; C.story = (n ?? SC.k.length) - 1; }
+$('cPreset').addEventListener('change', e => { setBuildingC(e.target.value); renderC(); });
+$('cN').addEventListener('input', e => { setBuildingC(SC.preset, +e.target.value); renderC(); }); sweeper($('cNPlay'), $('cN'), 9000);
+$('cTbl').addEventListener('click', openStories);
+$('cInput').addEventListener('change', e => { C.input = e.target.value; C.Ag = C.input === 'step' ? 0.28 : RECPEAK; renderC(); });
+$('cAg').addEventListener('input', e => { C.Ag = 10 ** +e.target.value; renderC(); }); sweeper($('cAgPlay'), $('cAg'));
+$('cXi').addEventListener('input', e => { C.xi = +e.target.value; renderC(); }); sweeper($('cXiPlay'), $('cXi'));
+$('cT').addEventListener('input', e => { C.tf = +e.target.value; drawC6(); drawC8(); writeHash(); }); looper($('cTPlay'), $('cT'), 25000);
+$('c6chips').addEventListener('change', e => { const j = e.target.dataset.mode; if (j != null) { C.on[+j] = e.target.checked; renderC6(); drawC6(); writeHash(); } });
+$('c8Case').addEventListener('change', e => { C.case8 = e.target.value; C.story = C.case8 === 'ex81' ? 1 : C.case8 === 'one' ? 3 : SC.k.length - 1; renderC8(); writeHash(); });
+$('c8Resp').addEventListener('change', e => { C.resp = e.target.value; renderC8(); writeHash(); });
+$('c8Story').addEventListener('change', e => { C.story = +e.target.value; renderC8(); writeHash(); });
+$('c8Rule').addEventListener('change', e => { C.rule = e.target.value; renderC8(); writeHash(); });
+$('c8Col').addEventListener('change', e => { C.col = e.target.checked; renderC8(); writeHash(); });
+$('c8Ends').addEventListener('change', e => { C.ends = e.target.checked; renderC8(); writeHash(); });
+// Tab D
+function setBuildingD(id, n = null) { SD = makeBuilding(id, n); D.floor = SD.k.length - 1; const md = dMd(); D.wb = Math.min(D.wb, 1.3 * md.w[md.w.length - 1]); }
+$('dPreset').addEventListener('change', e => { setBuildingD(e.target.value); D.wb = 1.05 * dMd().w[0]; renderD(); });
+$('dN').addEventListener('input', e => { setBuildingD(SD.preset, +e.target.value); renderD(); }); sweeper($('dNPlay'), $('dN'), 9000);
+$('dTbl').addEventListener('click', openStories);
+$('dLoad').addEventListener('change', e => { D.load = e.target.value; renderD(); });
+$('dW').addEventListener('input', e => { const md = dMd(); D.wb = +e.target.value * 1.3 * md.w[md.w.length - 1]; moveWb(); }); sweeper($('dWPlay'), $('dW'), 20000);
+$('dDamp').addEventListener('change', e => { D.damp = e.target.value; renderD(); });
+$('dXi').addEventListener('input', e => { D.xi = +e.target.value; renderD(); }); sweeper($('dXiPlay'), $('dXi'));
+$('dA0').addEventListener('input', e => { D.a0 = +e.target.value; renderD(); }); sweeper($('dA0Play'), $('dA0'));
+$('dA1').addEventListener('input', e => { D.a1 = +e.target.value; renderD(); }); sweeper($('dA1Play'), $('dA1'));
+$('dEx84').addEventListener('click', () => { SD = makeBuilding('paz'); Object.assign(D, { load: 'force', floor: 1, wb: 20, damp: 'xi', xi: 0 }); renderD(); });
+$('dEx85').addEventListener('click', () => { SD = makeBuilding('paz'); Object.assign(D, { load: 'force', floor: 1, wb: 20, damp: 'paz', a0: 0, a1: 0.01 }); renderD(); });
+$('dPlay').addEventListener('click', () => setPlay(!D.play));
+$('dMag').addEventListener('change', e => { D.mag = e.target.value; renderD(); });
+$('dModal').addEventListener('change', e => { D.modal = e.target.checked; renderD(); });
+$('dPhase').addEventListener('change', e => { D.phase = e.target.checked; renderD(); });
+$('d9svg').addEventListener('click', e => { const f = e.target.dataset && e.target.dataset.floor; if (f != null && D.load === 'force') { D.floor = +f; renderD(); } });
+document.querySelectorAll('#tabs a').forEach(a => a.addEventListener('click', () => { closePop(); }));
+
+// ---- State in the hash, per tab
+const DEF = { A: JSON.parse(JSON.stringify(A)), B: { ...B }, C: JSON.parse(JSON.stringify(C)), D: { ...D } };
+const buildingHash = b => `p=${b.preset}&n=${b.k.length}${b.edited ? `&k=${b.k.map(v => +v.toPrecision(5)).join(',')}&m=${b.m.map(v => +v.toPrecision(5)).join(',')}` : ''}`;
+const rnd = (v, d = 5) => +(+v).toPrecision(d);
+function hashOf() {
+  if (tab === 'a') return `tab=a&${buildingHash(SA)}&case=${A.case}&f=${A.type}&F=${A.F.map(v => rnd(v)).join(',')}&td=${rnd(A.tdT)}&xi=${A.xi}&fl=${A.floor + 1}&t=${rnd(A.tf, 3)}${A.sin ? '&sin=1' : ''}${A.auto ? '' : `&rho=${rnd(A.rho, 3)}`}${A.unit ? '&unit=1' : ''}${A.pt ? `&pt=${A.pt.map(v => rnd(v, 4)).join(',')}` : ''}`;
+  if (tab === 'b') return `tab=b&xi=${B.xi}&r=${rnd(B.r, 4)}&a=${B.ratio}&T1=${rnd(B.T1, 3)}&nrec=${B.nrec}${B.el ? '&el=1' : ''}&close=${B.close}&mu=${rnd(B.mu, 3)}&tune=${rnd(B.tune, 3)}`;
+  if (tab === 'c') return `tab=c&${buildingHash(SC)}&in=${C.input}&Ag=${rnd(C.Ag, 4)}&xi=${C.xi}&t=${rnd(C.tf, 3)}&off=${C.on.map((v, j) => (v === false ? j + 1 : 0)).filter(Boolean).join(',')}&case8=${C.case8}&resp=${C.resp}&story=${C.story + 1}&rule=${C.rule}${C.col ? '&col=1' : ''}${C.ends ? '&ends=1' : ''}`;
+  return `tab=d&${buildingHash(SD)}&load=${D.load}&fl=${D.floor + 1}&w=${rnd(D.wb)}&damp=${D.damp}&xi=${D.xi}&a0=${D.a0}&a1=${D.a1}&mag=${D.mag}${D.modal ? '&modal=1' : ''}${D.phase ? '&phase=1' : ''}`;
+}
+let hashTimer = null;   // debounced: Safari limits history.replaceState to about 100 calls in 30 s
+function writeHash() { clearTimeout(hashTimer); hashTimer = setTimeout(() => { history.replaceState(null, '', '#' + hashOf()); }, 250); }
+function readBuilding(p) {
+  const id = BUILDINGS[p.get('p')] ? p.get('p') : null; if (!id) return null;
+  const n = clamp(parseInt(p.get('n')) || BUILDINGS[id].m.length, 1, 10), b = makeBuilding(id, n);
+  const list = key => { const v = (p.get(key) || '').split(',').map(Number); return v.length === n && v.every(x => x > 0) ? v : null; };
+  const k = list('k'), m = list('m'); if (k && m) { b.k = k; b.m = m; b.edited = true; }
+  return b;
+}
+function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1)), t = ['a', 'b', 'c', 'd'].includes(p.get('tab')) ? p.get('tab') : 'a';
+  const num = (key, lo, hi) => { if (!p.has(key)) return null; const v = parseFloat(p.get(key)); return Number.isFinite(v) ? clamp(v, lo, hi) : null; };
+  const put = (o, f, v) => { if (v != null) o[f] = v; };
+  if ([...p.keys()].length <= 1) return t;   // a bare #tab=x (the nav links) changes the tab, nothing else
+  if (t === 'a') { const b = readBuilding(p); if (b) { SA = b; A.F = defaultF(b); A.Fmax = 1.5 * Math.max(...A.F.map(Math.abs)); }
+    if (['ex81', 'ex82', 'custom'].includes(p.get('case'))) A.case = p.get('case');
+    if (['tri', 'half', 'step'].includes(p.get('f'))) A.type = p.get('f');
+    const F = (p.get('F') || '').split(',').map(Number); if (F.length === SA.k.length && F.every(Number.isFinite)) { A.F = F; A.Fmax = Math.max(A.Fmax, 1.5 * Math.max(...F.map(Math.abs))); }
+    put(A, 'tdT', num('td', 0.05, 5)); put(A, 'xi', num('xi', 0, 0.2)); put(A, 'tf', num('t', 0, 1));
+    const fl = num('fl', 1, SA.k.length); if (fl != null) A.floor = Math.round(fl) - 1;
+    A.sin = p.get('sin') === '1'; A.unit = p.get('unit') === '1'; A.auto = !p.has('rho'); if (p.has('rho')) A.rho = num('rho', 0, 1);
+    const pt = (p.get('pt') || '').split(',').map(Number); A.pt = pt.length === 2 && pt.every(Number.isFinite) ? pt : null;
+  } else if (t === 'b') { put(B, 'xi', num('xi', 0, 0.2)); put(B, 'r', num('r', 1, 3)); put(B, 'ratio', num('a', -1, 1)); put(B, 'T1', num('T1', 0.2, 4));
+    const nr = num('nrec', 10, 400); if (nr != null) B.nrec = Math.round(nr); B.el = p.get('el') === '1'; if (['pC', 'app'].includes(p.get('close'))) B.close = p.get('close');
+    put(B, 'mu', num('mu', 0.002, 0.3)); put(B, 'tune', num('tune', 0.8, 1.2));
+  } else if (t === 'c') { const b = readBuilding(p); if (b) { SC = b; C.story = b.k.length - 1; }
+    if (['record', 'step'].includes(p.get('in'))) C.input = p.get('in'); put(C, 'Ag', num('Ag', 0.05, 1)); put(C, 'xi', num('xi', 0, 0.2)); put(C, 'tf', num('t', 0, 1));
+    C.on = []; (p.get('off') || '').split(',').map(Number).filter(Boolean).forEach(j => { C.on[j - 1] = false; });
+    if (['tab', 'ex81', 'one'].includes(p.get('case8'))) C.case8 = p.get('case8');
+    if (['shear', 'drift', 'moment'].includes(p.get('resp'))) C.resp = p.get('resp'); if (['srss', 'cqc'].includes(p.get('rule'))) C.rule = p.get('rule');
+    const st = num('story', 1, 10); if (st != null) C.story = Math.round(st) - 1; C.col = p.get('col') === '1'; C.ends = p.get('ends') === '1';
+  } else { const b = readBuilding(p); if (b) SD = b;
+    if (['force', 'base'].includes(p.get('load'))) D.load = p.get('load'); if (['xi', 'paz'].includes(p.get('damp'))) D.damp = p.get('damp'); if (['auto', 'fixed'].includes(p.get('mag'))) D.mag = p.get('mag');
+    const fl = num('fl', 1, SD.k.length); if (fl != null) D.floor = Math.round(fl) - 1; const md = dMd();
+    put(D, 'wb', num('w', 0, 1.3 * md.w[md.w.length - 1])); put(D, 'xi', num('xi', 0, 0.2)); put(D, 'a0', num('a0', 0, 2)); put(D, 'a1', num('a1', 0, 0.02));
+    D.modal = p.get('modal') === '1'; D.phase = p.get('phase') === '1';
+  }
+  return t;
+}
+function stopAll() { SWEEPS.slice().forEach(sw => sw.stop()); }
+function applyHash() { stopAll(); closePop(); showTab(readHash()); }
+window.addEventListener('hashchange', applyHash);
+$('reset').addEventListener('click', () => {
+  stopAll(); closePop();
+  Object.assign(A, JSON.parse(JSON.stringify(DEF.A))); Object.assign(B, DEF.B); Object.assign(C, JSON.parse(JSON.stringify(DEF.C))); Object.assign(D, DEF.D);
+  SA = makeBuilding('paz'); SC = makeBuilding('pB'); SD = makeBuilding('paz'); $('speed').value = '1';
+  render[tab]();
+});
+$('theme').addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme !== 'dark';
+  if (dark) document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme;
+  $('theme').textContent = dark ? '☀ light' : '☾ dark';
+});
+$('caps').addEventListener('click', () => { $('caps').classList.toggle('on', document.body.classList.toggle('nocap') === false); });
+new MutationObserver(() => render[tab]()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+applyHash();
+// Plotly sizes a plot once; follow later changes of its box. The drawings redraw at their new size.
+if (typeof Plotly !== 'undefined' && 'ResizeObserver' in window) {
+  const ro = new ResizeObserver(entries => entries.forEach(e => { if (e.target.data && e.target.offsetParent && e.contentRect.width > 0) Plotly.Plots.resize(e.target).catch(() => {}); }));
+  document.querySelectorAll('.plot').forEach(el => ro.observe(el));
+  let pend = false;
+  const so = new ResizeObserver(() => { if (pend) return; pend = true; requestAnimationFrame(() => { pend = false; render[tab](); }); });
+  document.querySelectorAll('.svgbox').forEach(el => so.observe(el));
+}
+</script>
+</body>
+</html>

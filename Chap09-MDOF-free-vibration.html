@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Free Vibration of a Shear Building — CIVE 6355</title>
+<!-- CIVE 6355 Structural Dynamics, deck 09 (Paz Secs. 7.2-7.4), from 202603/src/Chap09-animation-spec.md.
+     Built: the spec's panels 1 (tab A), 3 (tab B), 5 (tab C), 7 and 9 (tab D). Left out by Ruda's choice
+     (2026-11-03): panels 2, 4, 6, 8, 10, the Betti view of panel 5 and the lowest-R game of panel 7.
+     Closed forms only, no integrator. Open this file directly in a browser (internet needed for Plotly
+     and KaTeX). The state is in the URL hash, e.g. #tab=d&preset=paz71&y=1,1.5&step=2. On a landscape
+     screen (the iPad in class) tabs A, B, C fit one screen and tab D snaps between two. -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.3/plotly.min.js"></script>
+<style>
+  /* Layout: header with tabs, one control bar per tab, panels in a grid (same as the deck 08 app) */
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1f; --muted: #66666c; --line: #d9d9de;
+    --grid: #ececef; --uh: #c8102e; --hl: #fff4d6;
+    --c-pos: #1f5fbf; --c-neg: #d9621c; --c-net: #188a4a; --c-grav: #7a3fb0; --c-ghost: #9a9aa2;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color-scheme: light;
+  }
+  /* Light by default, whatever the system setting (projectors); the header button sets dark */
+  :root[data-theme="dark"] {
+    --bg: #17181b; --panel: #202226; --ink: #e8e8ea; --muted: #a0a0a8; --line: #3a3c42;
+    --grid: #2c2e33; --uh: #ff5a6e; --hl: #3a3420;
+    --c-pos: #6aa5ff; --c-neg: #ff9b5c; --c-net: #4cc77f; --c-grav: #b88cf0; --c-ghost: #8a8a92;
+    color-scheme: dark }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  /* No double-tap zoom on the iPad when something is tapped repeatedly */
+  html, body, button, input, select, label, nav a, .svgbox { touch-action: manipulation; }
+  button, nav a, label, .svgbox { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--ink);
+         font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         padding-left: max(16px, env(safe-area-inset-left, 0px));
+         padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 8px 24px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; padding-block: 4px 8px; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .sub { color: var(--muted); }
+  nav { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  nav a { padding: 6px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0;
+          color: var(--muted); text-decoration: none; }
+  nav a.on { background: var(--panel); border-color: var(--line); color: var(--ink); font-weight: 600;
+             margin-bottom: -1px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; }
+  .bar label, .bar .grp, .ctl label, .ctl .grp { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; white-space: nowrap; }
+  .bar input[type=range], .ctl input[type=range] { width: 130px; }
+  .val { font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 3em; }
+  .sym { font-style: italic; font-family: "Times New Roman", serif; font-size: 16px; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+           border-radius: 4px; padding: 2px 9px; cursor: pointer; }
+  button.on { background: var(--uh); border-color: var(--uh); color: #fff; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, select:focus-visible, input:focus-visible, nav a:focus-visible { outline: 2px solid var(--uh); outline-offset: 1px; }
+  select { font: inherit; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; max-width: 170px; }
+  input[type=number] { font: inherit; width: 5.5em; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 0 3px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #sec-a .grid { grid-template-columns: 1.55fr 1fr; }
+  #sec-b .grid { grid-template-columns: 0.8fr 1.2fr; }
+  #sec-c .grid { grid-template-columns: 1.9fr 1fr; }
+  #sec-d .grid { grid-template-columns: 1fr; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px 8px;
+           min-width: 0; display: flex; flex-direction: column; gap: 4px; position: relative; }
+  .panel h2 { font-size: 15px; margin: 2px 0 0; }
+  .panel h2 .ref { font-weight: 400; color: var(--muted); font-size: 13px; }
+  .see { color: var(--muted); font-size: 13px; margin: 0; }
+  .see b { color: var(--ink); font-weight: 600; }
+  .plot { width: 100%; min-width: 0; }
+  .svgbox { position: relative; width: 100%; min-width: 0; overflow: hidden; }
+  .svgbox svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .svgbox svg * { pointer-events: none; }
+  .svgbox [data-handle] { pointer-events: auto; cursor: ew-resize; }
+  .svgbox.drag { touch-action: none; }
+  .svgbox.tap { cursor: pointer; }
+  .h220 { height: 220px; } .h300 { height: 300px; } .h420 { height: 420px; }
+  .svgbox.fix { flex: none; height: var(--h); }
+  .duo { display: flex; gap: 8px; flex-wrap: wrap; }
+  .duo > * { min-width: 0; }
+  .f1 { flex: 1 1 260px; } .f2 { flex: 2 1 260px; } .fnone { flex: none; }
+  .col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .ctl { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 13px; }
+  .readout { font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; overflow-x: auto; }
+  .note { font-size: 12.5px; color: var(--muted); font-family: inherit; }
+  .bad { color: var(--uh); font-weight: 600; }
+  .chk { display: inline-flex; gap: 4px; align-items: center; }
+  .tools { margin-left: auto; display: inline-flex; gap: 10px; align-items: center; color: var(--muted); }
+  .eq { text-align: center; font-size: 14px; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+  .eq .katex-html { white-space: nowrap; }
+  #loaderr { display: none; margin: 12px 0; padding: 12px; background: var(--hl); border: 1px solid var(--uh); }
+  /* the moving time line over a Plotly curve: a thin element, since a relayout per frame is too slow */
+  .plotcur { position: absolute; width: 0; border-left: 1.5px solid var(--uh); pointer-events: none; display: none; }
+  /* matrices as grids of cells */
+  .matT { font-size: 12.5px; color: var(--muted); margin-bottom: 2px; }
+  table.mat { border-collapse: collapse; font-family: var(--mono); font-variant-numeric: tabular-nums;
+              border-left: 2px solid var(--ink); border-right: 2px solid var(--ink); }
+  table.mat td { padding: 3px 4px; text-align: right; white-space: nowrap; min-width: 2em; border: 1px solid var(--grid); }
+  table.mat td[data-cell] { cursor: pointer; }
+  table.mat td.sel { outline: 2px solid var(--uh); outline-offset: -2px; font-weight: 600; }
+  table.iter { border-collapse: collapse; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+  table.iter th { color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); padding: 1px 6px; text-align: right; white-space: nowrap; }
+  table.iter td { padding: 1px 6px; text-align: right; white-space: nowrap; }
+  table.iter tr.cur td { background: var(--hl); }
+  .scrolly { overflow: auto; min-height: 0; }
+  #b3pred { display: flex; gap: 6px; }
+  #b3pred label { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: stretch; font-size: 11.5px; text-align: center; color: var(--muted); }
+  #b3pred input { width: 100%; }
+  /* the story table floats over the panels, so opening it does not move them */
+  #pop { display: none; position: fixed; z-index: 20; left: 50%; top: 96px; transform: translateX(-50%);
+         max-width: calc(100vw - 24px); max-height: calc(100vh - 110px); overflow: auto; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+  #pop table { border-collapse: collapse; font-size: 13px; }
+  #pop td, #pop th { padding: 2px 6px; text-align: left; white-space: nowrap; }
+  #pop th { color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); }
+  #pop input[type=range] { width: 92px; vertical-align: middle; }
+  #pop .val { display: inline-block; min-width: 4.2em; text-align: right; }
+  #pop button.play { padding: 0 5px; }
+  body.nocap .see { display: none; }
+  @media (max-width: 1000px) {
+    #sec-a .grid, #sec-b .grid, #sec-c .grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 900px) {
+    .bar input[type=range] { width: 110px; }
+    .tools { margin-left: 0; }
+  }
+  /* Landscape screens (the iPad in class): the open tab fills the screen and the drawings and plots
+     take the height left over, so nothing needs scrolling. In tab D the controls stay and each panel
+     fills the screen below them, snapping on scroll. */
+  @media (min-width: 1000px) and (min-height: 600px) and (orientation: landscape) {
+    body { height: 100vh; height: 100dvh; margin: 0; display: flex; flex-direction: column;
+           padding-block: 4px 8px; overflow: hidden; }
+    header, nav, .bar { flex: none; }
+    section:not([hidden]) { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+    section > .grid { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+    .panel { min-height: 0; overflow: hidden; }
+    .plot, .svgbox { flex: 1 1 0; height: auto; min-height: 60px; overflow: hidden; }
+    .svgbox.fix { flex: none; height: var(--h); min-height: 0; }
+    .duo { flex: 1 1 0; min-height: 0; flex-wrap: nowrap; }
+    .col { min-height: 0; }
+    #sec-d > .grid { display: flex; flex-direction: column; overflow-y: auto; scroll-snap-type: y mandatory; }
+    #sec-d .panel { flex: 0 0 100%; scroll-snap-align: start; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Free vibration of a shear building</h1>
+  <span class="sub">CIVE 6355 · deck 09 · Paz Secs. 7.2–7.4</span>
+  <span class="tools">
+    <label>speed <select id="speed">
+      <option value="0.25">¼×</option><option value="0.5">½×</option>
+      <option value="1" selected>1×</option><option value="2">2×</option>
+    </select></label>
+    <button id="caps" class="on" title="show or hide the explanations under the panel titles">captions</button>
+    <button id="theme" title="light or dark colors">☾ dark</button>
+    <button id="reset" title="all controls back to their defaults">Reset</button>
+  </span>
+</header>
+<div id="loaderr">Plotly/KaTeX could not be loaded from the CDN. This page needs an internet connection.</div>
+<nav id="tabs">
+  <a href="#tab=a" data-tab="a">A · The modes</a>
+  <a href="#tab=b" data-tab="b">B · Initial conditions</a>
+  <a href="#tab=c" data-tab="c">C · Orthogonality</a>
+  <a href="#tab=d" data-tab="d">D · Rayleigh's quotient</a>
+</nav>
+<div id="pop"></div>
+
+<!-- ======================= Tab A: spec panel 1 ======================= -->
+<section id="sec-a" hidden>
+  <div class="bar">
+    <label>Building <select id="aPreset"></select></label>
+    <span class="grp">stories <span class="sym">n</span><button class="play" id="aNPlay" title="sweep n">▶</button>
+      <input type="range" id="aN" min="1" max="10" step="1" style="width:90px"><span class="val" id="aNLbl"></span></span>
+    <button id="aTbl" title="story stiffness, height and weight, one slider per story">stories…</button>
+    <span class="grp">amplitude<button class="play" id="aAmpPlay" title="sweep the amplitude">▶</button>
+      <input type="range" id="aAmp" min="0.1" max="0.5" step="0.01" style="width:90px"><span class="val" id="aAmpLbl"></span></span>
+    <button id="aRun" title="run or pause the clock">❚❚ pause</button>
+    <label class="chk" title="every mode takes 6 s, to read the fast ones; relative speeds are then not true"><input type="checkbox" id="aOwn">own clocks</label>
+    <span class="note" id="aClock"></span>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>Every mode at once <span class="ref">Paz 7.2</span></h2>
+      <p class="see"><b><i>n</i> floors, <i>n</i> modes. In one mode all floors pass through zero together and stop together. Mode <i>j</i> has <i>j</i> − 1 sign changes, and each one puts more drift into the stories for the same floor motion: more strain energy over the same mass term, so a higher frequency.</b>
+        Open circles: nodes. Shading: each story's share of the strain energy. Sweep <i>n</i> on the uniform building: T₁ grows about in proportion to <i>n</i>, the top frequency stops growing. Tap a building to enlarge it.</p>
+      <div id="a1line" class="svgbox fix" style="--h:56px" role="img" aria-label="the natural frequencies on one line"></div>
+      <div id="a1row" class="svgbox tap h300" role="img" aria-label="one building per mode, swaying on one clock"></div>
+    </div>
+    <div class="panel">
+      <h2 id="a1bigT">Mode 1</h2>
+      <p class="see"><b>The shape does not change, only the common factor does.</b> The amplitude slider changes nothing else: a scaled mode is the same mode.</p>
+      <div class="eq" id="eqA1"></div>
+      <div class="duo">
+        <div id="a1big" class="svgbox f2 h300" role="img" aria-label="the chosen mode, enlarged, with its amplitudes"></div>
+        <div id="a1sine" class="svgbox f1 h300" style="flex-basis:110px" role="img" aria-label="the common factor on the same clock"></div>
+      </div>
+      <div class="eq" id="eqA2"></div>
+      <div class="readout" id="a1read"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= Tab B: spec panel 3 ======================= -->
+<section id="sec-b" hidden>
+  <div class="bar">
+    <label>Building <select id="bPreset" class="presetS"></select></label>
+    <span class="grp"><span class="sym">n</span><button class="play" id="bNPlay" title="sweep n">▶</button>
+      <input type="range" id="bN" min="1" max="10" step="1" style="width:70px"><span class="val" id="bNLbl"></span></span>
+    <button id="bTbl" title="story stiffness, height and weight, one slider per story">stories…</button>
+    <label>Start <select id="bStart"></select></label>
+    <span class="grp">on mode <span id="bModes" style="display:inline-flex;gap:3px;flex-wrap:wrap"></span></span>
+    <label class="chk" title="drag an arrow at each floor to set the initial velocity"><input type="checkbox" id="bVel">velocity</label>
+    <button id="bPlay" title="let go: run the clock">▶ let go</button>
+    <button id="bBack" title="back to t = 0">⏮</button>
+    <label class="chk" title="each floor's modal parts as dotted curves"><input type="checkbox" id="bParts">modal parts</label>
+    <label class="chk" title="hide the coefficients; set each mode's sign and relative size, then reveal"><input type="checkbox" id="bPred">predict</label>
+    <button id="bReveal" disabled>reveal</button>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>Drag the floors, let go <span class="ref">Paz (k)–(m) of Ex. 7.1; 2024 notes L21</span></h2>
+      <p class="see"><b>Started on a mode, all other coefficients are exactly zero and the shape holds forever. Started anywhere else, the shape changes all the time, though each modal part keeps its own shape and clock.</b>
+        The colored segments under a floor add up to its displacement, one per mode. <span id="b3note"></span></p>
+      <div class="eq" id="eqB1"></div>
+      <div id="b3svg" class="svgbox drag h420" role="img" aria-label="building: drag the floors to set the initial shape"></div>
+      <div class="readout" id="b3read"></div>
+    </div>
+    <div class="panel">
+      <h2>The modes, and their sum <span class="ref">Chopra Ex. 10.8–10.11; not in Paz</span></h2>
+      <p class="see"><b>The first energy bar churns, the second never moves: that is what independent modes means.</b> <i>2n</i> conditions fix <i>2n</i> constants.</p>
+      <div class="eq" id="eqB2"></div>
+      <div id="b3modes" class="svgbox h220" role="img" aria-label="one small building per mode, each sized by its coefficient"></div>
+      <div id="b3pred" hidden></div>
+      <div id="b3energy" class="svgbox fix" style="--h:52px" role="img" aria-label="energy by floors and stories, and energy by modes"></div>
+      <div id="b3plot" class="plot h220"></div>
+      <div id="b3plotCur" class="plotcur"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= Tab C: spec panel 5 ======================= -->
+<section id="sec-c" hidden>
+  <div class="bar">
+    <label>Building <select id="cPreset" class="presetS"></select></label>
+    <span class="grp"><span class="sym">n</span><button class="play" id="cNPlay" title="sweep n">▶</button>
+      <input type="range" id="cN" min="1" max="10" step="1" style="width:70px"><span class="val" id="cNLbl"></span></span>
+    <button id="cTbl" title="story stiffness, height and weight, one slider per story">stories…</button>
+    <label>Weight <select id="cWeight">
+      <option value="M">[M]: floors</option><option value="K">[K]: stories</option><option value="I">none: plain</option></select></label>
+    <label>Scale <select id="cScale">
+      <option value="first">first floor = 1 (Paz)</option><option value="roof">roof = 1</option><option value="mnorm">M-norm, {φ}</option></select></label>
+    <span class="grp" title="multiply mode j by a factor">× mode <span class="sym">j</span><button class="play" id="cMsPlay" title="sweep the factor">▶</button>
+      <input type="range" id="cMs" min="-1" max="1" step="0.01" style="width:80px"><span class="val" id="cMsLbl"></span></span>
+    <label id="cRndWrap" title="Ex. 7.1's modes as printed: the deck has 1.263, −1.631; Paz 1.263, −1.629">Modes <select id="cRnd">
+      <option value="exact">computed</option><option value="deck">rounded, the deck's</option><option value="paz">rounded, Paz's</option></select></label>
+    <span class="grp"><button id="cStep" title="add the next floor">Step ▶</button><button id="cPlay" title="build the sum from the base to the roof">▶ play</button><button id="cFirst" title="start over">⏮</button></span>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>The inner product as a sum over floors <span class="ref">Paz 7.3; 2024 notes L22</span></h2>
+      <p class="see"><b>Neither sum is small term by term: the terms cancel exactly.</b> Without the weight the modes are not perpendicular as plain vectors, unless the masses are equal. Scaling a mode scales the sum, and a zero stays a zero: only the diagonal changes, which is all that normalization is.</p>
+      <div class="eq" id="eqC1"></div>
+      <div class="duo">
+        <div id="c5svg" class="svgbox f1 h420" role="img" aria-label="the building in both modes"></div>
+        <div id="c5sum" class="svgbox f1 h420" role="img" aria-label="one bar per floor and the running sum from base to roof"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2 id="c5gridT">The whole matrix</h2>
+      <p class="see">Tap a cell to pick the two modes. <span id="c5note"></span></p>
+      <div class="scrolly" id="c5grid"></div>
+      <div class="readout" id="c5read"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= Tab D: spec panels 7 and 9 ======================= -->
+<section id="sec-d" hidden>
+  <div class="bar">
+    <label>Building <select id="dPreset" class="presetS"></select></label>
+    <span class="grp"><span class="sym">n</span><button class="play" id="dNPlay" title="sweep n">▶</button>
+      <input type="range" id="dN" min="1" max="10" step="1" style="width:70px"><span class="val" id="dNLbl"></span></span>
+    <button id="dTbl" title="story stiffness, height and weight, one slider per story">stories…</button>
+    <label>Trial shape <select id="dShape"></select></label>
+    <span class="grp">on mode <span id="dModes" style="display:inline-flex;gap:3px;flex-wrap:wrap"></span></span>
+    <span class="grp"><button id="dGo7" title="show the trial shape">↑ quotient</button><button id="dGo9" title="show the iteration">↓ iteration</button></span>
+  </div>
+  <div class="grid">
+    <div class="panel" id="d7panel">
+      <h2>Drag a trial shape <span class="ref">Paz 7.4; 2024 notes L22</span></h2>
+      <p class="see"><b>Every trial shape lands inside [ω₁², ωₙ²]: R(y) is where a beam balances with a weight at each ωⱼ², and a balance point cannot leave its weights. A shape with sign changes jumps up the axis.</b>
+        Sensible shapes land just above ω₁², so R(y) gives a quick upper bound on the fundamental, and how good depends on the shape. Beside each floor: the ω² that floor would need. A mode is the shape on which all floors agree. R(y) is Rayleigh's quotient, not the flexibility matrix [R] of deck 08.</p>
+      <div class="eq" id="eqD1"></div>
+      <div class="duo">
+        <div id="d7svg" class="svgbox drag" style="flex:1 1 280px;min-height:280px" role="img" aria-label="building: drag the floors to set the trial shape"></div>
+        <div class="col" style="flex:2 1 360px">
+          <div id="d7axis" class="svgbox fix" style="--h:190px" role="img" aria-label="the frequencies on an axis of omega squared, and a balance of weights"></div>
+          <div id="d7bars" class="svgbox" style="flex:1 1 0;min-height:110px" role="img" aria-label="the weights by mode"></div>
+        </div>
+      </div>
+      <div class="readout" id="d7read"></div>
+    </div>
+    <div class="panel" id="d9panel">
+      <h2>Rayleigh quotient iteration <span class="ref">not in Paz; 2024 notes L22, L29; Chopra Ex. 10.14–10.16</span></h2>
+      <p class="see"><b>Digits roughly triple each step, and it finds whichever mode the start favors, not the lowest:</b> the count of sign changes tells which mode came out. Paz's update and solving with {y<sub>k</sub>} are quadratic; inverse iteration gains a fixed factor per step.</p>
+      <div class="ctl">
+        <button id="dStep" title="one more step">Step ▶</button><button id="dPlay" title="step until converged">▶ play</button><button id="dFirst" title="back to the start">⏮</button>
+        <label title="the shift of the first cycle; empty: R(y₀)">first shift <span class="sym">r₀</span> <input type="number" id="dR0" step="any" placeholder="R(y₀)"></label>
+        <label title="use the first shift for this many more cycles; large: inverse iteration with a fixed shift">hold for <span class="sym">p</span> <input type="number" id="dHold" min="0" max="20" step="1" style="width:3.5em"></label>
+        <span id="dChips" style="display:inline-flex;gap:3px;flex-wrap:wrap"></span>
+        <label class="chk" title="normalize by the plain norm instead of the M-norm: r_k does not change"><input type="checkbox" id="dPlain">plain norm</label>
+        <label class="chk" title="solve with {y_k} on the right-hand side instead of [M]{y_k}"><input type="checkbox" id="dSlip"><span>solve with {y<sub>k</sub>}</span></label>
+        <label>plot <select id="dMeas"><option value="shape">shape error</option><option value="r">error of r_k</option></select></label>
+      </div>
+      <div class="eq" id="eqD2"></div>
+      <div class="duo">
+        <div id="d9svg" class="svgbox" style="flex:0.7 1 200px;min-height:240px" role="img" aria-label="the building morphing from one iterate to the next"></div>
+        <div class="col" style="flex:1.7 1 340px">
+          <div class="scrolly" id="d9tbl" style="flex:1 1 0;min-height:110px"></div>
+          <div class="ctl"><b>Which mode?</b> <button id="dTry" title="run the iteration from 200 random starts">try 200 random starts</button><span class="note" id="d9whichN"></span></div>
+          <div id="d9which" class="svgbox fix" style="--h:96px" role="img" aria-label="which mode the iteration reaches from each start"></div>
+        </div>
+        <div id="d9plot" class="plot" style="flex:1.1 1 280px;min-height:320px"></div>
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+"use strict";
+// CORE-BEGIN ---- Numbers only, no page: matrices, modes, coefficients, iterations (spec, Notes). --
+const zeros = (r, c) => Array.from({ length: r }, () => new Array(c).fill(0));
+const sum = a => a.reduce((s, x) => s + x, 0);
+const matVec = (A, x) => A.map(r => r.reduce((s, v, j) => s + v * x[j], 0));
+const matMul = (A, B) => A.map(r => B[0].map((_, j) => r.reduce((s, v, l) => s + v * B[l][j], 0)));
+const dot = (a, b) => a.reduce((s, v, i) => s + v * b[i], 0);
+const identity = n => Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => +(i === j)));
+
+// Gaussian elimination with partial pivoting; factor once, solve many
+function luFactor(A0) {
+  const n = A0.length, A = A0.map(r => r.slice()), piv = A.map((_, i) => i);
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let i = c + 1; i < n; i++) if (Math.abs(A[i][c]) > Math.abs(A[p][c])) p = i;
+    if (p !== c) { [A[p], A[c]] = [A[c], A[p]]; [piv[p], piv[c]] = [piv[c], piv[p]]; }
+    if (A[c][c] === 0) continue;
+    for (let i = c + 1; i < n; i++) {
+      const f = A[i][c] / A[c][c]; A[i][c] = f;
+      if (f !== 0) for (let j = c + 1; j < n; j++) A[i][j] -= f * A[c][j];
+    }
+  }
+  return { A, piv };
+}
+function luSolve({ A, piv }, b) {
+  const n = A.length, x = piv.map(p => b[p]);
+  for (let i = 1; i < n; i++) for (let j = 0; j < i; j++) x[i] -= A[i][j] * x[j];
+  for (let i = n - 1; i >= 0; i--) { for (let j = i + 1; j < n; j++) x[i] -= A[i][j] * x[j]; x[i] /= A[i][i]; }
+  return x;
+}
+const solve = (A, b) => luSolve(luFactor(A), b);
+
+// [K] for story stiffnesses k: k_ii = k_i + k_i+1, k_i,i+1 = -k_i+1 (Paz 7.5 for n = 3)
+function stiffness(k) {
+  const n = k.length, K = zeros(n, n);
+  for (let i = 0; i < n; i++) {
+    K[i][i] = k[i] + (i + 1 < n ? k[i + 1] : 0);
+    if (i + 1 < n) K[i][i + 1] = K[i + 1][i] = -k[i + 1];
+  }
+  return K;
+}
+// [R]: r_ij = sum_{l <= min(i,j)} 1/k_l
+function flexibility(k) {
+  const n = k.length, c = []; let s = 0;
+  for (let i = 0; i < n; i++) { s += 1 / k[i]; c.push(s); }
+  return Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => c[Math.min(i, j)]));
+}
+
+// Mode shapes: [S] = [M]^-1/2 [K] [M]^-1/2 (symmetric tridiagonal for a diagonal [M]), Jacobi rotations
+// to 1e-14. phi_j = [M]^-1/2 v_j, omega_1 smallest, sign so phi_1j > 0, a_ij = phi_ij / phi_1j. The first
+// entry of a mode is never zero in a shear building (a Jacobi matrix), though it can be tiny.
+function jacobiEig(S) {
+  const n = S.length, A = S.map(r => r.slice()), V = identity(n);
+  const frob = Math.sqrt(sum(A.map(r => sum(r.map(x => x * x))))) || 1;
+  for (let sweep = 0; sweep < 80; sweep++) {
+    let offd = 0;
+    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) offd += A[p][q] * A[p][q];
+    if (Math.sqrt(offd) <= 1e-14 * frob) break;
+    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) {
+      if (A[p][q] === 0) continue;
+      const th = (A[q][q] - A[p][p]) / (2 * A[p][q]);
+      const t = (th >= 0 ? 1 : -1) / (Math.abs(th) + Math.sqrt(th * th + 1));
+      const c = 1 / Math.sqrt(t * t + 1), s = t * c;
+      for (let r = 0; r < n; r++) { const x = A[r][p], y = A[r][q]; A[r][p] = c * x - s * y; A[r][q] = s * x + c * y; }
+      for (let r = 0; r < n; r++) { const x = A[p][r], y = A[q][r]; A[p][r] = c * x - s * y; A[q][r] = s * x + c * y; }
+      for (let r = 0; r < n; r++) { const x = V[r][p], y = V[r][q]; V[r][p] = c * x - s * y; V[r][q] = s * x + c * y; }
+    }
+  }
+  return { d: A.map((r, i) => r[i]), V };
+}
+const colOf = (M, j) => M.map(r => r[j]);
+function modesOf(k, m) {
+  const n = k.length, K = stiffness(k);
+  const S = K.map((r, i) => r.map((v, j) => v / Math.sqrt(m[i] * m[j])));
+  const { d, V } = jacobiEig(S);
+  const ord = d.map((_, j) => j).sort((p, q) => d[p] - d[q]);
+  const w2 = ord.map(j => Math.max(d[j], 0)), w = w2.map(Math.sqrt), T = w.map(x => 2 * Math.PI / x);
+  const Phi = zeros(n, n), A = zeros(n, n);
+  ord.forEach((o, j) => {
+    const v = colOf(V, o).map((x, i) => x / Math.sqrt(m[i])), s = v[0] < 0 ? -1 : 1;
+    v.forEach((x, i) => { Phi[i][j] = s * x; A[i][j] = (s * x) / (s * v[0]); });
+  });
+  return { n, K, w2, w, T, Phi, A };
+}
+// Sign changes, skipping entries below 1e-12 of the largest (a node exactly at a floor). Mode j has
+// exactly j - 1 (oscillation theorem of a Jacobi matrix); in double precision the count can fail on a
+// strongly localized mode of an edited building, so the page shows the theorem's count for modes.
+function signChanges(v) {
+  const tol = 1e-12 * Math.max(...v.map(Math.abs));
+  let c = 0, last = 0;
+  for (const x of v) { if (Math.abs(x) <= tol) continue; const s = x > 0 ? 1 : -1; if (last && s !== last) c++; last = s; }
+  return c;
+}
+const drifts = y => y.map((v, i) => v - (i ? y[i - 1] : 0));
+const mDot = (m, x, y) => x.reduce((s, v, i) => s + m[i] * v * y[i], 0);
+// {y}^T[K]{z} = sum_l k_l Delta_l(y) Delta_l(z)
+const kDot = (k, x, y) => { const a = drifts(x), b = drifts(y); return a.reduce((s, v, l) => s + k[l] * v * b[l], 0); };
+const rayleighQ = (k, m, y) => { const d = mDot(m, y, y); return d > 0 ? kDot(k, y, y) / d : NaN; };
+// Each floor's own omega^2: r_l = ([K]y)_l / (m_l y_l); R(y) is their average with weights m_l y_l^2.
+// A floor with y_l near zero has no meaningful r_l: NaN below 1% of the largest floor.
+function floorOmegas(k, m, y) {
+  const Ky = matVec(stiffness(k), y), top = Math.max(...y.map(Math.abs));
+  return y.map((v, l) => (Math.abs(v) < 0.01 * top ? NaN : Ky[l] / (m[l] * v)));
+}
+const strainShares = (k, v) => { const e = drifts(v).map((x, l) => k[l] * x * x), t = sum(e); return e.map(x => x / t); };
+// c_j = {phi}_j^T [M] {x}
+const modalCoords = (md, m, x) => x.map((_, j) => mDot(m, colOf(md.Phi, j), x));
+// {y0} = [A]{b1}, {v0} = [A][Omega]{b2}, through [Phi]^T[M]: no system to solve
+function coeffs(md, m, y0, v0) {
+  const c = modalCoords(md, m, y0), d = modalCoords(md, m, v0);
+  const N = c.map((_, j) => { const a = colOf(md.A, j); return Math.sqrt(mDot(m, a, a)); });
+  return { c, d, N, b1: c.map((x, j) => x / N[j]), b2: d.map((x, j) => x / (md.w[j] * N[j])) };
+}
+// {y(t)} = [A]([cos Omega t]{b1} + [sin Omega t]{b2}), with the modal coordinates and the velocity
+function respond(md, b1, b2, t) {
+  const q = b1.map((x, j) => x * Math.cos(md.w[j] * t) + b2[j] * Math.sin(md.w[j] * t));
+  const qd = b1.map((x, j) => md.w[j] * (-x * Math.sin(md.w[j] * t) + b2[j] * Math.cos(md.w[j] * t)));
+  return { q, y: matVec(md.A, q), v: matVec(md.A, qd) };
+}
+const modalEnergy = (md, c, d) => c.map((x, j) => 0.5 * (md.w2[j] * x * x + d[j] * d[j]));
+// Energy by floors (kinetic) and by stories (strain), at one instant
+const floorEnergy = (k, m, y, v) => ({ ke: v.map((x, l) => 0.5 * m[l] * x * x), se: drifts(y).map((x, l) => 0.5 * k[l] * x * x) });
+// One term per floor ([M], or no weight) or per story ([K]) of {x}^T[.]{y}
+function innerTerms(k, m, x, y, weight) {
+  if (weight === 'K') { const a = drifts(x), b = drifts(y); return a.map((v, l) => k[l] * v * b[l]); }
+  return x.map((v, l) => (weight === 'M' ? m[l] : 1) * v * y[l]);
+}
+// Iterations for a trial shape: 'rqi'; 'slip', the same with {y_k} on the right-hand side; 'inv', no
+// shift; 'paz', n = 2, Paz's update of Ex. 7.3, a_2 from the first row at r_k. The solves pivot, since
+// [K] - r[M] is indefinite, and stop before it is singular: when the residual with {y} M-normalized is
+// below 1e-13. A first shift r0 is held for the cycles k <= hold, then the shift is r_k.
+function iterate(k, m, y0, { method = 'rqi', r0 = null, hold = 0, plain = false, steps = 8 } = {}) {
+  const K = stiffness(k), n = k.length, out = [];
+  let y = y0.slice();
+  for (let s = 0; s <= steps; s++) {
+    const r = rayleighQ(k, m, y), nm = Math.sqrt(mDot(m, y, y));
+    if (!(nm > 0) || !Number.isFinite(r)) break;
+    const ym = y.map(v => v / nm), Ky = matVec(K, ym);
+    const res = Math.sqrt(sum(Ky.map((v, i) => (v - r * m[i] * ym[i]) ** 2))) / Math.abs(r);
+    const first = r0 ?? (out.length ? out[0].r : r), shift = method === 'inv' ? 0 : s <= hold ? first : r;
+    out.push({ y, r, res, shift });
+    if (s === steps || res < 1e-13) break;
+    let z;
+    if (method === 'paz') {
+      if (n !== 2) break;
+      z = [1, (K[0][0] - r * m[0]) / k[1]];
+    } else {
+      const f = luFactor(K.map((row, i) => row.map((v, j) => v - (i === j ? shift * m[i] : 0))));
+      if (f.A.some((row, i) => row[i] === 0)) break;
+      z = luSolve(f, method === 'slip' ? y : y.map((v, i) => m[i] * v));
+    }
+    const nz = plain ? Math.sqrt(dot(z, z)) : Math.sqrt(mDot(m, z, z));
+    if (!(nz > 0) || !Number.isFinite(nz)) break;
+    const flip = mDot(m, z, y) < 0 ? -1 : 1;
+    y = method === 'paz' ? z : z.map(v => flip * v / nz);
+  }
+  return out;
+}
+// The mode with the largest modal coordinate
+function targetMode(md, m, y) {
+  const c = modalCoords(md, m, y); let j = 0;
+  c.forEach((x, l) => { if (Math.abs(x) > Math.abs(c[j])) j = l; });
+  return j;
+}
+// t_k = sqrt(sum_{l != j} c_l^2) / |c_j|, |tan theta| for n = 2
+function tanError(md, m, y, j) {
+  const c = modalCoords(md, m, y);
+  return Math.sqrt(sum(c.map((x, l) => (l === j ? 0 : x * x)))) / Math.abs(c[j]);
+}
+// Shape error, one measure for all methods: for n = 2 the error of y2/y1, as on the slide; else t_k
+function shapeError(md, m, y, j) {
+  if (md.n === 2) return Math.abs(y[0]) < 1e-12 * Math.abs(y[1]) ? Infinity : Math.abs(y[1] / y[0] - md.A[1][j]);
+  return tanError(md, m, y, j);
+}
+function errorsOf(md, m, run) {
+  const j = targetMode(md, m, run[run.length - 1].y);
+  return { mode: j, r: run.map(s => Math.abs(s.r - md.w2[j]) / md.w2[j]), shape: run.map(s => shapeError(md, m, s.y, j)) };
+}
+function reach(md, k, m, y0) {
+  const run = iterate(k, m, y0, { steps: 40 });
+  return { mode: targetMode(md, m, run[run.length - 1].y), steps: run.length - 1 };
+}
+// Which mode from N random starts (seeded, normal entries); shares by mode and the mean of the steps
+function randomStarts(md, k, m, N, seed) {
+  let s = seed >>> 0;
+  const unif = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const norm = () => Math.sqrt(-2 * Math.log(1 - unif())) * Math.cos(2 * Math.PI * unif());
+  const count = new Array(md.n).fill(0); let total = 0;
+  for (let c = 0; c < N; c++) { const r = reach(md, k, m, m.map(norm)); count[r.mode]++; total += r.steps; }
+  return { share: count.map(x => x / N), mean: total / N };
+}
+
+// Buildings. Units follow the preset: lb, in, s for Paz; kip, in, s for Chopra; normalized for uniform.
+const UNITS = {
+  lb: { k: 'lb/in', y: 'in', m: 'lb·s²/in', W: 'lb', h: 'in', t: 's', w: 'rad/s', w2: 'rad²/s²', v: 'in/s', E: 'lb·in', EI: 'lb·in²', g: 386, real: true },
+  kip: { k: 'kip/in', y: 'in', m: 'kip·s²/in', W: 'kip', h: 'in', t: 's', w: 'rad/s', w2: 'rad²/s²', v: 'in/s', E: 'kip·in', EI: 'kip·in²', g: 386, real: true },
+  norm: { k: 'k', y: 'δ', m: 'm', W: 'mg', h: 'h', t: '√(m/k)', w: '√(k/m)', w2: 'k/m', v: 'δ√(k/m)', E: 'kδ²', EI: 'kh³', g: 1, real: false },
+};
+const E_STEEL = 29000, F811 = 2 * 12 * E_STEEL * 1400 / 144 ** 3, F91 = 12 * E_STEEL * 250 / 144 ** 3;
+const uniformB = n => ({ units: 'norm', k: new Array(n).fill(1), h: new Array(n).fill(1), m: new Array(n).fill(1), pinned: false, F: null });
+const mass = (W, g = 386) => W.map(x => x / g);
+const SEVEN = [[1, 1], [1, 1.24], [1, 1.5], [1, 2], [1, 0], [0, 1], [1, -1]];
+const PRESETS = {
+  paz71: { label: 'Paz Ex. 7.1: 2 stories', n: 2,
+    make: () => ({ units: 'lb', k: [30700, 44300], m: [136, 66], h: [180, 120], pinned: false, F: null }),
+    starts: [{ label: 'the slide: y₀ = (0, 1)', y: [0, 1] }, { label: 'y₀ = (1, 1)', y: [1, 1] },
+             { label: 'code demo: (0.5, 1), ẏ₀ = (0, 10)', y: [0.5, 1], v: [0, 10] }],
+    shapes: SEVEN.map(y => ({ label: `the slide's (${y.join(', ').replace(/-/g, '−')})`, y })), y0: [1, 1.5] },
+  paz71u: { label: 'Paz Ex. 7.1, unrounded inputs', n: 2,
+    make: () => ({ units: 'lb', k: [24 * 30e6 * 248.6 / 180 ** 3, 24 * 30e6 * 106.3 / 120 ** 3], m: mass([52500, 25500], 386.09), h: [180, 120], pinned: false, F: null }),
+    starts: [{ label: 'the slide: y₀ = (0, 1)', y: [0, 1] }, { label: 'y₀ = (1, 1)', y: [1, 1] }],
+    shapes: SEVEN.map(y => ({ label: `the slide's (${y.join(', ').replace(/-/g, '−')})`, y })), y0: [1, 1.5] },
+  p811: { label: 'Chopra Prob. 8.11 (Problem A): 3 stories', n: 3,
+    make: () => ({ units: 'kip', k: [F811, F811 * 2 / 3, F811 / 3], m: mass([100, 100, 50]), h: [144, 144, 144], pinned: false, F: [8.64, 8.64, 4.32] }),
+    starts: [{ label: 'Prob. 10.16: (0.1, 0.2, 0.3)', y: [0.1, 0.2, 0.3] }, { label: 'Prob. 10.16: (−0.1, 0.025, 0.1)', y: [-0.1, 0.025, 0.1] },
+             { label: 'Prob. 10.16: (0.1, −0.1, 0.1)', y: [0.1, -0.1, 0.1] }, { label: 'the blast: ẏ₀ = 3.20 in/s', v: [3.2, 3.2, 3.2] }],
+    shapes: [{ label: 'Prob. 10.16: (0.1, 0.2, 0.3)', y: [0.1, 0.2, 0.3] }, { label: 'Prob. 10.16: (−0.1, 0.025, 0.1)', y: [-0.1, 0.025, 0.1] }, { label: 'Prob. 10.16: (0.1, −0.1, 0.1)', y: [0.1, -0.1, 0.1] }] },
+  p811e: { label: 'Chopra Prob. 8.10, 10.29 (Problem C): uniform EI', n: 3,
+    make: () => ({ units: 'kip', k: [F811, F811, F811], m: mass([100, 100, 50]), h: [144, 144, 144], pinned: false, F: [8.64, 8.64, 4.32] }),
+    machine: 45.03, shifts: [{ label: 'machine: ϖ² = 2027.7', r0: 2027.7 }] },
+  ex104: { label: 'Chopra Ex. 10.4 (Problem B): ω₂/ω₁ = 2', n: 2,
+    make: () => ({ units: 'kip', k: [4 * F91, 2 * F91], m: mass([600, 300]), h: [144, 144], pinned: false, F: [6, 3] }),
+    starts: [{ label: 'test: 0.1(1, 1)', y: [0.1, 0.1] }, { label: 'Ex. 10.9: 0.1(½, 1)', y: [0.05, 0.1] }, { label: 'Ex. 10.10: 0.1(−1, 1)', y: [-0.1, 0.1] }, { label: 'Ex. 10.11: 0.1(−½, 2)', y: [-0.05, 0.2] }],
+    shapes: [{ label: 'the wind shape (3, 5)', y: [3, 5] }, { label: '(1, 1)', y: [1, 1] }, { label: '(½, 1)', y: [0.5, 1] }, { label: '(−1, 1)', y: [-1, 1] }, { label: '(−½, 2)', y: [-0.5, 2] }] },
+  ch1014: { label: 'Chopra Ex. 10.14, 10.16: 3 stories', n: 3,
+    make: () => ({ units: 'kip', k: [168, 168 * 7 / 9, 56], m: [0.259, 0.259, 0.1295], h: [144, 144, 144], pinned: false, F: null }),
+    shapes: [{ label: 'Ex. 10.16: (1, 1, 1)', y: [1, 1, 1] }], y0: [1, 1, 1],
+    shifts: [{ label: 'μ = 100', r0: 100, y: [1, 1, 1] }, { label: 'μ = 600', r0: 600, y: [1, 1, 1] }, { label: 'μ = 1500', r0: 1500, y: [1, 1, 1] }] },
+  demo: { label: "Deck 08 code demo's building: 3 stories", n: 3, make: () => {
+    const h = [180, 144, 144], I = [999, 307, 204], c = [3, 12, 12];
+    return { units: 'kip', h, m: mass([621, 612, 360]), pinned: true, F: [30.375, 27, 13.5], k: I.map((v, i) => 8 * c[i] * E_STEEL * v / h[i] ** 3) }; } },
+  uniform: { label: 'Uniform n-story (normalized)', n: 5, make: uniformB },
+  soft: { label: 'Soft first story: k₁ = 0.3k', n: 5, make: n => { const b = uniformB(n); b.k[0] = 0.3; return b; } },
+  tall: { label: 'Tall: 10 stories', n: 10, make: uniformB },
+};
+const fitTo = (a, n) => { const r = a.slice(0, n); while (r.length < n) r.push(a[a.length - 1]); return r; };
+// A preset at another n: extra stories copy the top one
+function resized(b, n) { return { ...b, n, k: fitTo(b.k, n), h: fitTo(b.h, n), m: fitTo(b.m, n), F: b.F ? fitTo(b.F, n) : null }; }
+function makeBuilding(id, n = null) {
+  const P = PRESETS[id], nn = n ?? P.n;
+  return resized({ preset: id, edited: false, ...P.make(nn) }, nn);
+}
+const heights = b => { let z = 0; return b.h.map(h => (z += h)); };
+// The generic trial shapes of panel 7: uniform, linear in height, static under the floor weights
+function genericShapes(b) {
+  const n = b.k.length, z = heights(b), st = matVec(flexibility(b.k), b.m);
+  return [{ label: 'uniform', y: new Array(n).fill(1) }, { label: 'linear in height', y: z.map(v => v / z[n - 1]) },
+          { label: 'static under the floor weights', y: st.map(v => v / st[n - 1]) }];
+}
+const trialShapes = b => [...(PRESETS[b.preset].shapes ?? []).filter(s => s.y.length === b.k.length), ...genericShapes(b),
+  ...(b.F ? [{ label: 'the wind deflection', y: matVec(flexibility(b.k), b.F) }] : [])];
+// The starts of panel 3: the preset's own, its wind deflection, a base kick (a sudden support velocity)
+function startsOf(b) {
+  const n = b.k.length, zero = new Array(n).fill(0);
+  const own = (PRESETS[b.preset].starts ?? []).filter(s => (s.y ?? s.v).length === n);
+  return [...own, ...(b.F ? [{ label: 'released from the wind deflection', y: matVec(flexibility(b.k), b.F) }] : []),
+          { label: 'base kick: ẏ₀ = 1 at every floor', v: new Array(n).fill(1) }, { label: 'uniform: y₀ = 1 at every floor', y: new Array(n).fill(1) }]
+    .map(s => ({ label: s.label, y: s.y ?? zero, v: s.v ?? zero }));
+}
+// CORE-END ----------------------------------------------------------------------------------------
+
+// ---- App -----------------------------------------------------------------------------------
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const cfg = { displayModeBar: false, responsive: true };
+function lay(extra = {}) {
+  return Object.assign({ paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: css('--ink'), size: 12 }, margin: { l: 50, r: 12, t: 6, b: 36 },
+    showlegend: false, hovermode: 'closest' }, extra);
+}
+function ax(title, extra = {}) {
+  return Object.assign({ title: { text: title, standoff: 4, font: { size: 12 } }, gridcolor: css('--grid'),
+    zerolinecolor: css('--line'), linecolor: css('--line'), automargin: true }, extra);
+}
+const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+const MINUS = '−';
+// significant digits, with a true minus; thousands with commas
+function sig(x, d = 4) {
+  if (x === Infinity) return '∞'; if (x === -Infinity) return MINUS + '∞';
+  if (!Number.isFinite(x)) return '—';
+  if (Math.abs(x) < 1e-12) return '0';
+  const a = Math.abs(x);
+  const s = a >= 10 ** d ? Math.round(a).toLocaleString('en-US')
+          : a >= 1e-3 ? String(+a.toPrecision(d)) : a.toExponential(d - 1);
+  return (x < 0 ? MINUS : '') + s;
+}
+// fixed number of significant digits, for columns of numbers (0.8590, not 0.859)
+const sigF = (x, d = 4) => (!Number.isFinite(x) ? sig(x) : Math.abs(x) < 1e-12 ? '0'
+  : (x < 0 ? MINUS : '') + Math.abs(x).toPrecision(d));
+const SUB = '₀₁₂₃₄₅₆₇₈₉';
+const sub = i => String(i).split('').map(c => SUB[+c]).join('');
+const sub2 = (i, j) => (i > 9 || j > 9 ? sub(i) + ',' + sub(j) : sub(i) + sub(j));
+const speed = () => +$('speed').value || 1;
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+const shapeFixed = s => 3 * s * s - 2 * s ** 3, shapePinned = s => (3 * s - s ** 3) / 2;
+
+// Sweep a range input back and forth (the ▶ next to a slider); the speed menu scales it.
+// The position is kept as a float, so coarse slider steps do not stall the sweep.
+const SWEEPS = [];
+function sweeper(btn, input, period = 6000) {
+  let on = false, dir = 1, last = 0, cur = 0;
+  const lo = +input.min, hi = +input.max;
+  function tick(ts) {
+    if (!on) return;
+    const dt = last ? ts - last : 16; last = ts;
+    cur += dir * (hi - lo) * dt * speed() / period;
+    if (cur >= hi) { cur = hi; dir = -1; } if (cur <= lo) { cur = lo; dir = 1; }
+    input.value = cur; input.dispatchEvent(new Event('input'));
+    requestAnimationFrame(tick);
+  }
+  function set(v) {
+    on = v; btn.classList.toggle('on', on); btn.textContent = on ? '❚❚' : '▶'; last = 0;
+    if (on) { cur = +input.value; requestAnimationFrame(tick); }
+  }
+  btn.addEventListener('click', () => set(!on));
+  const sw = { stop() { if (on) set(false); } };
+  SWEEPS.push(sw);
+  return sw;
+}
+// Step a panel forward on a timer (the ▶ play next to a Step button); from the last step it
+// starts over at the first.
+function player(btn, { next, atEnd, toStart, ms = 400 }) {
+  let timer = null;
+  const stop = () => { clearTimeout(timer); timer = null; btn.classList.remove('on'); btn.textContent = '▶ play'; };
+  const tick = () => { if (atEnd()) { stop(); return; } next(); timer = setTimeout(tick, ms / speed()); };
+  btn.addEventListener('click', () => {
+    if (timer) { stop(); return; }
+    btn.classList.add('on'); btn.textContent = '❚❚ pause';
+    if (atEnd()) toStart();
+    timer = setTimeout(tick, ms / speed());
+  });
+  const pl = { stop() { if (timer) stop(); } };
+  SWEEPS.push(pl);
+  return pl;
+}
+function tex(el, s) {
+  if (typeof katex === 'undefined') { el.textContent = s; return; }
+  katex.render(s, el, { throwOnError: false, displayMode: false });
+}
+
+// ---- SVG drawing. Sizes are the box's own pixels, so type stays the same size at any scale. ---
+const n1 = x => (Number.isFinite(x) ? x.toFixed(1) : '0');
+const sv = {
+  line: (x1, y1, x2, y2, c = 'var(--ink)', w = 1.5, extra = '') =>
+    `<line x1="${n1(x1)}" y1="${n1(y1)}" x2="${n1(x2)}" y2="${n1(y2)}" style="stroke:${c};stroke-width:${w}" ${extra}/>`,
+  poly: (pts, c = 'var(--ink)', w = 2, extra = '') =>
+    `<polyline points="${pts.map(p => n1(p[0]) + ',' + n1(p[1])).join(' ')}" style="fill:none;stroke:${c};stroke-width:${w};stroke-linejoin:round" ${extra}/>`,
+  text: (x, y, s, { c = 'var(--ink)', size = 12, anchor = 'start', weight = 400, base = 'middle', cls = '' } = {}) =>
+    `<text x="${n1(x)}" y="${n1(y)}" text-anchor="${anchor}" dominant-baseline="${base}" font-size="${size}" font-weight="${weight}" class="${cls}" style="fill:${c}">${s}</text>`,
+  rect: (x, y, w, h, fill, extra = '') => `<rect x="${n1(x)}" y="${n1(y)}" width="${n1(w)}" height="${n1(h)}" style="fill:${fill}" ${extra}/>`,
+  circle: (x, y, r, fill, stroke = 'none', sw = 0, extra = '') =>
+    `<circle cx="${n1(x)}" cy="${n1(y)}" r="${r}" style="fill:${fill};stroke:${stroke};stroke-width:${sw}" ${extra}/>`,
+  arrow(x1, y1, x2, y2, c = 'var(--uh)', w = 2.5) {
+    const L = Math.hypot(x2 - x1, y2 - y1); if (L < 1) return '';
+    const ux = (x2 - x1) / L, uy = (y2 - y1) / L, hl = Math.min(9, L * 0.6), hw = 4.5;
+    const bx = x2 - ux * hl, by = y2 - uy * hl;
+    return sv.line(x1, y1, bx, by, c, w)
+      + `<polygon points="${n1(x2)},${n1(y2)} ${n1(bx - uy * hw)},${n1(by + ux * hw)} ${n1(bx + uy * hw)},${n1(by - ux * hw)}" style="fill:${c}"/>`;
+  },
+};
+function setSvg(el, body) {
+  const W = el.clientWidth, H = el.clientHeight;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
+}
+// Geometry of a building in a box: floor heights in px, the bay, ground
+function geom(el, b, { mL = 40, mR = 110, mT = 16, mB = 24, bay = null, frac = 0 } = {}) {
+  const W = el.clientWidth, H = el.clientHeight, n = b.k.length;
+  const tot = sum(b.h), sz = (H - mT - mB) / tot;
+  let z = 0; const zs = [H - mB];
+  b.h.forEach(h => { z += h; zs.push(H - mB - z * sz); });
+  const avail = W - mL - mR, bw = bay ?? clamp(avail * 0.42, 40, 130);
+  const x0 = mL + frac * Math.max(0, avail - bw);
+  return { W, H, n, zs, bw, x0, x1: x0 + bw, ground: H - mB };
+}
+// Offsets in px are clamped, so a runaway stays finite on the page
+const off = (sc, y) => (Number.isFinite(sc * y) ? clamp(sc * y, -3000, 3000) : (y > 0 ? 3000 : -3000));
+// One bent column from floor displacement ya to yb (shape in the story)
+function columnPts(xc, za, zb, ya, yb, sc, shape) {
+  const P = [];
+  for (let s = 0; s <= 1.0001; s += 0.1) {
+    const d = (Number.isFinite(ya) ? ya : 0) + ((Number.isFinite(yb) ? yb : 0) - (Number.isFinite(ya) ? ya : 0)) * shape(s);
+    P.push([xc + off(sc, Number.isFinite(ya) && Number.isFinite(yb) ? d : yb > 0 ? 1e9 : -1e9), za + (zb - za) * s]);
+  }
+  return P;
+}
+// The building: columns, girders, floor dots. style: { c, w, dash, storyC(i), dots }
+function frameSvg(g, b, y, sc, { c = 'var(--ink)', w = 2, dash = '', storyC = null, dots = true, girder = 3.5 } = {}) {
+  let s = '';
+  const yy = i => (i < 0 ? 0 : y[i]), ex = dash ? `stroke-dasharray="${dash}"` : '';
+  for (let i = 0; i < g.n; i++) {
+    const shape = b.pinned && i === 0 ? shapePinned : shapeFixed, col = storyC ? storyC(i) : c;
+    s += sv.poly(columnPts(g.x0, g.zs[i], g.zs[i + 1], yy(i - 1), yy(i), sc, shape), col, w, ex);
+    s += sv.poly(columnPts(g.x1, g.zs[i], g.zs[i + 1], yy(i - 1), yy(i), sc, shape), col, w, ex);
+  }
+  for (let i = 0; i < g.n; i++) {
+    const d = off(sc, y[i]);
+    s += sv.line(g.x0 + d, g.zs[i + 1], g.x1 + d, g.zs[i + 1], c, girder, ex);
+    if (dots) s += sv.circle((g.x0 + g.x1) / 2 + d, g.zs[i + 1], 4, c);
+  }
+  return s;
+}
+function groundSvg(g, b) {
+  let s = sv.line(g.x0 - 18, g.ground, g.x1 + 18, g.ground, 'var(--muted)', 2);
+  for (let x = g.x0 - 14; x < g.x1 + 18; x += 9) s += sv.line(x, g.ground + 7, x + 6, g.ground + 1, 'var(--line)', 1);
+  if (b.pinned) for (const x of [g.x0, g.x1]) s += sv.circle(x, g.ground - 3, 3.2, 'var(--panel)', 'var(--ink)', 1.5);
+  return s;
+}
+// ---- Matrices as grids of cells
+const tint = (x, a = '2e') => (x > 1e-12 ? css('--c-pos') + a : x < -1e-12 ? css('--c-neg') + a : 'transparent');
+const matSize = n => (n <= 4 ? 13 : n <= 6 ? 11.5 : n <= 8 ? 10 : 9);
+function matHTML(M, { title = '', f = x => sig(x, 3), col = -1, row = -1, show = null, bg = null, border = null, size = null } = {}) {
+  const n = M.length, fs = size ?? matSize(n);
+  let h = title ? `<div class="matT">${title}</div>` : '';
+  h += `<table class="mat" style="font-size:${fs}px">`;
+  for (let i = 0; i < n; i++) {
+    h += '<tr>';
+    for (let j = 0; j < n; j++) {
+      const vis = show ? show(i, j) : true, cl = [];
+      if (j === col) { cl.push('cj'); if (i === 0) cl.push('t'); if (i === n - 1) cl.push('b'); }
+      if (i === row && j !== col) cl.push('ri');
+      if (!vis) cl.push('empty');
+      const st = (vis ? `background:${bg ? bg(i, j, M[i][j]) : tint(M[i][j])};` : '') + (border ? border(i, j) : '');
+      h += `<td class="${cl.join(' ')}" style="${st}">${vis ? f(M[i][j]) : '·'}</td>`;
+    }
+    h += '</tr>';
+  }
+  return h + '</table>';
+}
+
+// ============================ Shared by the tabs ============================
+// Modes by order, always labelled directly; beyond the fourth, greys
+const MODEVAR = ['--c-pos', '--c-neg', '--c-net', '--c-grav'];
+const modeVar = j => (j < 4 ? `var(${MODEVAR[j]})` : 'var(--c-ghost)');
+const modeHex = j => css(j < 4 ? MODEVAR[j] : '--c-ghost');
+const unitsOf = b => UNITS[b.units];
+const maxAbs = v => Math.max(...v.map(Math.abs));
+const normTop = v => { const t = maxAbs(v) || 1; return v.map(x => x / t); };
+const sciHTML = x => { if (!Number.isFinite(x)) return '—'; if (x === 0) return '0'; const [a, e] = x.toExponential(1).split('e');
+  return `${a}×10<sup>${(+e).toString().replace('-', MINUS)}</sup>`; };
+// omega^2 and R(y) as on the slides: two decimals from 100 up
+const w2f = x => (Number.isFinite(x) && Math.abs(x) >= 100 && Math.abs(x) < 1e6 ? x.toFixed(2) : sig(x, 5));
+// A building in a slice of a box (a row of small buildings)
+function cellGeom(b, H, x, w, bw, mT, mB) {
+  const sz = (H - mT - mB) / sum(b.h), zs = [H - mB]; let z = 0;
+  b.h.forEach(h => { z += h; zs.push(H - mB - z * sz); });
+  const x0 = x + (w - bw) / 2;
+  return { W: x + w, H, n: b.k.length, zs, bw, x0, x1: x0 + bw, ground: H - mB };
+}
+// Nodes of a shape, as fractional floor indices: where the line through the floors crosses zero
+function nodesOf(v) {
+  const tol = 1e-9 * maxAbs(v), out = [];
+  v.forEach((x, i) => {
+    if (i === v.length - 1) return;
+    if (Math.abs(x) <= tol) out.push(i);
+    else if (Math.abs(v[i + 1]) > tol && x * v[i + 1] < 0) out.push(i + Math.abs(x) / (Math.abs(x) + Math.abs(v[i + 1])));
+  });
+  return out;
+}
+const zAt = (g, f) => { const i = Math.floor(f), t = f - i; return g.zs[i + 1] + (i + 2 <= g.n ? (g.zs[i + 2] - g.zs[i + 1]) * t : 0); };
+// Story shading: share of the strain energy, drawn behind the columns
+function shadeStories(g, shares, xL, xR) {
+  let s = '';
+  shares.forEach((v, l) => { if (v > 0.002) s += sv.rect(xL, g.zs[l + 1], xR - xL, g.zs[l] - g.zs[l + 1], 'var(--uh)', `fill-opacity="${(0.04 + 0.42 * v).toFixed(3)}"`); });
+  return s;
+}
+// The moving time line over a Plotly curve
+function plotCursor(id, t) {
+  const gd = $(id), c = $(id + 'Cur');
+  if (!gd._fullLayout || !gd._fullLayout.xaxis || !gd.offsetWidth) return;
+  const xa = gd._fullLayout.xaxis, ya = gd._fullLayout.yaxis;
+  c.style.left = n1(gd.offsetLeft + xa._offset + xa.l2p(t)) + 'px';
+  c.style.top = n1(gd.offsetTop + ya._offset) + 'px';
+  c.style.height = n1(ya._length) + 'px';
+  c.style.display = 'block';
+}
+// Dragging a handle: the box captures the pointer, since the drawing is redrawn underneath
+function dragHandles(el, { move, end = () => {} }) {
+  let idx = null;
+  el.addEventListener('pointerdown', e => { const h = e.target.closest('[data-handle]'); if (!h) return;
+    idx = h.dataset.handle; el.setPointerCapture(e.pointerId); e.preventDefault(); });
+  el.addEventListener('pointermove', e => { if (idx == null) return; move(idx, e.clientX - el.getBoundingClientRect().left); });
+  const up = () => { if (idx != null) { idx = null; end(); } };
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  return { active: () => idx != null };
+}
+const handleSvg = (x, y, id, c = 'var(--uh)') => sv.circle(x, y, 8, c, 'var(--panel)', 2) + sv.circle(x, y, 20, 'transparent', 'none', 0, `data-handle="${id}"`);
+const fillSelect = (sel, items, val) => { sel.innerHTML = items; if (val != null) sel.value = val; };
+
+// One rAF loop for the two clocks. The screen clock: T1 takes 6 s at speed 1, whatever the building.
+let rafId = 0, lastTs = 0, lastDraw = 0;
+function loop(ts) {
+  rafId = 0;
+  const dt = lastTs ? Math.min(ts - lastTs, 100) : 16; lastTs = ts;
+  let again = false;
+  if (tab === 'a' && A.run) { A.tau += dt / 1000 * speed(); again = true;
+    if (ts - lastDraw > (SA.k.length > 5 ? 32 : 15)) { lastDraw = ts; drawAFrame(); } }
+  if (tab === 'b' && B.run) { B.tau += dt / 1000 * speed(); again = true; drawBFrame(); }
+  if (again) rafId = requestAnimationFrame(loop); else lastTs = 0;
+}
+function kick() { if (!rafId) { lastTs = 0; rafId = requestAnimationFrame(loop); } }
+
+// ============================ Tab A: every mode at once (spec panel 1) ============================
+let SA = makeBuilding('uniform');
+const A = { j: 0, amp: 0.3, own: false, run: true, tau: 0, md: null, wMax: 1 };
+const aPhase = j => (A.own ? 2 * Math.PI * A.tau / 6 : A.md.w[j] * A.tau * A.md.T[0] / 6);
+function drawFreqLine() {
+  const el = $('a1line'); if (!el.clientWidth) return;
+  const W = el.clientWidth, md = A.md, u = unitsOf(SA), L = 8, R = 64, x = v => L + (W - L - R) * v / A.wMax, y0 = 24;
+  let s = sv.line(L, y0, W - R, y0, 'var(--muted)', 1.5);
+  s += sv.text(W - R + 6, y0, `ω (${u.w})`, { size: 11, c: 'var(--muted)' });
+  let lastX = -99;
+  md.w.forEach((w, j) => {
+    s += sv.line(x(w), y0 - 9, x(w), y0 + 9, modeVar(j), 3);
+    if (x(w) - lastX > 34) { s += sv.text(x(w), y0 - 17, sig(w, 3), { size: 11, anchor: 'middle', c: modeVar(j) }); lastX = x(w); }
+  });
+  const mc = PRESETS[SA.preset].machine;
+  if (mc && !SA.edited) { s += sv.line(x(mc), y0 - 5, x(mc), y0 + 14, 'var(--ink)', 1.5, 'stroke-dasharray="2 2"');
+    s += sv.text(x(mc), y0 + 16, `machine ϖ = ${mc}`, { size: 10.5, anchor: 'middle', base: 'hanging' }); }
+  s += sv.line(L, y0 - 4, L, y0 + 4, 'var(--muted)', 1.5) + sv.text(L, y0 + 8, '0', { size: 10.5, anchor: 'middle', base: 'hanging', c: 'var(--muted)' });
+  setSvg(el, s);
+}
+function drawRow() {
+  const el = $('a1row'); if (!el.clientWidth) return;
+  const b = SA, md = A.md, n = md.n, W = el.clientWidth, H = el.clientHeight, cw = W / n, u = unitsOf(b);
+  const mT = 36, mB = 22, big = n <= 6, storyPx = (H - mT - mB) / n, bw = clamp(cw * 0.42, 16, 90);
+  let s = '';
+  for (let j = 0; j < n; j++) {
+    const x = j * cw, g = cellGeom(b, H, x, cw, bw, mT, mB), shape = normTop(colOf(md.A, j));
+    const amp = Math.min(A.amp * storyPx, (cw - bw) / 2 - 3), f = Math.sin(aPhase(j)), y = shape.map(v => v * f);
+    if (j === A.j) s += sv.rect(x + 1, 1, cw - 2, H - 2, 'var(--hl)', 'rx="4"');
+    s += shadeStories(g, strainShares(b.k, shape), g.x0, g.x1);
+    s += frameSvg(g, b, new Array(n).fill(0), 0, { c: 'var(--c-ghost)', w: 0.8, dash: '3 3', dots: false, girder: 0.8 });
+    s += sv.line(g.x0 - 6, g.ground, g.x1 + 6, g.ground, 'var(--muted)', 2);
+    s += frameSvg(g, b, y, amp, { c: modeVar(j), w: n > 6 ? 1.3 : 2, girder: n > 6 ? 2.5 : 3.5, dots: false });
+    const xc = (g.x0 + g.x1) / 2;
+    nodesOf(shape).forEach(fz => { s += sv.circle(xc, zAt(g, fz), 3.6, 'var(--panel)', 'var(--ink)', 1.5); });
+    const fs = big ? 11.5 : 10;
+    s += sv.text(x + cw / 2, 10, `ω${sub(j + 1)} = ${sig(md.w[j], 3)}`, { size: fs, anchor: 'middle', c: modeVar(j), weight: 600 });
+    s += sv.text(x + cw / 2, 24, `T${sub(j + 1)} = ${sig(md.T[j], 3)}`, { size: fs, anchor: 'middle', c: 'var(--muted)' });
+    s += sv.text(x + cw / 2, H - 9, big ? `${j} sign change${j === 1 ? '' : 's'}` : `${j} chg`, { size: fs, anchor: 'middle', c: 'var(--muted)' });
+  }
+  setSvg(el, s);
+}
+function drawBig() {
+  const el = $('a1big'); if (!el.clientWidth) return;
+  const b = SA, md = A.md, j = A.j, n = md.n, W = el.clientWidth, shape = normTop(colOf(md.A, j)), a = colOf(md.A, j);
+  const g = geom(el, b, { mL: 8, mR: 86, mT: 12, mB: 16, frac: 0.5, bay: clamp(W * 0.32, 40, 120) });
+  const story = (g.ground - g.zs[n]) / n, amp = Math.min(A.amp * story * 1.2, (W - 86 - g.bw - 8) / 2 - 2);
+  const f = Math.sin(aPhase(j)), shares = strainShares(b.k, a);
+  let s = shadeStories(g, shares, g.x0, g.x1);
+  s += frameSvg(g, b, new Array(n).fill(0), 0, { c: 'var(--c-ghost)', w: 1, dash: '3 3', dots: false, girder: 1 });
+  s += groundSvg(g, b);
+  s += frameSvg(g, b, shape.map(v => v * f), amp, { c: modeVar(j), dots: false });
+  const xc = (g.x0 + g.x1) / 2;
+  nodesOf(shape).forEach(fz => { s += sv.circle(xc, zAt(g, fz), 4, 'var(--panel)', 'var(--ink)', 1.5); });
+  const fs = n <= 6 ? 11.5 : 10;
+  for (let i = 0; i < n; i++) {
+    s += sv.text(W - 2, g.zs[i + 1], `a${sub2(i + 1, j + 1)} = ${sig(a[i], 4)}`, { size: fs, anchor: 'end' });
+    if (n <= 8) s += sv.text(xc, (g.zs[i] + g.zs[i + 1]) / 2, `${Math.round(100 * shares[i])}%`, { size: fs - 1, anchor: 'middle', c: 'var(--muted)' });
+  }
+  setSvg(el, s);
+}
+function drawSine() {
+  const el = $('a1sine'); if (!el.clientWidth) return;
+  const W = el.clientWidth, H = el.clientHeight, j = A.j, ph = aPhase(j) % (4 * Math.PI), yc = H / 2, Am = Math.min(H * 0.3, 90);
+  const x = p => 6 + (W - 12) * p / (4 * Math.PI);
+  const pts = linspace(0, 4 * Math.PI, 73).map(p => [x(p), yc - Am * Math.sin(p)]);
+  let s = sv.line(6, yc, W - 6, yc, 'var(--line)', 1) + sv.poly(pts, modeVar(j), 2);
+  s += sv.circle(x(ph), yc - Am * Math.sin(ph), 5.5, modeVar(j), 'var(--panel)', 1.5);
+  s += sv.text(W / 2, yc - Am - 14, `sin ω${sub(j + 1)}t`, { size: 12, anchor: 'middle', c: 'var(--muted)' });
+  s += sv.text(W / 2, yc + Am + 14, 'two periods', { size: 10.5, anchor: 'middle', c: 'var(--muted)' });
+  setSvg(el, s);
+}
+function drawAFrame() { drawRow(); drawBig(); drawSine(); }
+function renderA() {
+  const b = SA, md = modesOf(b.k, b.m), n = md.n, u = unitsOf(b);
+  A.md = md; A.j = Math.min(A.j, n - 1);
+  // one scale for every n: the largest omega the building reaches at any n up to 10
+  A.wMax = 1.05 * Math.max(...[1, 2, 3, 5, 8, 10].map(q => { const r = resized(b, q); return modesOf(r.k, r.m).w[q - 1]; }), md.w[n - 1], PRESETS[b.preset].machine ?? 0);
+  $('aN').value = n; $('aNLbl').textContent = n; $('aAmp').value = A.amp; $('aAmpLbl').textContent = A.amp.toFixed(2);
+  $('aRun').textContent = A.run ? '❚❚ pause' : '▶ run'; $('aRun').classList.toggle('on', A.run);
+  $('aClock').innerHTML = (A.own ? 'every mode takes 6 s' : u.real ? `slow motion: ${sig(6 / md.T[0], 2)} × real time` : `T₁ = ${sig(md.T[0], 3)} ${u.t}`);
+  const j = A.j, a = colOf(md.A, j), N = kDot(b.k, a, a), D = mDot(b.m, a, a);
+  $('a1bigT').innerHTML = `Mode ${j + 1} <span class="ref">${j} sign change${j === 1 ? '' : 's'}; ω${sub(j + 1)} = ${sig(md.w[j], 4)} ${u.w}, T${sub(j + 1)} = ${sig(md.T[j], 3)} ${u.t}</span>`;
+  tex($('eqA1'), String.raw`\{y(t)\} = \{a\}_{${j + 1}} \sin(\omega_{${j + 1}} t - \alpha_{${j + 1}})`);
+  tex($('eqA2'), String.raw`\omega_j^2 = \frac{\sum_l k_l\Delta_{lj}^2}{\sum_l m_l a_{lj}^2},\quad \Delta_{lj} = a_{lj} - a_{l-1,j}`);
+  $('a1read').textContent = `ω${sub(j + 1)}² = ${sig(N, 4)} / ${sig(D, 5)} = ${w2f(md.w2[j])} ${u.w2}`;
+  drawFreqLine(); drawAFrame();
+  writeHash();
+  kick();
+}
+
+// ============================ Shared building of tabs B, C, D ============================
+let SB = makeBuilding('paz71');
+const zerosN = n => new Array(n).fill(0);
+
+// ============================ Tab B: drag the floors, let go (spec panel 3) ============================
+const B = { y0: [0, 1], v0: [0, 0], vel: false, run: false, tau: 0, parts: false, pred: false, rev: false, guess: [],
+            start: '0', bound: 1, vBound: 1, md: null, co: null };
+const bTime = () => B.tau * B.md.T[0] / 6;
+const bHidden = () => B.pred && !B.rev;
+function bBound() {   // the largest a floor can reach, for one drawing scale during the motion
+  const { md, co } = B; let top = 0;
+  for (let i = 0; i < md.n; i++) top = Math.max(top, sum(co.b1.map((x, j) => Math.abs(md.A[i][j]) * Math.hypot(x, co.b2[j]))));
+  if (top > 0) B.bound = top;
+  const vt = maxAbs(B.v0); B.vBound = vt > 0 ? vt : B.bound * md.w[0];
+}
+function drawB3() {
+  const el = $('b3svg'); if (!el.clientWidth) return;
+  const b = SB, md = B.md, n = md.n, W = el.clientWidth, { q, y, v } = respond(md, B.co.b1, B.co.b2, bTime()), u = unitsOf(b);
+  const g = geom(el, b, { mL: 8, mR: 8, mT: 24, mB: 18, frac: 0.5, bay: clamp(W * 0.2, 40, 100) });
+  const xc = (g.x0 + g.x1) / 2, room = g.x0 - 44, sc = room / B.bound, vsc = room * 0.5 / B.vBound, rest = B.tau === 0, hid = bHidden();
+  let s = groundSvg(g, b) + frameSvg(g, b, zerosN(n), 0, { c: 'var(--c-ghost)', w: 1, dash: '3 3', dots: false, girder: 1 });
+  s += frameSvg(g, b, y, sc, { dots: false });
+  const fs = n <= 6 ? 11.5 : 10, sp = n <= 6 ? 5 : 3;
+  for (let i = 0; i < n; i++) {
+    const zc = g.zs[i + 1], d = off(sc, y[i]);
+    // the floor's displacement as stacked segments, one per mode
+    if (!hid) { let acc = 0;
+      q.forEach((qj, j) => { const inc = md.A[i][j] * qj;
+        s += sv.line(xc + sc * acc, zc + sp + j * 3, xc + sc * (acc + inc), zc + sp + j * 3, modeVar(j), 3.5); acc += inc; }); }
+    if (rest && !B.vel) s += handleSvg(xc + d, zc, i);
+    else s += sv.circle(xc + d, zc, 4, 'var(--ink)');
+    if (rest && Math.abs(v[i]) > 0) s += sv.arrow(xc + d, zc - 5, xc + d + v[i] * vsc, zc - 5, 'var(--c-grav)', 2.2);
+    if (rest && B.vel) s += handleSvg(xc + d + v[i] * vsc, zc - 5, i, 'var(--c-grav)');
+    s += sv.text(4, zc, `y${sub(i + 1)}`, { size: fs, c: 'var(--muted)' });
+    s += sv.text(W - 3, zc, sig(y[i], 3), { size: fs, anchor: 'end' });
+  }
+  s += sv.text(W / 2, 7, rest ? (B.vel ? 'drag the arrows: ẏ₀' : 'drag the floors: y₀') : '', { size: 11, anchor: 'middle', c: 'var(--muted)' });
+  el._xc = xc; el._sc = sc; el._vsc = vsc; el._room = room + 40;
+  setSvg(el, s);
+  const t = bTime();
+  $('b3read').textContent = `t = ${sig(t, 3)} ${u.t}` + (u.real ? `, shown ${sig(6 / md.T[0], 2)} × slower than real time` : '');
+}
+function drawB3Modes() {
+  const el = $('b3modes'); if (!el.clientWidth) return;
+  const b = SB, md = B.md, n = md.n, W = el.clientWidth, H = el.clientHeight, cw = W / n, hid = bHidden(), { b1, b2 } = B.co;
+  const { q } = respond(md, b1, b2, bTime()), mT = 16, mB = 52, bw = clamp(cw * 0.36, 14, 60);
+  // one scale for all modes: each small building is sized by its coefficient
+  const reach = Math.max(...b1.map((x, j) => Math.hypot(x, b2[j]) * maxAbs(colOf(md.A, j))), 1e-30);
+  const sc = ((cw - bw) / 2 - 3) / reach, bm = Math.max(...b1.map(Math.abs), ...b2.map(Math.abs), 1e-30), half = cw / 2 - 6;
+  const fs = n <= 4 ? 11.5 : n <= 7 ? 10.5 : 9.5, primary = B.vel ? b2 : b1, pm = maxAbs(primary) || 1;
+  let s = '';
+  for (let j = 0; j < n; j++) {
+    const x = j * cw, g = cellGeom(b, H, x, cw, bw, mT, mB), xc = x + cw / 2;
+    s += sv.text(xc, 8, `mode ${j + 1}`, { size: fs, anchor: 'middle', c: modeVar(j), weight: 600 });
+    s += sv.line(g.x0 - 6, g.ground, g.x1 + 6, g.ground, 'var(--muted)', 2);
+    if (hid) { s += frameSvg(g, b, zerosN(n), 0, { c: 'var(--c-ghost)', w: 1, dash: '3 3', dots: false, girder: 1 });
+      s += sv.text(xc, H / 2 - 16, '?', { size: 22, anchor: 'middle', c: 'var(--muted)' }); continue; }
+    s += frameSvg(g, b, colOf(md.A, j).map(v => v * q[j]), sc, { c: modeVar(j), w: n > 6 ? 1.3 : 2, girder: n > 6 ? 2.5 : 3.5, dots: false });
+    [b1[j], b2[j]].forEach((v, r) => {
+      const yT = H - mB + 8 + r * 22, L = v / bm * half;
+      s += sv.text(xc, yT + 3, n <= 6 ? `b${sub2(r + 1, j + 1)} = ${sig(v, 4)}` : (j === 0 ? `b${sub(r + 1)}: ` : '') + sig(v, 3), { size: fs, anchor: 'middle' });
+      s += sv.line(xc, yT + 14, xc + L, yT + 14, modeVar(j), 5);
+      s += sv.line(xc, yT + 10, xc, yT + 18, 'var(--muted)', 1);
+    });
+    if (B.pred && B.rev && B.guess[j] != null) {   // the student's guess against the answer
+      const r = B.vel ? 1 : 0, yT = H - mB + 8 + r * 22, gx = xc + B.guess[j] * half * pm / bm;
+      s += sv.line(gx, yT + 8, gx, yT + 20, 'var(--ink)', 2);
+      const ok = Math.sign(B.guess[j]) === Math.sign(Math.abs(primary[j]) < 1e-9 * pm ? 0 : primary[j]) || (Math.abs(primary[j]) < 1e-9 * pm && Math.abs(B.guess[j]) < 0.05);
+      s += sv.text(xc + half, 8, ok ? '✓' : '✗', { size: 12, anchor: 'end', c: ok ? 'var(--c-net)' : 'var(--uh)', weight: 700 });
+    }
+  }
+  setSvg(el, s);
+}
+function drawB3Energy() {
+  const el = $('b3energy'); if (!el.clientWidth) return;
+  const b = SB, md = B.md, W = el.clientWidth, { y, v } = respond(md, B.co.b1, B.co.b2, bTime()), LB = 92, BW = W - LB - 4, n = md.n;
+  const { ke, se } = floorEnergy(b.k, b.m, y, v), Em = modalEnergy(md, B.co.c, B.co.d), Et = sum(Em);
+  let s = sv.text(0, 13, 'floors, stories', { size: 11, c: 'var(--muted)' }) + sv.text(0, 39, 'modes', { size: 11, c: 'var(--muted)' });
+  if (Et > 0) {
+    let x = LB;
+    ke.forEach((e, l) => { const w = BW * e / Et; s += sv.rect(x, 4, w, 18, 'var(--c-pos)', `fill-opacity="${(0.5 + 0.5 * (l + 1) / n).toFixed(2)}"`); x += w; });
+    se.forEach((e, l) => { const w = BW * e / Et; s += sv.rect(x, 4, w, 18, 'var(--c-neg)', `fill-opacity="${(0.5 + 0.5 * (l + 1) / n).toFixed(2)}"`); x += w; });
+    const keS = sum(ke) / Et;
+    if (keS > 0.12) s += sv.text(LB + 4, 13, `kinetic ${Math.round(100 * keS)}%`, { size: 10.5, c: '#fff' });
+    if (keS < 0.88) s += sv.text(LB + BW - 4, 13, `strain ${Math.round(100 * (1 - keS))}%`, { size: 10.5, c: '#fff', anchor: 'end' });
+    if (!bHidden()) { x = LB;
+      Em.forEach((e, j) => { const w = BW * e / Et; s += sv.rect(x, 30, w, 18, modeVar(j));
+        if (w > 44) s += sv.text(x + w / 2, 39, `${sig(100 * e / Et, 3)}%`, { size: 10.5, c: '#fff', anchor: 'middle' }); x += w; });
+    } else s += sv.rect(LB, 30, BW, 18, 'var(--grid)') + sv.text(LB + BW / 2, 39, '?', { size: 12, anchor: 'middle', c: 'var(--muted)' });
+  } else s += sv.text(LB, 26, 'no energy: nothing moves', { size: 11, c: 'var(--muted)' });
+  setSvg(el, s);
+}
+function drawBFrame() {
+  drawB3(); drawB3Modes(); drawB3Energy();
+  const Tw = 3 * B.md.T[0], t = bTime() % Tw; plotCursor('b3plot', t);
+}
+function plotB3() {
+  if (typeof Plotly === 'undefined') return;
+  const md = B.md, n = md.n, u = unitsOf(SB), Tw = 3 * md.T[0], N = clamp(Math.ceil(40 * Tw / md.T[n - 1]), 240, 1500);
+  const ts = linspace(0, Tw, N), rs = ts.map(t => respond(md, B.co.b1, B.co.b2, t)), hid = bHidden(), tr = [];
+  if (B.parts && !hid) {
+    const floors = n <= 3 ? md.A.map((_, i) => i) : [n - 1];
+    floors.forEach(i => { for (let j = 0; j < n; j++) tr.push({ x: ts, y: rs.map(r => md.A[i][j] * r.q[j]), mode: 'lines', name: `y${sub(i + 1)}, mode ${j + 1}`,
+      line: { color: modeHex(j), width: 1.2, dash: 'dot' }, hoverinfo: 'skip', showlegend: i === floors[0] }); });
+  }
+  for (let i = 0; i < n; i++) tr.push({ x: ts, y: rs.map(r => r.y[i]), mode: 'lines', name: `y${sub(i + 1)}`, opacity: 0.35 + 0.65 * (i + 1) / n,
+    line: { color: css('--ink'), width: i === n - 1 ? 2.4 : 1.7 }, showlegend: n <= 5 || i === n - 1,
+    hovertemplate: `y${sub(i + 1)} = %{y:.4g}, t = %{x:.3g}<extra></extra>` });
+  Plotly.react('b3plot', tr, lay({ showlegend: true, legend: { orientation: 'h', y: 1.16, x: 0, font: { size: 11 } }, margin: { l: 46, r: 8, t: 22, b: 34 },
+    xaxis: ax(`t (${u.t})`, { range: [0, Tw] }), yaxis: ax(`y (${u.y})`, {}) }), cfg).then(() => plotCursor('b3plot', bTime() % Tw));
+}
+function bSetFromCoeffs() { const b = SB; B.md = modesOf(b.k, b.m); B.co = coeffs(B.md, b.m, B.y0, B.v0); }
+function renderBNote() {
+  const b = SB, E = modalEnergy(B.md, B.co.c, B.co.d), Et = sum(E);
+  $('b3note').innerHTML = Et > 0 && !bHidden() ? `Energy by mode: ${E.map(e => sig(100 * e / Et, 3) + '%').join(', ')}.` : '';
+}
+function renderB() {
+  const b = SB, n = b.k.length;
+  bSetFromCoeffs();
+  if (!bDrag.active()) bBound();
+  $('bN').value = n; $('bNLbl').textContent = n;
+  $('bVel').checked = B.vel; $('bParts').checked = B.parts; $('bPred').checked = B.pred;
+  $('bPlay').textContent = B.run ? '❚❚ pause' : '▶ let go'; $('bPlay').classList.toggle('on', B.run);
+  $('bPlay').disabled = bHidden();
+  $('bReveal').disabled = !bHidden();
+  tex($('eqB1'), String.raw`\{y_0\} = [A]\{b_1\},\quad \{\dot y_0\} = [A][\Omega]\{b_2\}`);
+  tex($('eqB2'), String.raw`\{y(t)\} = [A]\big([\cos\Omega t]\{b_1\} + [\sin\Omega t]\{b_2\}\big);\ \text{one DOF: } y = b_1\cos\omega t + b_2\sin\omega t,\ b_1 = y_0,\ b_2 = \dot y_0/\omega`);
+  const bm = $('bModes'); if (bm.childElementCount !== n) { bm.innerHTML = b.k.map((_, j) => `<button data-m="${j}" title="start exactly on mode ${j + 1}">${j + 1}</button>`).join(''); }
+  // predict: one slider per mode
+  const pr = $('b3pred');
+  pr.hidden = !bHidden();
+  if (bHidden() && pr.childElementCount !== n) {
+    B.guess = zerosN(n);
+    pr.innerHTML = b.k.map((_, j) => `<label>mode ${j + 1}<input type="range" data-g="${j}" min="-1" max="1" step="0.01" value="0"></label>`).join('');
+  }
+  renderBNote(); plotB3(); drawBFrame();
+  writeHash();
+  kick();
+}
+function syncStart() { const same = (a, c) => a.every((x, i) => Math.abs(x - c[i]) < 1e-5 * (Math.abs(c[i]) + 1e-5));
+  const i = startsOf(SB).findIndex(s => same(B.y0, s.y) && same(B.v0, s.v)); $('bStart').value = i < 0 ? '' : String(i); }
+function bStartValues(y, v, label = null) {
+  B.y0 = y.slice(); B.v0 = v.slice(); B.tau = 0; B.run = false; B.rev = false; B.guess = [];
+  $('b3pred').innerHTML = '';
+  $('bStart').value = label ?? '';
+}
+function fillStarts() {
+  const list = startsOf(SB);
+  fillSelect($('bStart'), `<option value="" hidden>dragged</option>` + list.map((s, i) => `<option value="${i}">${s.label}</option>`).join(''));
+  return list;
+}
+const bDrag = dragHandles($('b3svg'), {
+  move(idx, x) {
+    const el = $('b3svg'), i = +idx, lim = (el._room) / el._sc;
+    if (B.vel) { B.v0[i] = clamp((x - el._xc - el._sc * B.y0[i]) / el._vsc, -1.5 * B.vBound, 1.5 * B.vBound); }
+    else B.y0[i] = clamp((x - el._xc) / el._sc, -lim, lim);
+    $('bStart').value = ''; B.rev = false; B.guess = bHidden() ? B.guess : [];
+    if (!raf2) raf2 = requestAnimationFrame(() => { raf2 = 0; bSetFromCoeffs(); renderBNote(); plotB3(); drawBFrame(); });
+  },
+  end() { renderB(); },
+});
+let raf2 = 0;
+
+// ============================ Tab C: the inner product as a sum over floors (spec panel 5) ======
+const C = { i: 0, j: 1, weight: 'M', scale: 'first', ms: 0, rnd: 'exact', upto: null, md: null };
+// The vectors in the chosen scale, with Ex. 7.1's rounded modes if asked; mode j times the slider's factor
+function cVectors() {
+  const b = SB, md = modesOf(b.k, b.m), n = md.n;
+  let cols = md.A[0].map((_, j) => colOf(md.A, j));
+  if (b.preset === 'paz71' && !b.edited && n === 2 && C.rnd !== 'exact') cols = [[1, 1.263], [1, C.rnd === 'deck' ? -1.631 : -1.629]];
+  cols = cols.map(v => { if (C.scale === 'roof') return v.map(x => x / v[n - 1]);
+    if (C.scale === 'mnorm') { const s = Math.sqrt(mDot(b.m, v, v)); return v.map(x => x / s); } return v; });
+  const f = 10 ** C.ms; cols[C.j] = cols[C.j].map(x => x * f);
+  return { md, cols };
+}
+function drawC() {
+  const b = SB, n = b.k.length, { md, cols } = cVectors(), { i, j } = C, ai = cols[i], aj = cols[j], upto = C.upto ?? n, u = unitsOf(b);
+  const el = $('c5svg');
+  const fs = n <= 6 ? 11.5 : 10;
+  if (el.clientWidth) {
+    const W = el.clientWidth, g = geom(el, b, { mL: 10, mR: 10, mT: 30, mB: 18, frac: 0.42, bay: clamp(W * 0.22, 36, 90) });
+    const sc = Math.min(g.x0 - 8, W - g.x1 - 104) / Math.max(maxAbs(ai), maxAbs(aj), 1e-30);
+    let s = groundSvg(g, b) + frameSvg(g, b, zerosN(n), 0, { c: 'var(--c-ghost)', w: 1, dash: '3 3', dots: false, girder: 1 });
+    s += frameSvg(g, b, ai, sc, { c: modeVar(i), dots: false });
+    if (j !== i) s += frameSvg(g, b, aj, sc, { c: modeVar(j), dots: false });
+    for (let l = 0; l < n; l++) {
+      s += sv.text(W - 52, g.zs[l + 1], sig(ai[l], 4), { size: fs, anchor: 'end', c: modeVar(i) });
+      if (j !== i) s += sv.text(W - 3, g.zs[l + 1], sig(aj[l], 4), { size: fs, anchor: 'end', c: modeVar(j) });
+    }
+    s += sv.text(W - 52, 10, `mode ${i + 1}`, { size: 11, anchor: 'end', c: modeVar(i), weight: 600 });
+    if (j !== i) s += sv.text(W - 3, 10, `mode ${j + 1}`, { size: 11, anchor: 'end', c: modeVar(j), weight: 600 });
+    setSvg(el, s);
+  }
+  // the bars and the running sum climb from the base to the roof
+  const el2 = $('c5sum');
+  const terms = innerTerms(b.k, b.m, ai, aj, C.weight);
+  if (el2.clientWidth) {
+    const W = el2.clientWidth, g = geom(el2, b, { mL: 0, mR: 0, mT: 30, mB: 18, frac: 0.5, bay: 2 });
+    let acc = 0; const partial = terms.map(t => (acc += t));
+    const top = Math.max(maxAbs(terms), maxAbs(partial), 1e-30), xc = W / 2, sc = (W / 2 - 66) / top;
+    const atK = C.weight === 'K', zOf = l => (atK ? (g.zs[l] + g.zs[l + 1]) / 2 : g.zs[l + 1]);
+    let s = sv.line(xc, 20, xc, g.ground + 4, 'var(--muted)', 1.5);
+    s += sv.line(4, g.ground, W - 4, g.ground, 'var(--line)', 1);
+    const pts = [[xc, g.ground]], bh = clamp((g.ground - g.zs[n]) / n * 0.32, 6, 22);
+    for (let l = 0; l < Math.min(upto, n); l++) {
+      const z = zOf(l), v = terms[l], L = v * sc, tiny = Math.abs(v) < 1e-9 * top;
+      s += sv.rect(Math.min(xc, xc + L), z - bh / 2, Math.abs(L), bh, v >= 0 ? 'var(--c-pos)' : 'var(--c-neg)', 'fill-opacity="0.85"');
+      const lab = (tiny ? '0' : (v > 0 ? '+' : '') + sig(v, 4));
+      s += sv.text(v >= 0 ? W - 3 : 3, z, lab, { size: fs, anchor: v >= 0 ? 'end' : 'start' });
+      pts.push([xc + partial[l] * sc, z]);
+    }
+    s += sv.poly(pts, 'var(--c-net)', 2.5);
+    pts.slice(1).forEach(p => { s += sv.circle(p[0], p[1], 3.5, 'var(--c-net)', 'var(--panel)', 1); });
+    const done = upto >= n, tot = partial[n - 1], zero = Math.abs(tot) < 1e-9 * Math.max(maxAbs(terms), 1e-30);
+    s += sv.text(W / 2, 10, done ? `sum = ${zero ? '0' : sig(tot, 4)}` : `running sum = ${upto ? sig(partial[upto - 1], 4) : '0'}`, { size: 12.5, anchor: 'middle', c: 'var(--c-net)', weight: 700 });
+    setSvg(el2, s);
+  }
+}
+function renderC() {
+  const b = SB, n = b.k.length, { md, cols } = cVectors(), u = unitsOf(b);
+  C.i = Math.min(C.i, n - 1); C.j = Math.min(C.j, n - 1);
+  const i = C.i, j = C.j, nm = C.scale === 'mnorm' ? 'phi' : 'a', V = C.scale === 'mnorm' ? String.raw`\phi` : 'a';
+  $('cN').value = n; $('cNLbl').textContent = n; $('cWeight').value = C.weight; $('cScale').value = C.scale;
+  $('cMs').value = C.ms; $('cMsLbl').textContent = '×' + sig(10 ** C.ms, 3); $('cRnd').value = C.rnd;
+  const paz = b.preset === 'paz71' && !b.edited && n === 2; $('cRndWrap').hidden = !paz;
+  const W = { M: '[M]', K: '[K]', I: '' }[C.weight];
+  const sumT = { M: String.raw`\sum_l m_l ${V}_{li}${V}_{lj}`, K: String.raw`\sum_l k_l \Delta_{li}\Delta_{lj}`, I: String.raw`\sum_l ${V}_{li}${V}_{lj}` }[C.weight];
+  tex($('eqC1'), String.raw`\{${V}\}_{${i + 1}}^T${W}\{${V}\}_{${j + 1}} = ${sumT.replace(/_\{li\}/g, `_{l${i + 1}}`).replace(/_\{lj\}/g, `_{l${j + 1}}`)}`);
+  // the grid
+  const G = cols.map((x, r) => cols.map((y, c) => sum(innerTerms(b.k, b.m, x, y, C.weight))));
+  const top = Math.max(...G.map((r, q) => Math.abs(r[q])), 1e-30), fsz = n <= 3 ? 16 : matSize(n);
+  const name = C.scale === 'mnorm' ? '[Φ]' : '[A]';
+  let h = `<div class="matT">${name}<sup>T</sup>${W}${name}</div><table class="mat" style="font-size:${fsz}px">`;
+  G.forEach((r, q) => { h += '<tr>' + r.map((v, c) => {
+    const tiny = Math.abs(v) < 1e-9 * top, bg = q === c ? tint(1, '1a') : tiny ? 'transparent' : css('--uh') + '26';
+    return `<td data-cell="${q},${c}" class="${q === i && c === j ? 'sel' : ''}" style="background:${bg}">${tiny ? '0' : sig(v, n > 6 ? 3 : 5)}</td>`; }).join('') + '</tr>'; });
+  $('c5grid').innerHTML = h + '</table>';
+  $('c5gridT').innerHTML = C.weight === 'I' ? 'The whole matrix: no weight, no zeros' : `The whole matrix <span class="ref">Ex. 7.2</span>`;
+  const offd = G.flatMap((r, q) => r.filter((_, c) => c !== q)), big = Math.max(...offd.map(Math.abs), 0);
+  $('c5note').innerHTML = n === 1 ? '' : C.weight === 'I'
+    ? 'The plain product leaves the off-diagonal cells (red), unless the masses are equal.'
+    : big < 1e-9 * top ? (n === 2 ? 'The off-diagonal cells are exactly zero.' : `Every off-diagonal cell is zero: ${n * (n - 1) / 2} pairs of modes, every one exact.`) : 'Rounded modes leave a small remainder: rounding, not a failed check.';
+  const terms = innerTerms(b.k, b.m, cols[i], cols[j], C.weight);
+  $('c5read').style.fontSize = n <= 3 ? '15px' : '';
+  $('c5read').innerHTML = terms.length <= 4 ? terms.map(v => (v >= 0 ? '+' : '') + sig(v, 4)).join(' ') + ` = ${(s => (Math.abs(s) < 1e-9 * top ? '0' : sig(s, 4)))(sum(terms))}` : `sum over ${terms.length} ${C.weight === 'K' ? 'stories' : 'floors'} = ${(s => (Math.abs(s) < 1e-9 * top ? '0' : sig(s, 4)))(sum(terms))}`;
+  drawC();
+  writeHash();
+}
+
+// ============================ Tab D: Rayleigh's quotient (spec panel 7) and its iteration (panel 9) =
+const D = { y: [1, 1.5], shape: '', k: 0, r0: null, hold: 0, plain: false, slip: false, meas: 'shape', morph: 1, seed: 1, hist: null, md: null, run: null, histKey: '', strip: null, stripKey: '', top: 1 };
+function drawD7() {
+  const el = $('d7svg'); if (!el.clientWidth) return;
+  const b = SB, md = D.md, n = md.n, W = el.clientWidth, y = D.y;
+  const g = geom(el, b, { mL: 26, mR: 92, mT: 28, mB: 18, frac: 0.5, bay: clamp(W * 0.2, 36, 90) });
+  const xc = (g.x0 + g.x1) / 2, room = Math.min(g.x0 - 22, W - 92 - g.x1), sc = room / (D.top || 1), rl = floorOmegas(b.k, b.m, y);
+  let s = groundSvg(g, b) + frameSvg(g, b, zerosN(n), 0, { c: 'var(--c-ghost)', w: 1, dash: '3 3', dots: false, girder: 1 });
+  s += frameSvg(g, b, y, sc, { dots: false });
+  const fs = n <= 6 ? 11.5 : 10;
+  s += sv.text(W - 2, 9, 'floor wants ω²', { size: 10.5, anchor: 'end', c: 'var(--muted)' });
+  for (let i = 0; i < n; i++) {
+    const zc = g.zs[i + 1];
+    s += handleSvg(xc + off(sc, y[i]), zc, i);
+    s += sv.text(3, zc, `y${sub(i + 1)}`, { size: fs, c: 'var(--muted)' });
+    s += sv.text(W - 2, zc, Number.isFinite(rl[i]) ? sig(rl[i], 4) : '—', { size: fs, anchor: 'end' });
+  }
+  el._xc = xc; el._sc = sc; el._lim = (room + 18) / sc;
+  setSvg(el, s);
+}
+function drawD7Axis() {
+  const el = $('d7axis'); if (!el.clientWidth) return;
+  const b = SB, md = D.md, n = md.n, W = el.clientWidth, H = el.clientHeight, u = unitsOf(b), R = rayleighQ(b.k, b.m, D.y);
+  const L = 12, Rt = 12, c = modalCoords(md, b.m, D.y), sc2 = sum(c.map(x => x * x)), wt = c.map(x => (sc2 > 0 ? x * x / sc2 : 0));
+  const rl = floorOmegas(b.k, b.m, D.y), xMax = 1.08 * md.w2[n - 1], x = v => L + (W - L - Rt) * v / xMax, yA = 36;
+  let s = sv.rect(L, yA - 12, x(md.w2[0]) - L, 24, 'var(--c-neg)', 'fill-opacity="0.13"') + sv.rect(x(md.w2[n - 1]), yA - 12, W - Rt - x(md.w2[n - 1]), 24, 'var(--c-neg)', 'fill-opacity="0.13"');
+  s += sv.line(L, yA, W - Rt, yA, 'var(--muted)', 1.5);
+  s += sv.text(W - Rt, yA + 20, `ω² (${u.w2})`, { size: 10.5, anchor: 'end', c: 'var(--muted)' });
+  let lastX = -99;
+  md.w2.forEach((v, j) => {
+    s += sv.line(x(v), yA - 11, x(v), yA + 11, modeVar(j), 3);
+    if (x(v) - lastX > 44) { s += sv.text(x(v), yA - 19, w2f(v), { size: 11, anchor: 'middle', c: modeVar(j) }); lastX = x(v); }
+  });
+  // each floor's own omega^2, small diamonds; they meet on a tick when the shape is a mode
+  rl.forEach(v => { if (Number.isFinite(v) && v >= 0 && v <= xMax) { const q = x(v), r = 4; s += `<polygon points="${n1(q)},${n1(yA + 9 - r)} ${n1(q + r)},${n1(yA + 9)} ${n1(q)},${n1(yA + 9 + r)} ${n1(q - r)},${n1(yA + 9)}" style="fill:var(--panel);stroke:var(--ink);stroke-width:1"/>`; } });
+  if (Number.isFinite(R)) s += sv.circle(x(R), yA, 6.5, 'var(--uh)', 'var(--panel)', 2);
+  // the balance
+  const yB = yA + 44, hMax = Math.max(16, Math.min(H - yB - 30, 84));
+  if (Number.isFinite(R)) {
+    s += sv.line(x(md.w2[0]), yB, x(md.w2[n - 1]), yB, 'var(--ink)', 3);
+    s += `<polygon points="${n1(x(R))},${n1(yB + 2)} ${n1(x(R) - 9)},${n1(yB - 14)} ${n1(x(R) + 9)},${n1(yB - 14)}" style="fill:var(--uh)"/>`;
+    s += sv.line(x(R), yA + 6, x(R), yB - 14, 'var(--uh)', 1, 'stroke-dasharray="2 3"');
+    wt.forEach((w, j) => {
+      // a square whose area is the weight
+      const q = x(md.w2[j]), side = Math.sqrt(w) * Math.min(hMax, n > 5 ? 50 : hMax);
+      s += sv.line(q, yB, q, yB + 8, modeVar(j), 1.5);
+      if (w > 1e-5) s += sv.rect(q - side / 2, yB + 8, side, side, modeVar(j));
+      if (n <= 5 || w > 0.05) s += sv.text(q, yB + 8 + side + 9, sig(w, 3), { size: 10.5, anchor: 'middle' });
+    });
+    s += sv.text(W / 2, yB - 8, 'the balance: weight at each ωⱼ²', { size: 10.5, anchor: 'middle', c: 'var(--muted)' });
+  }
+  setSvg(el, s);
+}
+function drawD7Bars() {
+  const el = $('d7bars'); if (!el.clientWidth) return;
+  const b = SB, md = D.md, n = md.n, W = el.clientWidth, H = el.clientHeight, c = modalCoords(md, b.m, D.y), t = sum(c.map(x => x * x));
+  const wt = c.map(x => (t > 0 ? x * x / t : 0)), cw = W / n, top = 14, bot = 16, h = H - top - bot;
+  let s = sv.line(0, H - bot, W, H - bot, 'var(--line)', 1);
+  wt.forEach((w, j) => {
+    const bw = Math.min(cw * 0.56, 90), x = j * cw + (cw - bw) / 2;
+    s += sv.rect(x, H - bot - w * h, bw, Math.max(w * h, 0.5), modeVar(j));
+    s += sv.text(x + bw / 2, H - bot - w * h - 7, `${sig(100 * w, 3)}%`, { size: 11, anchor: 'middle' });
+    s += sv.text(x + bw / 2, H - 6, n <= 6 ? `mode ${j + 1}` : `${j + 1}`, { size: 11, anchor: 'middle', c: modeVar(j) });
+  });
+  setSvg(el, s);
+}
+const iterOpts = () => ({ r0: D.r0, hold: D.hold, plain: D.plain, steps: Math.max(8, D.hold + 6) });
+function runMethods() {
+  const b = SB, md = D.md, runs = { main: iterate(b.k, b.m, D.y, { ...iterOpts(), method: D.slip ? 'slip' : 'rqi' }) };
+  if (D.slip) runs.rqi = iterate(b.k, b.m, D.y, { method: 'rqi' });
+  runs.inv = iterate(b.k, b.m, D.y, { method: 'inv' });
+  if (md.n === 2) runs.paz = iterate(b.k, b.m, D.y, { method: 'paz' });
+  D.run = runs;
+}
+function drawD9() {
+  const el = $('d9svg'); if (!el.clientWidth || !D.run) return;
+  const b = SB, md = D.md, n = md.n, W = el.clientWidth, run = D.run.main, k = Math.min(D.k, run.length - 1), cur = normTop(run[k].y), prev = k ? normTop(run[k - 1].y) : cur;
+  // the ratio of two iterates can flip the sign of the largest entry: follow the previous one
+  const fl = dot(cur, prev) < 0 ? -1 : 1, shown = cur.map((v, i) => prev[i] + (fl * v - prev[i]) * D.morph);
+  const g = geom(el, b, { mL: 8, mR: 8, mT: 22, mB: 18, frac: 0.5, bay: clamp(W * 0.26, 36, 80) }), sc = g.x0 - 10;
+  let s = groundSvg(g, b) + frameSvg(g, b, zerosN(n), 0, { c: 'var(--c-ghost)', w: 1, dash: '3 3', dots: false, girder: 1 });
+  if (k) s += frameSvg(g, b, prev, sc, { c: 'var(--c-ghost)', w: 1.5, dash: '4 3', dots: false, girder: 2 });
+  s += frameSvg(g, b, shown, sc, { c: modeVar(targetMode(md, b.m, run[k].y)) });
+  s += sv.text(W / 2, 8, `y${sub(k)}: ${signChanges(run[k].y)} sign change${signChanges(run[k].y) === 1 ? '' : 's'}`, { size: 11.5, anchor: 'middle', c: 'var(--muted)' });
+  setSvg(el, s);
+}
+function renderD9Table() {
+  const b = SB, md = D.md, n = md.n, run = D.run.main, k = Math.min(D.k, run.length - 1), err = errorsOf(md, b.m, run), u = unitsOf(b);
+  const shifted = D.r0 != null || D.hold > 0;
+  let h = `<table class="iter"><tr><th>k</th><th>r<sub>k</sub></th>${shifted ? '<th>shift</th>' : ''}<th>err r<sub>k</sub></th><th>${n === 2 ? 'err y₂/y₁' : 'shape err'}</th><th>sign chg</th>${n <= 3 ? `<th>y<sub>k</sub> (${D.plain ? 'plain' : 'M'}-norm)</th>` : ''}</tr>`;
+  for (let s = 0; s <= k; s++) {
+    h += `<tr class="${s === k ? 'cur' : ''}"><td>${s}</td><td>${sigF(run[s].r, s > 1 ? 10 : 7)}</td>${shifted ? `<td>${sig(run[s].shift, 6)}</td>` : ''}<td>${sciHTML(err.r[s])}</td><td>${sciHTML(err.shape[s])}</td><td>${signChanges(run[s].y)}</td>${n <= 3 ? `<td>${run[s].y.map(v => sigF(v, n === 3 ? 3 : 4)).join(', ')}</td>` : ''}</tr>`;
+  }
+  $('d9tbl').innerHTML = h + '</table>' + (k === run.length - 1 ? `<div class="note">Converged to mode ${err.mode + 1}: ω² = ${sig(md.w2[err.mode], 8)} ${u.w2}, ${err.mode} sign change${err.mode === 1 ? '' : 's'}. Double precision stops near 10<sup>−16</sup>.</div>` : '');
+  $('dStep').disabled = k >= run.length - 1;
+}
+function plotD9() {
+  if (typeof Plotly === 'undefined') return;
+  const b = SB, md = D.md, key = D.meas, K = Math.min(D.k, D.run.main.length - 1);
+  const FLOOR = 1e-16, curve = (run, name, color, width, dash) => { const e = errorsOf(md, b.m, run)[key].slice(0, K + 1);
+    return { x: e.map((_, i) => i), y: e.map(v => (Number.isFinite(v) ? Math.max(v, FLOOR) : null)), mode: 'lines+markers', name, line: { color, width, dash }, marker: { size: width > 2 ? 8 : 6 },
+             hovertemplate: `${name}, k = %{x}: %{y:.2e}<extra></extra>` }; };
+  const tr = [curve(D.run.main, D.slip ? 'solving with {y_k}' : 'RQI', css('--uh'), 3, 'solid')];
+  if (D.slip) tr.push(curve(D.run.rqi, 'RQI', css('--c-net'), 2, 'solid'));
+  tr.push(curve(D.run.inv, 'inverse iteration', css('--c-pos'), 2, 'dash'));
+  if (D.run.paz) tr.push(curve(D.run.paz, "Paz's update", css('--c-grav'), 2, 'dot'));
+  Plotly.react('d9plot', tr, lay({ showlegend: true, legend: { orientation: 'h', y: 1.12, x: 0, font: { size: 11 } }, margin: { l: 56, r: 10, t: 24, b: 36 },
+    xaxis: ax('step k', { dtick: 1, range: [-0.2, Math.max(4, K) + 0.2] }),
+    yaxis: ax(key === 'shape' ? (md.n === 2 ? 'error of y₂/y₁' : 'shape error') : 'relative error of r_k', { type: 'log', range: [-16.5, 1], dtick: 2, exponentformat: 'power' }) }), cfg);
+}
+// n = 2: a strip of the start angle, colored by the mode reached. Larger n: random starts on request.
+function drawD9Which() {
+  const el = $('d9which'); if (!el.clientWidth) return;
+  const b = SB, md = D.md, n = md.n, W = el.clientWidth, H = el.clientHeight;
+  $('dTry').hidden = n <= 2;
+  let s = '';
+  if (n === 1) { setSvg(el, sv.text(4, 12, 'One story: one mode.', { size: 12, c: 'var(--muted)' })); $('d9whichN').textContent = ''; return; }
+  if (n === 2) {
+    const key = [...b.k, ...b.m].join(','), L = 8, R = 8, N = 361, x = th => L + (W - L - R) * (th + 90) / 180, yT = 26, hS = Math.max(16, H - 58);
+    if (D.stripKey !== key) { D.stripKey = key;
+      D.strip = linspace(-90, 90, N).map(th => reach(md, b.k, b.m, [Math.cos(th * Math.PI / 180), Math.sin(th * Math.PI / 180)]).mode); }
+    let a = 0;
+    for (let i = 1; i <= N; i++) if (i === N || D.strip[i] !== D.strip[a]) {
+      s += sv.rect(x(-90 + 180 * a / (N - 1)), yT, x(-90 + 180 * Math.min(i, N - 1) / (N - 1)) - x(-90 + 180 * a / (N - 1)) + 0.5, hS, modeVar(D.strip[a]), 'fill-opacity="0.75"'); a = i; }
+    [0, 1].forEach(j => { const th = Math.atan(md.A[1][j]) * 180 / Math.PI; s += sv.line(x(th), yT - 4, x(th), yT + hS + 4, 'var(--ink)', 1.5);
+      s += sv.text(x(th), yT - 11, `mode ${j + 1}`, { size: 10.5, anchor: 'middle', c: modeVar(j), weight: 600 }); });
+    if (Math.abs(D.y[0]) + Math.abs(D.y[1]) > 0) { const th = Math.atan2(D.y[1], D.y[0]) * 180 / Math.PI, t2 = th > 90 ? th - 180 : th < -90 ? th + 180 : th;
+      s += sv.circle(x(t2), yT + hS / 2, 6, 'var(--uh)', 'var(--panel)', 2); }
+    [-90, -45, 0, 45, 90].forEach(t => { s += sv.text(x(t), yT + hS + 14, `${t}°`.replace('-', MINUS), { size: 10, anchor: t === -90 ? 'start' : t === 90 ? 'end' : 'middle', c: 'var(--muted)' }); });
+    $('d9whichN').textContent = `start angle atan(y₂/y₁); the dot is y₀; mode 1 exactly when R(y₀) is below the midpoint, ${sig((md.w2[0] + md.w2[1]) / 2, 4)}`;
+    setSvg(el, s); return;
+  }
+  const key = [n, ...b.k, ...b.m].join(',');
+  if (D.histKey !== key) { D.hist = null; D.histKey = key; }
+  if (!D.hist) { $('d9whichN').textContent = ''; setSvg(el, sv.text(4, 14, 'Press the button: students assume iteration finds the first mode.', { size: 12, c: 'var(--muted)' })); return; }
+  const cw = W / n, top = 16, bot = 16, h = H - top - bot;
+  s += sv.line(0, H - bot, W, H - bot, 'var(--line)', 1);
+  D.hist.share.forEach((w, j) => { const x = j * cw + cw * 0.2, bw = cw * 0.6;
+    s += sv.rect(x, H - bot - w * h, bw, Math.max(w * h, 0.5), modeVar(j));
+    s += sv.text(x + bw / 2, H - bot - w * h - 7, `${Math.round(100 * w)}%`, { size: 11, anchor: 'middle' });
+    s += sv.text(x + bw / 2, H - 6, n <= 6 ? `mode ${j + 1}` : `${j + 1}`, { size: 11, anchor: 'middle', c: modeVar(j) }); });
+  $('d9whichN').textContent = `mean ${sig(D.hist.mean, 3)} steps`;
+  setSvg(el, s);
+}
+let d9Anim = 0;
+function animateD9() {
+  cancelAnimationFrame(d9Anim);
+  const t0 = performance.now(), dur = 420 / speed();
+  const step = ts => { D.morph = clamp((ts - t0) / dur, 0, 1); drawD9(); if (D.morph < 1) d9Anim = requestAnimationFrame(step); };
+  D.morph = 0; d9Anim = requestAnimationFrame(step);
+}
+function renderD7Read() {
+  const b = SB, md = D.md, u = unitsOf(b), R = rayleighQ(b.k, b.m, D.y), N = kDot(b.k, D.y, D.y), Dn = mDot(b.m, D.y, D.y);
+  if (!Number.isFinite(R)) { $('d7read').textContent = 'y = 0: no shape, no quotient'; return; }
+  const per = 2 * Math.PI / Math.sqrt(R);
+  $('d7read').innerHTML = `R(y) = ${sig(N, 4)} / ${sig(Dn, 4)} = ${w2f(R)} ${u.w2}; ω₁² = ${w2f(md.w2[0])}, R/ω₁² = ${sig(R / md.w2[0], 5)}; period ${sig(per, 3)} against T₁ = ${sig(md.T[0], 3)} ${u.t}`;
+}
+function renderD9() {
+  runMethods();
+  const b = SB, md = D.md, n = md.n, P = PRESETS[b.preset];
+  $('dR0').value = D.r0 ?? ''; $('dHold').value = D.hold; $('dPlain').checked = D.plain; $('dSlip').checked = D.slip; $('dMeas').value = D.meas;
+  const ch = $('dChips'), shifts = (b.edited ? [] : P.shifts ?? []).filter(s => !s.y || s.y.length === n);
+  ch.innerHTML = shifts.map((s, i) => `<button data-s="${i}" title="first shift ${s.r0}${s.y ? ', start ' + s.y.join(', ') : ''}">${s.label}</button>`).join('');
+  tex($('eqD2'), D.slip ? String.raw`r_k = R(y_k),\quad ([K] - r_k[M])\{z\} = \{y_k\}\quad\text{(no } [M]\text{: quadratic, not cubic)}`
+                       : String.raw`r_k = R(y_k),\quad ([K] - r_k[M])\{z\} = [M]\{y_k\},\quad \{y_{k+1}\} = \{z\}/\text{norm}`);
+  renderD9Table(); drawD9(); plotD9(); drawD9Which();
+}
+function renderD() {
+  const b = SB, n = b.k.length;
+  D.md = modesOf(b.k, b.m);
+  if (!dDrag.active()) D.top = maxAbs(D.y) || 1;
+  $('dN').value = n; $('dNLbl').textContent = n;
+  const dm = $('dModes'); if (dm.childElementCount !== n) dm.innerHTML = b.k.map((_, j) => `<button data-m="${j}" title="snap to mode ${j + 1}">${j + 1}</button>`).join('');
+  tex($('eqD1'), String.raw`R(y) = \frac{\{y\}^T[K]\{y\}}{\{y\}^T[M]\{y\}} = \sum_j w_j\,\omega_j^2,\quad w_j = \frac{c_j^2}{\sum_i c_i^2},\quad c_j = \{\phi\}_j^T[M]\{y\}`);
+  renderD7Read(); drawD7(); drawD7Axis(); drawD7Bars();
+  renderD9();
+  writeHash();
+}
+function fillShapes() {
+  const list = trialShapes(SB);
+  fillSelect($('dShape'), `<option value="" hidden>dragged</option>` + list.map((s, i) => `<option value="${i}">${s.label}</option>`).join(''));
+  return list;
+}
+// The menu shows a listed shape, or "dragged"
+function syncShape() { const i = trialShapes(SB).findIndex(s => s.y.every((v, l) => Math.abs(v - D.y[l]) < 1e-9)); $('dShape').value = i < 0 ? '' : String(i); }
+let raf3 = 0;
+const dDrag = dragHandles($('d7svg'), {
+  move(idx, x) {
+    const el = $('d7svg'), i = +idx;
+    D.y[i] = clamp((x - el._xc) / el._sc, -el._lim, el._lim); D.k = 0; D.morph = 1; $('dShape').value = '';
+    if (!raf3) raf3 = requestAnimationFrame(() => { raf3 = 0; renderD7Read(); drawD7(); drawD7Axis(); drawD7Bars(); renderD9(); });
+  },
+  end() { renderD(); },
+});
+player($('dPlay'), { next: () => { D.k++; renderD9Table(); plotD9(); animateD9(); writeHash(); }, atEnd: () => !D.run || D.k >= D.run.main.length - 1,
+                     toStart: () => { D.k = 0; renderD9Table(); plotD9(); drawD9(); }, ms: 900 });
+
+// ============================ The story table ============================
+let popFor = null, popSweeps = [];
+const A_HOLD = { v: true };
+const COLC = (b, i) => (b.pinned && i === 0 ? 3 : 12);
+const cur = () => (tab === 'a' ? SA : SB);
+const prec3 = x => +(+x).toPrecision(3);
+function closePop() { popSweeps.forEach(sw => { sw.stop(); SWEEPS.splice(SWEEPS.indexOf(sw), 1); }); popSweeps = []; $('pop').style.display = 'none'; popFor = null; }
+function openPop() {
+  closePop(); popFor = tab;
+  const pop = $('pop'), b = cur(), n = b.k.length, u = unitsOf(b);
+  const ref = b.ref ?? (b.ref = { k: b.k.slice(), h: b.h.slice(), m: b.m.slice() });
+  ['k', 'h', 'm'].forEach(key => { while (ref[key].length < n) ref[key].push(ref[key][ref[key].length - 1]); });
+  let h = `<div style="display:flex;gap:12px;align-items:baseline;margin-bottom:4px"><b>Stories</b>
+    <label class="chk" title="k = c ΣEI / h³: a taller story or a pinned base softens it"><input type="checkbox" id="popHold" ${A_HOLD.v ? 'checked' : ''}>hold ΣEI when h or the ends change</label>
+    <span class="note">k = 12ΣEI/h³ (both ends fixed, Paz 7.1a), 3ΣEI/h³ (one end pinned, 7.1b)</span>
+    <button id="popClose" style="margin-left:auto">close</button></div>
+    <table><tr><th>story</th><th>k (${u.k})</th><th>h (${u.h})</th><th>m (${u.m})</th><th>W = mg (${u.W})</th><th>ends</th><th>ΣEI (${u.EI})</th></tr>`;
+  for (let i = n - 1; i >= 0; i--) {
+    const sl = (key, lo, hi, step) => `<button class="play" id="pp${key}${i}">▶</button><input type="range" id="ps${key}${i}" min="${lo}" max="${hi}" step="${step}"><span class="val" id="pv${key}${i}"></span>`;
+    h += `<tr><td>${i + 1}</td><td>${sl('k', -1, 1, 0.005)}</td><td>${sl('h', 0.5, 2, 0.005)}</td><td>${sl('m', -1, 1, 0.005)}</td><td class="val" id="pW${i}"></td>`
+      + `<td>${i === 0 ? `<select id="pEnds"><option value="f">both fixed</option><option value="p">base pinned</option></select>` : 'both fixed'}</td>`
+      + `<td class="val" id="pEI${i}"></td></tr>`;
+  }
+  pop.innerHTML = h + '</table>';
+  pop.style.display = 'block';
+  const sync = () => {
+    const bb = cur();
+    for (let i = 0; i < n; i++) {
+      $(`pvk${i}`).textContent = sig(bb.k[i], 4); $(`pvh${i}`).textContent = sig(bb.h[i], 4); $(`pvm${i}`).textContent = sig(bb.m[i], 4);
+      $(`pW${i}`).textContent = sig(prec3(bb.m[i] * u.g), 4);
+      $(`pEI${i}`).textContent = sig(bb.k[i] * bb.h[i] ** 3 / COLC(bb, i), 4);
+      $(`psk${i}`).value = Math.log10(bb.k[i] / ref.k[i]); $(`psh${i}`).value = bb.h[i] / ref.h[i]; $(`psm${i}`).value = Math.log10(bb.m[i] / ref.m[i]);
+    }
+    $('pEnds').value = bb.pinned ? 'p' : 'f';
+  };
+  sync();
+  for (let i = 0; i < n; i++) {
+    $(`psk${i}`).addEventListener('input', e => { cur().k[i] = ref.k[i] * 10 ** +e.target.value; edited(); sync(); });
+    $(`psm${i}`).addEventListener('input', e => { cur().m[i] = ref.m[i] * 10 ** +e.target.value; edited(); sync(); });
+    $(`psh${i}`).addEventListener('input', e => { const bb = cur(), hn = ref.h[i] * +e.target.value;
+      if (A_HOLD.v) bb.k[i] *= (bb.h[i] / hn) ** 3; bb.h[i] = hn; edited(); sync(); });
+    for (const key of ['k', 'h', 'm']) popSweeps.push(sweeper($(`pp${key}${i}`), $(`ps${key}${i}`)));
+  }
+  $('pEnds').addEventListener('change', e => { const bb = cur(), p = e.target.value === 'p';
+    if (A_HOLD.v && p !== bb.pinned) bb.k[0] *= p ? 0.25 : 4; bb.pinned = p; edited(); sync(); });
+  $('popHold').addEventListener('change', e => { A_HOLD.v = e.target.checked; });
+  $('popClose').addEventListener('click', closePop);
+}
+function edited() { cur().edited = true; D.k = 0; render[tab](); }
+
+// ============================ Wiring ============================
+if (typeof Plotly === 'undefined' || typeof katex === 'undefined') $('loaderr').style.display = 'block';
+let tab = 'a';
+const render = { a: renderA, b: renderB, c: renderC, d: renderD };
+function showTab(t) {
+  tab = t;
+  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
+  ['a', 'b', 'c', 'd'].forEach(x => { $('sec-' + x).hidden = x !== t; });
+  render[t]();
+}
+const presetOptions = Object.entries(PRESETS).map(([id, P]) => `<option value="${id}">${P.label}</option>`).join('');
+$('aPreset').innerHTML = presetOptions;
+document.querySelectorAll('.presetS').forEach(s => { s.innerHTML = presetOptions; });
+const defaultTrial = b => { const P = PRESETS[b.preset];
+  return P.y0 && P.y0.length === b.k.length ? P.y0.slice() : genericShapes(b)[1].y.slice(); };
+// The shared building of B, C, D: the start and the trial shape follow it
+function setBuildingS(id, n = null) {
+  SB = makeBuilding(id, n);
+  document.querySelectorAll('.presetS').forEach(s => { s.value = id; });
+  const st = fillStarts(); bStartValues(st[0].y, st[0].v, '0');
+  fillShapes(); D.y = defaultTrial(SB); D.k = 0; D.r0 = null; D.hold = 0; D.hist = null; syncShape();
+  C.i = 0; C.j = Math.min(1, SB.k.length - 1); C.upto = null; C.ms = 0; C.rnd = 'exact';
+  bBoundReset();
+}
+function bBoundReset() { const b = SB; B.md = modesOf(b.k, b.m); B.co = coeffs(B.md, b.m, B.y0, B.v0); B.bound = 1; bBound(); }
+function setBuildingA(id, n = null) { SA = makeBuilding(id, n); $('aPreset').value = id; A.j = Math.min(A.j, SA.k.length - 1); }
+function changeN(n) {
+  if (tab === 'a') { const b = SA; if (b.k.length === n) return; SA = { ...resized(b, n), preset: b.preset, edited: b.edited, ref: undefined }; if (popFor) openPop(); renderA(); return; }
+  const b = SB; if (b.k.length === n) return;
+  SB = { ...resized(b, n), preset: b.preset, edited: b.edited, ref: undefined };
+  const st = fillStarts(); fillShapes();
+  // a start of the old size carries over, extra floors copying the top one; velocities too
+  B.y0 = fitTo(B.y0, n); B.v0 = fitTo(B.v0, n); B.tau = 0; B.run = false; B.rev = false; B.guess = []; $('b3pred').innerHTML = ''; $('bStart').value = '';
+  D.y = fitTo(D.y, n); D.k = 0; D.hist = null; $('dShape').value = '';
+  C.i = Math.min(C.i, n - 1); C.j = Math.min(C.j, n - 1); C.upto = null;
+  bBoundReset();
+  if (popFor) openPop(); render[tab]();
+}
+// Tab A
+$('aPreset').addEventListener('change', e => { closePop(); setBuildingA(e.target.value); renderA(); });
+$('aN').addEventListener('input', e => changeN(Math.round(+e.target.value)));
+sweeper($('aNPlay'), $('aN'), 9000);
+$('aTbl').addEventListener('click', () => (popFor ? closePop() : openPop()));
+$('aAmp').addEventListener('input', e => { A.amp = +e.target.value; $('aAmpLbl').textContent = A.amp.toFixed(2); drawAFrame(); writeHash(); });
+sweeper($('aAmpPlay'), $('aAmp'));
+$('aRun').addEventListener('click', () => { A.run = !A.run; renderA(); });
+$('aOwn').addEventListener('change', e => { A.own = e.target.checked; renderA(); });
+$('a1row').addEventListener('click', e => { const el = $('a1row'), n = SA.k.length;
+  A.j = clamp(Math.floor((e.clientX - el.getBoundingClientRect().left) / (el.clientWidth / n)), 0, n - 1); renderA(); });
+// Tab B
+$('bN').addEventListener('input', e => changeN(Math.round(+e.target.value)));
+sweeper($('bNPlay'), $('bN'), 9000);
+$('bTbl').addEventListener('click', () => (popFor ? closePop() : openPop()));
+$('bStart').addEventListener('change', e => { const s = startsOf(SB)[+e.target.value]; if (!s) return; bStartValues(s.y, s.v, e.target.value); B.bound = 1; renderB(); });
+$('bModes').addEventListener('click', e => { const m = e.target.closest('[data-m]'); if (!m) return;
+  const md = modesOf(SB.k, SB.m), a = colOf(md.A, +m.dataset.m), t = maxAbs(a);
+  bStartValues(t > 1e6 ? a.map(x => x / t) : a, zerosN(a.length)); B.bound = 1; renderB(); });
+$('bVel').addEventListener('change', e => { B.vel = e.target.checked; B.tau = 0; B.run = false; renderB(); });
+$('bPlay').addEventListener('click', () => { if (bHidden()) return; B.run = !B.run; renderB(); });
+$('bBack').addEventListener('click', () => { B.run = false; B.tau = 0; renderB(); });
+$('bParts').addEventListener('change', e => { B.parts = e.target.checked; plotB3(); writeHash(); });
+$('bPred').addEventListener('change', e => { B.pred = e.target.checked; B.rev = false; B.run = false; B.tau = 0; B.guess = []; $('b3pred').innerHTML = ''; renderB(); });
+$('bReveal').addEventListener('click', () => { B.rev = true; renderB(); });
+$('b3pred').addEventListener('input', e => { if (e.target.dataset.g != null) B.guess[+e.target.dataset.g] = +e.target.value; });
+// Tab C
+$('cN').addEventListener('input', e => changeN(Math.round(+e.target.value)));
+sweeper($('cNPlay'), $('cN'), 9000);
+$('cTbl').addEventListener('click', () => (popFor ? closePop() : openPop()));
+$('cWeight').addEventListener('change', e => { C.weight = e.target.value; C.upto = null; renderC(); });
+$('cScale').addEventListener('change', e => { C.scale = e.target.value; renderC(); });
+$('cMs').addEventListener('input', e => { C.ms = +e.target.value; renderC(); });
+sweeper($('cMsPlay'), $('cMs'));
+$('cRnd').addEventListener('change', e => { C.rnd = e.target.value; renderC(); });
+$('c5grid').addEventListener('click', e => { const td = e.target.closest('[data-cell]'); if (!td) return;
+  [C.i, C.j] = td.dataset.cell.split(',').map(Number); C.upto = null; renderC(); });
+$('cStep').addEventListener('click', () => { const n = SB.k.length; C.upto = (C.upto ?? n) >= n ? 1 : C.upto + 1; renderC(); });
+$('cFirst').addEventListener('click', () => { C.upto = 0; renderC(); });
+player($('cPlay'), { next: () => { C.upto = (C.upto ?? 0) + 1; renderC(); }, atEnd: () => (C.upto ?? SB.k.length) >= SB.k.length,
+                     toStart: () => { C.upto = 0; renderC(); }, ms: 800 });
+// Tab D
+$('dN').addEventListener('input', e => changeN(Math.round(+e.target.value)));
+sweeper($('dNPlay'), $('dN'), 9000);
+$('dTbl').addEventListener('click', () => (popFor ? closePop() : openPop()));
+$('dShape').addEventListener('change', e => { const s = trialShapes(SB)[+e.target.value]; if (!s) return; D.y = s.y.slice(); D.k = 0; renderD(); });
+$('dModes').addEventListener('click', e => { const m = e.target.closest('[data-m]'); if (!m) return;
+  D.y = normTop(colOf(modesOf(SB.k, SB.m).A, +m.dataset.m)); D.k = 0; $('dShape').value = ''; renderD(); });
+$('dGo7').addEventListener('click', () => $('d7panel').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+$('dGo9').addEventListener('click', () => $('d9panel').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+$('dStep').addEventListener('click', () => { D.k = Math.min(D.k + 1, D.run.main.length - 1); renderD9Table(); plotD9(); animateD9(); writeHash(); });
+$('dFirst').addEventListener('click', () => { D.k = 0; D.morph = 1; renderD9Table(); plotD9(); drawD9(); writeHash(); });
+$('dR0').addEventListener('change', e => { const v = parseFloat(e.target.value); D.r0 = Number.isFinite(v) ? v : null; D.k = 0; renderD(); });
+$('dHold').addEventListener('change', e => { const v = parseInt(e.target.value, 10); D.hold = Number.isFinite(v) ? clamp(v, 0, 20) : 0; D.k = 0; renderD(); });
+$('dChips').addEventListener('click', e => { const c = e.target.closest('[data-s]'); if (!c) return;
+  const s = (PRESETS[SB.preset].shifts ?? [])[+c.dataset.s]; if (!s) return;
+  D.r0 = s.r0; if (s.y) { D.y = s.y.slice(); syncShape(); } D.k = 0; renderD(); });
+$('dPlain').addEventListener('change', e => { D.plain = e.target.checked; renderD(); });
+$('dSlip').addEventListener('change', e => { D.slip = e.target.checked; renderD(); });
+$('dMeas').addEventListener('change', e => { D.meas = e.target.value; plotD9(); writeHash(); });
+$('dTry').addEventListener('click', () => { D.hist = randomStarts(D.md, SB.k, SB.m, 200, D.seed++); drawD9Which(); });
+
+// Presets shared by B, C, D
+document.querySelectorAll('.presetS').forEach(s => s.addEventListener('change', e => { closePop(); setBuildingS(e.target.value); render[tab](); }));
+
+// ---- State in the URL hash: the open tab and its controls, e.g. #tab=d&preset=paz71&y=1,1.5&step=2
+const fmtN = x => +(+x).toPrecision(6);
+const list = a => a.map(fmtN).join(',');
+const DEF = { A: { j: 0, amp: 0.3, own: false, run: true, tau: 0 }, B: { vel: false, run: false, tau: 0, parts: false, pred: false, rev: false, guess: [] },
+              C: { i: 0, j: 1, weight: 'M', scale: 'first', ms: 0, rnd: 'exact', upto: null }, D: { k: 0, r0: null, hold: 0, plain: false, slip: false, meas: 'shape', morph: 1, hist: null } };
+function buildingHash(b) {
+  const p = { preset: b.preset, n: b.k.length };
+  if (b.edited) Object.assign(p, { k: list(b.k), hh: list(b.h), m: list(b.m), pin: +b.pinned });
+  return p;
+}
+function hashOf() {
+  const p = { tab };
+  if (tab === 'a') Object.assign(p, buildingHash(SA), { j: A.j + 1, amp: A.amp, own: +A.own });
+  if (tab === 'b') Object.assign(p, buildingHash(SB), { y0: list(B.y0), v0: list(B.v0), vel: +B.vel, parts: +B.parts });
+  if (tab === 'c') Object.assign(p, buildingHash(SB), { i: C.i + 1, j: C.j + 1, w: C.weight, sc: C.scale, ms: +C.ms.toFixed(2), rnd: C.rnd });
+  if (tab === 'd') Object.assign(p, buildingHash(SB), { y: list(D.y), step: D.k, hold: D.hold, plain: +D.plain, slip: +D.slip, meas: D.meas, ...(D.r0 != null ? { r0: D.r0 } : {}) });
+  return Object.entries(p).map(([k, v]) => k + '=' + v).join('&');
+}
+let hashTimer = null;   // debounced: Safari limits history.replaceState to about 100 calls in 30 s
+function writeHash() {
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => history.replaceState(null, '', '#' + hashOf()), 300);
+}
+function readBuilding(p, t) {
+  const isA = t === 'a', get = () => (isA ? SA : SB), set = isA ? setBuildingA : setBuildingS;
+  const nn = p.n != null && Number.isFinite(+p.n) ? clamp(Math.round(+p.n), 1, 10) : null;
+  if (PRESETS[p.preset] && (p.preset !== get().preset || (nn != null && nn !== get().k.length) || p.k)) set(p.preset, nn);
+  else if (nn != null && nn !== get().k.length) { const prev = tab; tab = t; changeN(nn); tab = prev; }
+  if (p.k && p.hh && p.m) {
+    const b = get(), v = s => s.split(',').map(Number), k = v(p.k), h = v(p.hh), m = v(p.m);
+    if ([k, h, m].every(a => a.length === b.k.length && a.every(x => x > 0))) Object.assign(b, { k, h, m, pinned: p.pin === '1', edited: true });
+  }
+}
+function readHash() {
+  const p = Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
+  const num = (k, lo, hi) => { const v = parseFloat(p[k]); return Number.isFinite(v) ? clamp(v, lo, hi) : null; };
+  const bool = k => (p[k] == null ? null : p[k] === '1');
+  const vec = (k, n) => { if (!p[k]) return null; const v = p[k].split(',').map(Number); return v.length === n && v.every(Number.isFinite) ? v : null; };
+  const t = ['a', 'b', 'c', 'd'].includes(p.tab) ? p.tab : 'a';
+  readBuilding(p, t);
+  const nS = SB.k.length;
+  if (t === 'a') {
+    if (num('j', 1, 10) != null) A.j = clamp(Math.round(num('j', 1, 10)) - 1, 0, SA.k.length - 1);
+    if (num('amp', 0.1, 0.5) != null) A.amp = num('amp', 0.1, 0.5);
+    if (bool('own') != null) A.own = bool('own');
+  } else if (t === 'b') {
+    const y = vec('y0', nS), v = vec('v0', nS);
+    if (y || v) { bStartValues(y ?? B.y0, v ?? B.v0); syncStart(); bBoundReset(); }
+    if (bool('vel') != null) B.vel = bool('vel');
+    if (bool('parts') != null) B.parts = bool('parts');
+  } else if (t === 'c') {
+    if (num('i', 1, 10) != null) C.i = clamp(Math.round(num('i', 1, 10)) - 1, 0, nS - 1);
+    if (num('j', 1, 10) != null) C.j = clamp(Math.round(num('j', 1, 10)) - 1, 0, nS - 1);
+    if (['M', 'K', 'I'].includes(p.w)) C.weight = p.w;
+    if (['first', 'roof', 'mnorm'].includes(p.sc)) C.scale = p.sc;
+    if (num('ms', -1, 1) != null) C.ms = num('ms', -1, 1);
+    if (['exact', 'deck', 'paz'].includes(p.rnd)) C.rnd = p.rnd;
+  } else {
+    const y = vec('y', nS); if (y) { D.y = y; syncShape(); }
+    if (num('step', 0, 40) != null) D.k = Math.round(num('step', 0, 40));
+    if (num('hold', 0, 20) != null) D.hold = Math.round(num('hold', 0, 20));
+    if (bool('plain') != null) D.plain = bool('plain');
+    if (bool('slip') != null) D.slip = bool('slip');
+    if (['shape', 'r'].includes(p.meas)) D.meas = p.meas;
+    D.r0 = p.r0 != null && Number.isFinite(parseFloat(p.r0)) ? parseFloat(p.r0) : D.r0;
+  }
+  return t;
+}
+function stopAll() { SWEEPS.slice().forEach(sw => sw.stop()); }
+function applyHash() { stopAll(); closePop(); const t = readHash(); $('aOwn').checked = A.own; showTab(t); }
+window.addEventListener('hashchange', applyHash);
+$('reset').addEventListener('click', () => {
+  stopAll(); closePop();
+  Object.assign(A, DEF.A); Object.assign(B, DEF.B); Object.assign(C, DEF.C); Object.assign(D, DEF.D);
+  $('speed').value = '1'; $('aOwn').checked = false;
+  setBuildingA('uniform'); setBuildingS('paz71');
+  render[tab]();
+});
+
+// Header buttons: dark colors and captions, for this visit only; a theme change redraws
+$('theme').addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme !== 'dark';
+  if (dark) document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme;
+  $('theme').textContent = dark ? '☀ light' : '☾ dark';
+});
+$('caps').addEventListener('click', () => {
+  $('caps').classList.toggle('on', document.body.classList.toggle('nocap') === false);
+});
+new MutationObserver(() => render[tab]()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+setBuildingA('uniform'); setBuildingS('paz71');
+applyHash();
+// Plotly sizes a plot once; follow later changes of its box. The drawings redraw at their new size.
+if (typeof Plotly !== 'undefined' && 'ResizeObserver' in window) {
+  const ro = new ResizeObserver(entries => entries.forEach(e => { if (e.target.data && e.target.offsetParent && e.contentRect.width > 0) Plotly.Plots.resize(e.target).catch(() => {}); }));
+  document.querySelectorAll('.plot').forEach(el => ro.observe(el));
+  let pend = false;
+  const so = new ResizeObserver(() => { if (pend) return; pend = true;
+    requestAnimationFrame(() => { pend = false; render[tab](); }); });
+  document.querySelectorAll('.svgbox').forEach(el => so.observe(el));
+}
+</script>
+</body>
+</html>
