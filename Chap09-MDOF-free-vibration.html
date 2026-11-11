@@ -114,7 +114,7 @@
   table.meth tr.cur td { background: var(--hl); }
   table.meth tr.off { opacity: 0.45; }
   table.meth .sw { display: inline-block; width: 22px; height: 4px; border-radius: 2px; vertical-align: middle; }
-  #dsplot { min-height: 480px; }
+  #dsplot { min-height: 480px; touch-action: none; }   /* touch: the app's own gestures, no page zoom */
   #b3pred { display: flex; gap: 6px; }
   #b3pred label { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: stretch; font-size: 11.5px; text-align: center; color: var(--muted); }
   #b3pred input { width: 100%; }
@@ -315,7 +315,7 @@
       <h2>Rayleigh's quotient on the unit sphere <span class="ref">the slide's polar plot, one dimension up</span></h2>
       <p class="see"><b>Every direction {y} reaches out to √R(y): the surface comes closest along mode 1, reaches farthest along mode 3, and has a saddle at mode 2,</b>
         where two curves of R = ω₂² cross. Each trial shape is a point on this surface, so R(y) cannot leave [ω₁², ω₃²]. Near mode 1 the surface is flat: a small error in the shape barely changes R.
-        Click the surface to put the trial shape there (drag to turn the view). The red dots are the trial shape {y₀} and −{y₀} (R is the same); step the iteration and a path follows the method shown in the panel below, in that method's color (red: Rayleigh quotient iteration), each {y<sub>k</sub>} at its own √R.</p>
+        Click or tap the surface to put the trial shape there; drag to turn the view; on a touch screen pinch to zoom, and move or twist two fingers to pan or roll. The red dots are the trial shape {y₀} and −{y₀} (R is the same); step the iteration and a path follows the method shown in the panel below, in that method's color (red: Rayleigh quotient iteration), each {y<sub>k</sub>} at its own √R.</p>
       <div class="ctl">
         <label>radius <select id="dsRad"><option value="sqrt">√R(y), in ω units</option><option value="r">R(y), as on the slide</option></select></label>
         <label class="chk" title="the two curves on which R = ω₂²; they cross at mode 2"><input type="checkbox" id="dsLvl">R = ω₂² curves</label>
@@ -339,17 +339,19 @@
         <table class="meth" id="dMeth"></table>
         <div class="note" style="flex:1 1 300px;min-width:0">
           <div id="eqD2" style="font-size:13px;color:var(--ink)"></div>
-          <div><b>Hold for <i>p</i>, first shift <i>r</i>₀</b> set the shifted start: the shift stays at <i>r</i>₀ for the cycles <i>k</i> = 0, …, <i>p</i> (<i>p</i> = 0: once). That is inverse iteration with a fixed shift: it pulls toward the ωⱼ² nearest <i>r</i>₀, at a fixed factor per step. Then the shift follows <i>r<sub>k</sub></i> and the digits triple. Empty <i>r</i>₀: R(y₀).</div>
+          <div class="see" style="font-size:inherit"><b>Hold for <i>p</i>, first shift <i>r</i>₀</b> set the shifted start: the shift stays at <i>r</i>₀ for the cycles <i>k</i> = 0, …, <i>p</i> (<i>p</i> = 0: once). That is inverse iteration with a fixed shift: it pulls toward the ωⱼ² nearest <i>r</i>₀, at a fixed factor per step. Then the shift follows <i>r<sub>k</sub></i> and the digits triple. Empty <i>r</i>₀: R(y₀).</div>
         </div>
       </div>
       <div class="duo">
         <div id="d9svg" class="svgbox" style="flex:0.7 1 200px;min-height:240px" role="img" aria-label="the building morphing from one iterate to the next"></div>
         <div class="col" style="flex:1.7 1 340px">
           <div class="scrolly" id="d9tbl" style="flex:1 1 0;min-height:110px"></div>
-          <div class="ctl"><b>Which mode?</b> <button id="dTry" title="run the iteration from 200 random starts">try 200 random starts</button><span class="note" id="d9whichN"></span></div>
-          <div id="d9which" class="svgbox fix" style="--h:96px" role="img" aria-label="which mode the iteration reaches from each start"></div>
         </div>
         <div id="d9plot" class="plot" style="flex:1.1 1 280px;min-height:230px"></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:flex-start;flex:none">
+        <div class="ctl" style="flex:0 1 250px"><b>Which mode?</b> <button id="dTry" title="run the iteration from 200 random starts">try 200 random starts</button><span class="note" id="d9whichN"></span></div>
+        <div id="d9which" class="svgbox fix" style="--h:84px;flex:1 1 320px" role="img" aria-label="which mode the iteration reaches from each start"></div>
       </div>
     </div>
   </div>
@@ -1265,7 +1267,7 @@ function drawD7Axis() {
 // mode 2. R = w2^2 where (w1^2 - w2^2)c1^2 + (w3^2 - w2^2)c3^2 = 0 (c_j = phi_j^T M y): two planes through
 // phi_2, so two great circles on the sphere of radius f(w2^2) that cross at mode 2. The red path: the
 // iterates {y_k} of the panel below up to step k, joined by great-circle arcs lifted onto the surface.
-const DS = { rad: 'sqrt', lvl: true, key: '', camFor: '', bound: false, hover: null, down: null };
+const DS = { rad: 'sqrt', lvl: true, key: '', camFor: '', bound: false };
 // The camera the viewer left: Plotly keeps a dragged view only inside the scene, and a restyle or react
 // would put back the stored one, so read it before every update. A new example resets it.
 function dsCam(el) {
@@ -1302,10 +1304,10 @@ function dsPath(b) {
 }
 function renderDSRead(b, md) {
   const un = unitsOf(b), u = unitV(D.y);
-  let s = `on the unit sphere: ω₁ = ${sig(md.w[0], 4)}, ω₂ = ${sig(md.w[1], 4)} (saddle), ω₃ = ${sig(md.w[2], 4)} ${un.w}; ω₃/ω₁ = ${sig(md.w[2] / md.w[0], 3)}, ω₃²/ω₁² = ${sig(md.w2[2] / md.w2[0], 3)}`;
-  if (u) { const R = rayleighQ(b.k, b.m, u); s += `<br>red dot {y₀}: R = ${w2f(R)} ${un.w2}, √R = ${sig(Math.sqrt(R), 4)} ${un.w}, ${sig(100 * (Math.sqrt(R / md.w2[0]) - 1), 3)}% above ω₁`; }
+  let s = `modes: ω₁² = ${w2f(md.w2[0])}, ω₂² = ${w2f(md.w2[1])} (saddle), ω₃² = ${w2f(md.w2[2])} ${un.w2}`;
+  if (u) { const R = rayleighQ(b.k, b.m, u); s += `<br>red dot {y₀}: R = ${w2f(R)} ${un.w2}`; }
   const run = D.run?.main, K = run ? Math.min(D.k, run.length - 1) : 0;
-  if (run && K > 0) { const j = targetMode(md, b.m, run[K].y); s += `; step ${K}: r${sub(K)} = ${w2f(run[K].r)}, toward mode ${j + 1} (ω${sub(j + 1)}² = ${w2f(md.w2[j])})`; }
+  if (run && K > 0) { const j = targetMode(md, b.m, run[K].y); s += `; step ${K}: r${sub(K)} = ${w2f(run[K].r)}, toward mode ${j + 1}`; }
   $('dsK').textContent = run ? `k = ${K} of ${run.length - 1}` : '';
   $('dsread').innerHTML = s;
 }
@@ -1318,8 +1320,10 @@ function renderDS() {
   const cam = el.data && DS.camFor === b.preset ? dsCam(el) : null;
   if (cam) el.layout.scene.camera = cam;
   if (key === DS.key && el.data) {
-    const t = dsTrial(b), pa = dsPath(b), N = el.data.length;
-    Plotly.restyle(el, { x: [pa.line.x, pa.pts.x, t.x], y: [pa.line.y, pa.pts.y, t.y], z: [pa.line.z, pa.pts.z, t.z], text: [null, pa.pts.text, t.text] }, [N - 3, N - 2, N - 1]);
+    // the path and its dots in the color of the method shown, which may have changed
+    const t = dsTrial(b), pa = dsPath(b), N = el.data.length, mt = methodOf(D.show), c = css(mt.c), uh = css('--uh');
+    Plotly.restyle(el, { x: [pa.line.x, pa.pts.x, t.x], y: [pa.line.y, pa.pts.y, t.y], z: [pa.line.z, pa.pts.z, t.z], text: [null, pa.pts.text, t.text],
+      'line.color': [c, c, uh], 'marker.color': [c, c, uh], name: [`${mt.long}, {y₀} to {yₖ}`, '', 'trial shape {y₀}'] }, [N - 3, N - 2, N - 1]);
     return;
   }
   DS.key = key;
@@ -1384,31 +1388,125 @@ function renderDS() {
   Plotly.react(el, tr, lay({ showlegend: true, legend: { x: 0, y: 1, font: { size: 11 }, bgcolor: 'rgba(0,0,0,0)' }, margin: { l: 0, r: 0, t: 0, b: 0 }, uirevision: b.preset,
     scene: { xaxis: axs('y₁'), yaxis: axs('y₂'), zaxis: axs('y₃ (roof)'), aspectmode: 'cube', camera: cam ?? { eye: { x: eye[0], y: eye[1], z: eye[2] } } } }), cfg);
   DS.camFor = b.preset;
-  // a click (press and release within 6 px; a drag turns the view) on the surface puts the trial shape at
-  // the point under the pointer, {y} along that direction with largest entry 1. The point is Plotly's hover
-  // pick: its own plotly_click in 3D misses short clicks. On pointerup, not click: a hover box appearing
-  // under the pointer between press and release cancels the click event.
-  if (!DS.bound && el.on) {
-    DS.bound = true;
-    el.on('plotly_hover', ev => {
-      const pt = ev?.points?.[0], ok = pt && (pt.fullData ?? pt.data)?.type === 'surface' && [pt.x, pt.y, pt.z].every(Number.isFinite);
-      DS.hover = ok ? [pt.x, pt.y, pt.z] : null;
-      const u = ok && unitV(DS.hover), b = SD, un = unitsOf(b);
-      if (u) { const R = rayleighQ(b.k, b.m, u); $('dsHover').textContent = `under the pointer: {y} = (${u.map(v => sigF(v, 3)).join(', ')}), R = ${w2f(R)} ${un.w2}, √R = ${sig(Math.sqrt(R), 4)} ${un.w}; click to start there`; }
-    });
-    el.on('plotly_unhover', () => { DS.hover = null; $('dsHover').textContent = ''; });
-    el.addEventListener('pointerdown', e => { DS.down = [e.clientX, e.clientY]; });
-    el.addEventListener('pointerup', e => {
-      const d = DS.down; if (!d || Math.hypot(e.clientX - d[0], e.clientY - d[1]) > 6) return;
-      let tries = 0;   // the hover pick comes with the next frames
-      const go = () => {
-        const u = DS.hover && unitV(DS.hover); if (!u) { if (++tries < 8) setTimeout(go, 50); return; }
-        const top = u.reduce((a, v) => (Math.abs(v) > Math.abs(a) ? v : a), 0);
-        D.y = u.map(v => +(v / Math.abs(top)).toPrecision(4)); D.k = 0; D.morph = 1; syncShape(); renderD();
-      };
-      setTimeout(go, 50);
-    });
+  if (!DS.bound && el.on) { DS.bound = true; dsBind(el); }
+}
+// Picking: the point of the surface under a screen point, by casting the ray through it with the scene's
+// own matrices (model, view, projection) and finding where it first enters the surface |p| = f(R(p/|p|)).
+// Mouse and touch alike, so a tap needs no hover. Returns the direction u (unit) or null.
+const m4mul = (a, b) => { const o = new Array(16).fill(0); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k]; return o; };
+function m4inv(m) {   // column-major 4x4, by Gauss-Jordan
+  const a = Array.from({ length: 4 }, (_, r) => [0, 1, 2, 3].map(c => m[c * 4 + r]).concat([0, 1, 2, 3].map(c => +(c === r))));
+  for (let c = 0; c < 4; c++) {
+    let p = c; for (let r = c + 1; r < 4; r++) if (Math.abs(a[r][c]) > Math.abs(a[p][c])) p = r;
+    [a[c], a[p]] = [a[p], a[c]]; const d = a[c][c]; if (!d) return null;
+    for (let j = 0; j < 8; j++) a[c][j] /= d;
+    for (let r = 0; r < 4; r++) if (r !== c) { const f = a[r][c]; for (let j = 0; j < 8; j++) a[r][j] -= f * a[c][j]; }
   }
+  const o = new Array(16); for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) o[c * 4 + r] = a[r][4 + c]; return o;
+}
+const dsScene = () => { try { return $('dsplot')._fullLayout.scene._scene; } catch (e) { return null; } };
+function dsPick(cx, cy) {
+  const sc = dsScene(), cp = sc?.glplot?.cameraParams, cv = sc?.glplot?.canvas; if (!cp || !cv) return null;
+  const inv = m4inv(m4mul(cp.projection, m4mul(cp.view, cp.model))); if (!inv) return null;
+  const rc = cv.getBoundingClientRect(), nx = 2 * (cx - rc.left) / rc.width - 1, ny = 1 - 2 * (cy - rc.top) / rc.height;
+  const ds = sc.dataScale ?? [1, 1, 1];
+  const un = z => { const v = [nx, ny, z, 1], q = [0, 1, 2, 3].map(r => [0, 1, 2, 3].reduce((t, c) => t + inv[c * 4 + r] * v[c], 0)); return [0, 1, 2].map(i => q[i] / q[3] / ds[i]); };
+  const A = un(-1), B = un(1), b = SD, P = t => A.map((v, i) => v + t * (B[i] - v));
+  const g = t => { const p = P(t), r = Math.hypot(...p); return r < 1e-12 ? -1 : r - dsF(rayleighQ(b.k, b.m, p.map(v => v / r))); };
+  const N = 600; let t0 = 0, g0 = g(0);
+  for (let i = 1; i <= N; i++) {
+    const t1 = i / N, g1 = g(t1);
+    if (g0 > 0 && g1 <= 0) { let lo = t0, hi = t1; for (let it = 0; it < 40; it++) { const m = (lo + hi) / 2; if (g(m) > 0) lo = m; else hi = m; } return unitV(P((lo + hi) / 2)); }
+    t0 = t1; g0 = g1;
+  }
+  return null;
+}
+function dsSetTrial(u) {
+  const top = u.reduce((a, v) => (Math.abs(v) > Math.abs(a) ? v : a), 0);
+  D.y = u.map(v => +(v / Math.abs(top)).toPrecision(4)); D.k = 0; D.morph = 1; syncShape(); renderD();
+}
+function dsHoverText(u, verb) {
+  const b = SD, un = unitsOf(b), R = rayleighQ(b.k, b.m, u);
+  $('dsHover').textContent = `${verb}: {y} = (${u.map(v => sigF(v, 3)).join(', ')}), R = ${w2f(R)} ${un.w2}, √R = ${sig(Math.sqrt(R), 4)} ${un.w}`;
+}
+// Touch (the iPad), in place of Plotly's own touch control: one finger orbits about the camera's up
+// direction (as the mouse does), two fingers pinch to zoom, move to pan and twist to roll the picture
+// (the up direction turns with the fingers), and a tap (no movement, no second finger) puts the trial
+// shape at the point under the finger. The camera is Plotly's scene camera: eye, center, up.
+const v3 = { add: (a, b) => a.map((v, i) => v + b[i]), sub: (a, b) => a.map((v, i) => v - b[i]), mul: (a, s) => a.map(v => v * s),
+  dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  rot(v, k, a) { const c = Math.cos(a), s = Math.sin(a), kv = v3.dot(k, v), kx = v3.cross(k, v); return v.map((x, i) => x * c + kx[i] * s + k[i] * kv * (1 - c)); } };
+const cArr = p => [p.x, p.y, p.z], cObj = a => ({ x: a[0], y: a[1], z: a[2] });
+function dsBind(el) {
+  el.on('plotly_hover', ev => {
+    const pt = ev?.points?.[0], ok = pt && (pt.fullData ?? pt.data)?.type === 'surface' && [pt.x, pt.y, pt.z].every(Number.isFinite);
+    const u = ok && unitV([pt.x, pt.y, pt.z]); if (u) dsHoverText(u, 'under the pointer (click to start there)');
+  });
+  el.on('plotly_unhover', () => { $('dsHover').textContent = ''; });
+  // the mouse: a click (press and release within 6 px; a drag turns the view) on the surface
+  let mdown = null;
+  el.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') mdown = [e.clientX, e.clientY]; });
+  el.addEventListener('pointerup', e => {
+    if (e.pointerType !== 'mouse' || !mdown || Math.hypot(e.clientX - mdown[0], e.clientY - mdown[1]) > 6) return;
+    mdown = null; const u = dsPick(e.clientX, e.clientY); if (u) dsSetTrial(u);
+  });
+  // touch: keep every touch event away from Plotly (capture phase on the plot) and from the page
+  const block = e => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); };
+  ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(t => el.addEventListener(t, block, { capture: true, passive: false }));
+  const P = new Map(); let G = null;   // the fingers down; the gesture: camera, last positions, tap state
+  const cam = () => { const c = dsScene()?.getCamera?.(); return c && c.eye ? { eye: cArr(c.eye), center: cArr(c.center), up: cArr(c.up), projection: c.projection } : null; };
+  const apply = () => { const sc = dsScene(); if (!sc || !G?.c) return; const c = G.c;
+    sc.camera.lookAt(c.eye, c.center, c.up); sc.glplot.redraw?.(); };
+  const two = () => { const [a, b] = [...P.values()]; return { d: Math.hypot(b.x - a.x, b.y - a.y), ang: Math.atan2(b.y - a.y, b.x - a.x), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; };
+  const frame = c => { const v = v3.sub(c.eye, c.center), f = unitV(v3.mul(v, -1)), r = unitV(v3.cross(f, c.up)) ?? [1, 0, 0]; return { v, f, r, s: v3.cross(r, f) }; };
+  el.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch') return; e.stopPropagation();
+    try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    P.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (P.size === 1) G = { c: cam(), x0: e.clientX, y0: e.clientY, t0: performance.now(), tap: true };
+    else if (G) { G.tap = false; G.two = two(); }
+  }, true);
+  el.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'touch' || !P.has(e.pointerId) || !G?.c) return; e.stopPropagation();
+    const prev = P.get(e.pointerId); P.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const cr = dsScene()?.glplot?.canvas?.getBoundingClientRect(), W = cr?.width || el.clientWidth || 400, H = cr?.height || el.clientHeight || 400, c = G.c;
+    if (P.size === 1) {
+      if (Math.hypot(e.clientX - G.x0, e.clientY - G.y0) > 8) G.tap = false;
+      if (G.tap) return;
+      // orbit: horizontal turns about up, vertical tilts toward up, as Plotly's turntable drag
+      const dx = e.clientX - prev.x, dy = e.clientY - prev.y, k = unitV(c.up) ?? [0, 0, 1];
+      let v = v3.rot(v3.sub(c.eye, c.center), k, -Math.PI * dx / W);
+      const ax = unitV(v3.cross(v, k));
+      if (ax) { const w = v3.rot(v, ax, Math.PI * dy / H), cosU = v3.dot(unitV(w), k); if (Math.abs(cosU) < 0.995) v = w; }
+      c.eye = v3.add(c.center, v);
+    } else if (P.size === 2 && G.two) {
+      const t = two(), o = G.two, fr = frame(c), dist = Math.hypot(...fr.v);
+      // pan: the point at the center moves with the fingers (the scale per pixel from the projection matrix)
+      const pm = dsScene()?.glplot?.cameraParams?.projection, ppx = pm ? 2 / (pm[0] * W) : 0.83 / H, ppy = pm ? 2 / (pm[5] * H) : 0.83 / H;
+      const sh = v3.add(v3.mul(fr.r, -(t.mx - o.mx) * dist * ppx), v3.mul(fr.s, (t.my - o.my) * dist * ppy));
+      c.center = v3.add(c.center, sh);
+      // zoom: fingers apart bring the eye in
+      const z = clamp(o.d / Math.max(t.d, 1), 0.5, 2), nd = clamp(dist * z, 0.25, 12);
+      c.eye = v3.add(c.center, v3.mul(fr.v, nd / dist));
+      // roll: the picture turns with the fingers, so the up direction turns the other way about the view axis
+      c.up = v3.rot(c.up, fr.f, -(t.ang - o.ang));
+      G.two = t;
+    } else return;
+    apply();
+  }, true);
+  const end = e => {
+    if (e.pointerType !== 'touch' || !P.has(e.pointerId)) return; e.stopPropagation();
+    P.delete(e.pointerId);
+    if (P.size === 1 && G) G.two = null;   // one finger left: it orbits from where it is, no jump
+    if (P.size) return;
+    const g = G; G = null; if (!g) return;
+    if (e.type === 'pointerup' && g.tap && performance.now() - g.t0 < 700) {
+      const u = dsPick(e.clientX, e.clientY); if (u) { dsSetTrial(u); dsHoverText(u, 'tapped'); }
+    } else if (g.c) {   // keep the view the fingers left, as the mouse's does
+      const c = g.c; try { $('dsplot').layout.scene.camera = { eye: cObj(c.eye), center: cObj(c.center), up: cObj(c.up), projection: c.projection }; } catch (_) { /* ignore */ }
+    }
+  };
+  el.addEventListener('pointerup', end, true); el.addEventListener('pointercancel', end, true);
 }
 // The methods of panel 9, each with its own color everywhere: the error plot, the method table, the path
 // on the sphere. 'hyb', the shifted start, exists only when a first shift or a hold is set; r0 and hold act
@@ -1418,7 +1516,7 @@ const METHODS = [
   { id: 'rqi', name: 'RQI', long: 'Rayleigh quotient iteration', c: '--uh', eq: String.raw`([K] - r_k[M])\{z\} = [M]\{y_k\}`, why: 'shift r<sub>k</sub> = R(y<sub>k</sub>), new each step: cubic' },
   { id: 'slip', name: 'solve with {y<sub>k</sub>}', long: 'solve with {yₖ}', c: '--c-net', eq: String.raw`([K] - r_k[M])\{z\} = \{y_k\}`, why: 'no [M] on the right (the 2024 notes): quadratic' },
   { id: 'inv', name: 'inverse iteration', long: 'inverse iteration', c: '--c-pos', eq: String.raw`[K]\{z\} = [M]\{y_k\}`, why: 'static deflection under the loads [M]{y<sub>k</sub>}; no shift: a fixed factor per step, toward mode 1' },
-  { id: 'hyb', name: 'shifted start', long: 'shifted start', c: '--c-grav', eq: String.raw`([K] - s_k[M])\{z\} = [M]\{y_k\},\ \ s_k = r_0\ (k \le p),\ r_k\ (k > p)`, why: 'inverse iteration at shift r₀, then RQI' },
+  { id: 'hyb', name: 'shifted start', long: 'shifted start', c: '--c-grav', eq: String.raw`\begin{aligned}&([K] - s_k[M])\{z\} = [M]\{y_k\}\\ &s_k = r_0\ (k \le p),\ r_k\ (k > p)\end{aligned}`, why: 'inverse iteration at shift r₀, then RQI' },
 ];
 const methodOf = id => METHODS.find(m => m.id === id) ?? METHODS[0];
 const hybOn = () => D.r0 != null || D.hold > 0;
@@ -1462,9 +1560,9 @@ function drawD9() {
 function renderD9Table() {
   const b = SD, md = D.md, n = md.n, run = D.run.main, k = Math.min(D.k, run.length - 1), err = errorsOf(md, b.m, run), u = unitsOf(b);
   const shifted = D.show === 'hyb', done = run[run.length - 1].res < 1e-13;
-  let h = `<table class="iter"><tr><th>k</th><th>r<sub>k</sub></th>${shifted ? '<th>shift</th>' : ''}<th>err r<sub>k</sub></th><th>${n === 2 ? 'err y₂/y₁' : 'shape err'}</th><th>sign chg</th>${n <= 3 ? '<th>y<sub>k</sub></th>' : ''}</tr>`;
+  let h = `<table class="iter"><tr><th>k</th><th>r<sub>k</sub></th>${shifted ? '<th>shift</th>' : ''}<th>err r<sub>k</sub></th><th>${n === 2 ? 'err y₂/y₁' : 'shape err'}</th>${n <= 3 ? '<th>y<sub>k</sub></th>' : ''}</tr>`;
   for (let s = 0; s <= k; s++) {
-    h += `<tr class="${s === k ? 'cur' : ''}"><td>${s}</td><td>${sigF(run[s].r, s > 1 ? 10 : 7)}</td>${shifted ? `<td>${sig(run[s].shift, 6)}</td>` : ''}<td>${sciHTML(err.r[s])}</td><td>${sciHTML(err.shape[s])}</td><td>${signChanges(run[s].y)}</td>${n <= 3 ? `<td>${run[s].y.map(v => sigF(v, n === 3 ? 3 : 4)).join(', ')}</td>` : ''}</tr>`;
+    h += `<tr class="${s === k ? 'cur' : ''}"><td>${s}</td><td>${sigF(run[s].r, s > 1 ? 10 : 7)}</td>${shifted ? `<td>${sig(run[s].shift, 6)}</td>` : ''}<td>${sciHTML(err.r[s])}</td><td>${sciHTML(err.shape[s])}</td>${n <= 3 ? `<td>${run[s].y.map(v => sigF(v, n === 3 ? 3 : 4)).join(', ')}</td>` : ''}</tr>`;
   }
   $('d9tbl').innerHTML = h + '</table>' + (k === run.length - 1 && !done ? `<div class="note">${methodOf(D.show).long}: not converged after ${k} steps, heading for mode ${err.mode + 1}.</div>` : k === run.length - 1 ? `<div class="note">${methodOf(D.show).long} converged to mode ${err.mode + 1}: ω² = ${sig(md.w2[err.mode], 8)} ${u.w2}, ${err.mode} sign change${err.mode === 1 ? '' : 's'}. Double precision stops near 10<sup>−16</sup>.</div>` : '');
   $('dStep').disabled = k >= run.length - 1;
@@ -1476,8 +1574,8 @@ function plotD9() {
     return { x: e.map((_, i) => i), y: e.map(v => (Number.isFinite(v) ? Math.max(v, FLOOR) : null)), mode: 'lines+markers', name, line: { color, width, dash }, marker: { size: width > 2 ? 8 : 6 },
              hovertemplate: `${name}, k = %{x}: %{y:.2e}<extra></extra>` }; };
   // the shown method last, so it lies on top, and heavier
-  const tr = METHODS.filter(m => plotted(m.id) && m.id !== D.show).concat(methodOf(D.show)).map(m => curve(D.run[m.id], m.long, css(m.c), m.id === D.show ? 3.5 : 2, 'solid'));
-  Plotly.react('d9plot', tr, lay({ showlegend: false, margin: { l: 56, r: 10, t: 10, b: 36 },
+  const tr = METHODS.filter(m => plotted(m.id) && m.id !== D.show).concat(methodOf(D.show)).map(m => curve(D.run[m.id], m.name, css(m.c), m.id === D.show ? 3.5 : 2, 'solid'));
+  Plotly.react('d9plot', tr, lay({ showlegend: true, legend: { orientation: 'h', x: 0, xanchor: 'left', y: 1.02, yanchor: 'bottom', font: { size: 11 }, bgcolor: 'rgba(0,0,0,0)', traceorder: 'normal' }, margin: { l: 56, r: 10, t: 10, b: 36 },
     xaxis: ax('step k', { dtick: 1, range: [-0.2, Math.max(4, K) + 0.2] }),
     yaxis: ax(key === 'shape' ? (md.n === 2 ? 'error of y₂/y₁' : 'shape error') : 'relative error of r_k', { type: 'log', range: [-16.5, 1], dtick: 2, exponentformat: 'power' }) }), cfg);
 }
