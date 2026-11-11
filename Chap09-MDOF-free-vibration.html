@@ -9,7 +9,9 @@
      (2026-11-03): panels 2, 4, 6, 8, 10, the Betti view of panel 5 and the lowest-R game of panel 7.
      Closed forms only, no integrator. Open this file directly in a browser (internet needed for Plotly
      and KaTeX). The state is in the URL hash, e.g. #tab=d&preset=paz71&y=1,1.5&step=2. On a landscape
-     screen (the iPad in class) tabs A, B, C fit one screen and tab D snaps between two. -->
+     screen (the iPad in class) tabs A, B, C fit one screen and tab D snaps between three. Tab D has its own building, three stories
+     only, with k and m in boxes, and draws R over the unit sphere with the iteration's path (added
+     2026-11-10, not in the spec). -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.3/plotly.min.js"></script>
@@ -104,6 +106,15 @@
   table.iter td { padding: 1px 6px; text-align: right; white-space: nowrap; }
   table.iter tr.cur td { background: var(--hl); }
   .scrolly { overflow: auto; min-height: 0; }
+  table.meth { border-collapse: collapse; font-size: 12.5px; }
+  table.meth th { color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); padding: 1px 8px; text-align: left; white-space: nowrap; }
+  table.meth td { padding: 2px 8px; white-space: nowrap; vertical-align: middle; }
+  table.meth td.c, table.meth th.c { text-align: center; }
+  table.meth td.why { white-space: normal; color: var(--muted); min-width: 150px; }
+  table.meth tr.cur td { background: var(--hl); }
+  table.meth tr.off { opacity: 0.45; }
+  table.meth .sw { display: inline-block; width: 22px; height: 4px; border-radius: 2px; vertical-align: middle; }
+  #dsplot { min-height: 480px; }
   #b3pred { display: flex; gap: 6px; }
   #b3pred label { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: stretch; font-size: 11.5px; text-align: center; color: var(--muted); }
   #b3pred input { width: 100%; }
@@ -141,6 +152,7 @@
     .col { min-height: 0; }
     #sec-d > .grid { display: flex; flex-direction: column; overflow-y: auto; scroll-snap-type: y mandatory; }
     #sec-d .panel { flex: 0 0 100%; scroll-snap-align: start; }
+    #dsplot { min-height: 240px; }
   }
 </style>
 </head>
@@ -279,13 +291,12 @@
 <!-- ======================= Tab D: spec panels 7 and 9 ======================= -->
 <section id="sec-d" hidden>
   <div class="bar">
-    <label>Building <select id="dPreset" class="presetS"></select></label>
-    <span class="grp"><span class="sym">n</span><button class="play" id="dNPlay" title="sweep n">▶</button>
-      <input type="range" id="dN" min="1" max="10" step="1" style="width:70px"><span class="val" id="dNLbl"></span></span>
-    <button id="dTbl" title="story stiffness, height and weight, one slider per story">stories…</button>
+    <span class="grp" id="dKM"></span>
+    <label title="three-story buildings only: the quotient over all shapes is then a surface over the sphere">Building <select id="dPreset"></select></label>
+    <button id="dKMReset" hidden title="back to the example's numbers">↺ example</button>
+    <span class="grp" id="dYs"></span>
     <label>Trial shape <select id="dShape"></select></label>
     <span class="grp">on mode <span id="dModes" style="display:inline-flex;gap:3px;flex-wrap:wrap"></span></span>
-    <span class="grp"><button id="dGo7" title="show the trial shape">↑ quotient</button><button id="dGo9" title="show the iteration">↓ iteration</button></span>
   </div>
   <div class="grid">
     <div class="panel" id="d7panel">
@@ -296,25 +307,41 @@
       <div class="duo">
         <div id="d7svg" class="svgbox drag" style="flex:1 1 280px;min-height:280px" role="img" aria-label="building: drag the floors to set the trial shape"></div>
         <div class="col" style="flex:2 1 360px">
-          <div id="d7axis" class="svgbox fix" style="--h:190px" role="img" aria-label="the frequencies on an axis of omega squared, and a balance of weights"></div>
-          <div id="d7bars" class="svgbox" style="flex:1 1 0;min-height:110px" role="img" aria-label="the weights by mode"></div>
+          <div id="d7axis" class="svgbox" style="flex:1 1 0;min-height:230px" role="img" aria-label="the frequencies on an axis of omega squared, each labeled with its mode, and a balance with each mode's weight in percent"></div>
         </div>
       </div>
-      <div class="readout" id="d7read"></div>
+    </div>
+    <div class="panel" id="dSpanel">
+      <h2>Rayleigh's quotient on the unit sphere <span class="ref">the slide's polar plot, one dimension up</span></h2>
+      <p class="see"><b>Every direction {y} reaches out to √R(y): the surface comes closest along mode 1, reaches farthest along mode 3, and has a saddle at mode 2,</b>
+        where two curves of R = ω₂² cross. Each trial shape is a point on this surface, so R(y) cannot leave [ω₁², ω₃²]. Near mode 1 the surface is flat: a small error in the shape barely changes R.
+        Click the surface to put the trial shape there (drag to turn the view). The red dots are the trial shape {y₀} and −{y₀} (R is the same); step the iteration and a path follows the method shown in the panel below, in that method's color (red: Rayleigh quotient iteration), each {y<sub>k</sub>} at its own √R.</p>
+      <div class="ctl">
+        <label>radius <select id="dsRad"><option value="sqrt">√R(y), in ω units</option><option value="r">R(y), as on the slide</option></select></label>
+        <label class="chk" title="the two curves on which R = ω₂²; they cross at mode 2"><input type="checkbox" id="dsLvl">R = ω₂² curves</label>
+        <span class="grp">iteration <button id="dsStep" title="one more step of the iteration below">Step ▶</button><button id="dsFirst" title="back to the start">⏮</button><span class="note" id="dsK"></span></span>
+      </div>
+      <div id="dsplot" class="plot" role="img" aria-label="Rayleigh's quotient of a three-story building as a surface over the unit sphere, with the three mode axes"></div>
+      <div class="readout" id="dsread"></div>
+      <div class="readout" id="dsHover" style="min-height:1.4em"></div>
     </div>
     <div class="panel" id="d9panel">
       <h2>Rayleigh quotient iteration <span class="ref">not in Paz; 2024 notes L22, L29; Chopra Ex. 10.14–10.16</span></h2>
-      <p class="see"><b>Digits roughly triple each step, and it finds whichever mode the start favors, not the lowest:</b> the count of sign changes tells which mode came out. Paz's update and solving with {y<sub>k</sub>} are quadratic; inverse iteration gains a fixed factor per step.</p>
+      <p class="see"><b>Digits roughly triple each step, and it finds whichever mode the start favors, not the lowest:</b> the count of sign changes tells which mode came out. The table defines the methods: tick the ones to plot, pick the one to show in the building, the table of iterates and on the sphere.</p>
       <div class="ctl">
         <button id="dStep" title="one more step">Step ▶</button><button id="dPlay" title="step until converged">▶ play</button><button id="dFirst" title="back to the start">⏮</button>
-        <label title="the shift of the first cycle; empty: R(y₀)">first shift <span class="sym">r₀</span> <input type="number" id="dR0" step="any" placeholder="R(y₀)"></label>
-        <label title="use the first shift for this many more cycles; large: inverse iteration with a fixed shift">hold for <span class="sym">p</span> <input type="number" id="dHold" min="0" max="20" step="1" style="width:3.5em"></label>
+        <label title="shifted start: keep the first shift for the cycles k = 0, …, p">hold for <span class="sym">p</span> <input type="number" id="dHold" min="0" max="20" step="1" style="width:3.5em"></label>
+        <label title="shifted start: the shift of the first cycle; empty: R(y₀)">first shift <span class="sym">r₀</span> <input type="number" id="dR0" step="any" placeholder="R(y₀)"></label>
         <span id="dChips" style="display:inline-flex;gap:3px;flex-wrap:wrap"></span>
-        <label class="chk" title="normalize by the plain norm instead of the M-norm: r_k does not change"><input type="checkbox" id="dPlain">plain norm</label>
-        <label class="chk" title="solve with {y_k} on the right-hand side instead of [M]{y_k}"><input type="checkbox" id="dSlip"><span>solve with {y<sub>k</sub>}</span></label>
         <label>plot <select id="dMeas"><option value="shape">shape error</option><option value="r">error of r_k</option></select></label>
       </div>
-      <div class="eq" id="eqD2"></div>
+      <div class="duo" style="flex:none;align-items:flex-start;gap:8px 20px">
+        <table class="meth" id="dMeth"></table>
+        <div class="note" style="flex:1 1 300px;min-width:0">
+          <div id="eqD2" style="font-size:13px;color:var(--ink)"></div>
+          <div><b>Hold for <i>p</i>, first shift <i>r</i>₀</b> set the shifted start: the shift stays at <i>r</i>₀ for the cycles <i>k</i> = 0, …, <i>p</i> (<i>p</i> = 0: once). That is inverse iteration with a fixed shift: it pulls toward the ωⱼ² nearest <i>r</i>₀, at a fixed factor per step. Then the shift follows <i>r<sub>k</sub></i> and the digits triple. Empty <i>r</i>₀: R(y₀).</div>
+        </div>
+      </div>
       <div class="duo">
         <div id="d9svg" class="svgbox" style="flex:0.7 1 200px;min-height:240px" role="img" aria-label="the building morphing from one iterate to the next"></div>
         <div class="col" style="flex:1.7 1 340px">
@@ -322,7 +349,7 @@
           <div class="ctl"><b>Which mode?</b> <button id="dTry" title="run the iteration from 200 random starts">try 200 random starts</button><span class="note" id="d9whichN"></span></div>
           <div id="d9which" class="svgbox fix" style="--h:96px" role="img" aria-label="which mode the iteration reaches from each start"></div>
         </div>
-        <div id="d9plot" class="plot" style="flex:1.1 1 280px;min-height:320px"></div>
+        <div id="d9plot" class="plot" style="flex:1.1 1 280px;min-height:230px"></div>
       </div>
     </div>
   </div>
@@ -459,7 +486,7 @@ function innerTerms(k, m, x, y, weight) {
 // shift; 'paz', n = 2, Paz's update of Ex. 7.3, a_2 from the first row at r_k. The solves pivot, since
 // [K] - r[M] is indefinite, and stop before it is singular: when the residual with {y} M-normalized is
 // below 1e-13. A first shift r0 is held for the cycles k <= hold, then the shift is r_k.
-function iterate(k, m, y0, { method = 'rqi', r0 = null, hold = 0, plain = false, steps = 8 } = {}) {
+function iterate(k, m, y0, { method = 'rqi', r0 = null, hold = 0, steps = 8 } = {}) {
   const K = stiffness(k), n = k.length, out = [];
   let y = y0.slice();
   for (let s = 0; s <= steps; s++) {
@@ -479,7 +506,7 @@ function iterate(k, m, y0, { method = 'rqi', r0 = null, hold = 0, plain = false,
       if (f.A.some((row, i) => row[i] === 0)) break;
       z = luSolve(f, method === 'slip' ? y : y.map((v, i) => m[i] * v));
     }
-    const nz = plain ? Math.sqrt(dot(z, z)) : Math.sqrt(mDot(m, z, z));
+    const nz = Math.sqrt(mDot(m, z, z));
     if (!(nz > 0) || !Number.isFinite(nz)) break;
     const flip = mDot(m, z, y) < 0 ? -1 : 1;
     y = method === 'paz' ? z : z.map(v => flip * v / nz);
@@ -923,6 +950,9 @@ function renderA() {
 
 // ============================ Shared building of tabs B, C, D ============================
 let SB = makeBuilding('paz71');
+// Tab D has its own building, three stories only: R over all shapes is then a surface over the unit sphere
+const D_PRESETS = ['p811', 'p811e', 'ch1014', 'demo'];
+let SD = makeBuilding('p811');
 const zerosN = n => new Array(n).fill(0);
 
 // ============================ Tab B: drag the floors, let go (spec panel 3) ============================
@@ -1171,10 +1201,10 @@ function renderC() {
 }
 
 // ============================ Tab D: Rayleigh's quotient (spec panel 7) and its iteration (panel 9) =
-const D = { y: [1, 1.5], shape: '', k: 0, r0: null, hold: 0, plain: false, slip: false, meas: 'shape', morph: 1, seed: 1, hist: null, md: null, run: null, histKey: '', strip: null, stripKey: '', top: 1 };
+const D = { y: [1, 1.5], shape: '', k: 0, r0: null, hold: 0, show: 'rqi', plot: { rqi: true, slip: true, inv: true, hyb: true }, meas: 'shape', morph: 1, seed: 1, hist: null, md: null, run: null, histKey: '', strip: null, stripKey: '', top: 1 };
 function drawD7() {
   const el = $('d7svg'); if (!el.clientWidth) return;
-  const b = SB, md = D.md, n = md.n, W = el.clientWidth, y = D.y;
+  const b = SD, md = D.md, n = md.n, W = el.clientWidth, y = D.y;
   const g = geom(el, b, { mL: 26, mR: 92, mT: 28, mB: 18, frac: 0.5, bay: clamp(W * 0.2, 36, 90) });
   const xc = (g.x0 + g.x1) / 2, room = Math.min(g.x0 - 22, W - 92 - g.x1), sc = room / (D.top || 1), rl = floorOmegas(b.k, b.m, y);
   let s = groundSvg(g, b) + frameSvg(g, b, zerosN(n), 0, { c: 'var(--c-ghost)', w: 1, dash: '3 3', dots: false, girder: 1 });
@@ -1192,22 +1222,27 @@ function drawD7() {
 }
 function drawD7Axis() {
   const el = $('d7axis'); if (!el.clientWidth) return;
-  const b = SB, md = D.md, n = md.n, W = el.clientWidth, H = el.clientHeight, u = unitsOf(b), R = rayleighQ(b.k, b.m, D.y);
+  const b = SD, md = D.md, n = md.n, W = el.clientWidth, H = el.clientHeight, u = unitsOf(b), R = rayleighQ(b.k, b.m, D.y);
   const L = 12, Rt = 12, c = modalCoords(md, b.m, D.y), sc2 = sum(c.map(x => x * x)), wt = c.map(x => (sc2 > 0 ? x * x / sc2 : 0));
-  const rl = floorOmegas(b.k, b.m, D.y), xMax = 1.08 * md.w2[n - 1], x = v => L + (W - L - Rt) * v / xMax, yA = 36;
+  const rl = floorOmegas(b.k, b.m, D.y), xMax = 1.08 * md.w2[n - 1], x = v => L + (W - L - Rt) * v / xMax, yA = 64;
   let s = sv.rect(L, yA - 12, x(md.w2[0]) - L, 24, 'var(--c-neg)', 'fill-opacity="0.13"') + sv.rect(x(md.w2[n - 1]), yA - 12, W - Rt - x(md.w2[n - 1]), 24, 'var(--c-neg)', 'fill-opacity="0.13"');
   s += sv.line(L, yA, W - Rt, yA, 'var(--muted)', 1.5);
   s += sv.text(W - Rt, yA + 20, `ω² (${u.w2})`, { size: 10.5, anchor: 'end', c: 'var(--muted)' });
-  let lastX = -99;
+  let lastX = -99; const shown = [];
   md.w2.forEach((v, j) => {
     s += sv.line(x(v), yA - 11, x(v), yA + 11, modeVar(j), 3);
-    if (x(v) - lastX > 44) { s += sv.text(x(v), yA - 19, w2f(v), { size: 11, anchor: 'middle', c: modeVar(j) }); lastX = x(v); }
+    if (x(v) - lastX > 44) { s += sv.text(x(v), yA - 19, w2f(v), { size: 11, anchor: 'middle', c: modeVar(j) });
+      s += sv.text(x(v), yA - 32, `mode ${j + 1}`, { size: 11, anchor: 'middle', c: modeVar(j), weight: 600 }); lastX = x(v); shown.push(x(v)); }
   });
+  if (Number.isFinite(R)) {
+    const q = clamp(x(R), L + 34, W - Rt - 34), up = shown.some(t => Math.abs(t - q) < 70);
+    s += sv.text(q, up ? yA - 46 : yA - 19, `R(y) = ${w2f(R)}`, { size: 11, anchor: 'middle', c: 'var(--uh)' });
+  }
   // each floor's own omega^2, small diamonds; they meet on a tick when the shape is a mode
   rl.forEach(v => { if (Number.isFinite(v) && v >= 0 && v <= xMax) { const q = x(v), r = 4; s += `<polygon points="${n1(q)},${n1(yA + 9 - r)} ${n1(q + r)},${n1(yA + 9)} ${n1(q)},${n1(yA + 9 + r)} ${n1(q - r)},${n1(yA + 9)}" style="fill:var(--panel);stroke:var(--ink);stroke-width:1"/>`; } });
   if (Number.isFinite(R)) s += sv.circle(x(R), yA, 6.5, 'var(--uh)', 'var(--panel)', 2);
   // the balance
-  const yB = yA + 44, hMax = Math.max(16, Math.min(H - yB - 30, 84));
+  const yB = yA + 44, hMax = Math.max(16, Math.min(H - yB - 30, 110));
   if (Number.isFinite(R)) {
     s += sv.line(x(md.w2[0]), yB, x(md.w2[n - 1]), yB, 'var(--ink)', 3);
     s += `<polygon points="${n1(x(R))},${n1(yB + 2)} ${n1(x(R) - 9)},${n1(yB - 14)} ${n1(x(R) + 9)},${n1(yB - 14)}" style="fill:var(--uh)"/>`;
@@ -1217,73 +1252,239 @@ function drawD7Axis() {
       const q = x(md.w2[j]), side = Math.sqrt(w) * Math.min(hMax, n > 5 ? 50 : hMax);
       s += sv.line(q, yB, q, yB + 8, modeVar(j), 1.5);
       if (w > 1e-5) s += sv.rect(q - side / 2, yB + 8, side, side, modeVar(j));
-      if (n <= 5 || w > 0.05) s += sv.text(q, yB + 8 + side + 9, sig(w, 3), { size: 10.5, anchor: 'middle' });
+      if (n <= 5 || w > 0.05) s += sv.text(q, yB + 8 + side + 9, `${sig(100 * w, 3)}%`, { size: 11, anchor: 'middle' });
     });
     s += sv.text(W / 2, yB - 8, 'the balance: weight at each ωⱼ²', { size: 10.5, anchor: 'middle', c: 'var(--muted)' });
   }
   setSvg(el, s);
 }
-function drawD7Bars() {
-  const el = $('d7bars'); if (!el.clientWidth) return;
-  const b = SB, md = D.md, n = md.n, W = el.clientWidth, H = el.clientHeight, c = modalCoords(md, b.m, D.y), t = sum(c.map(x => x * x));
-  const wt = c.map(x => (t > 0 ? x * x / t : 0)), cw = W / n, top = 14, bot = 16, h = H - top - bot;
-  let s = sv.line(0, H - bot, W, H - bot, 'var(--line)', 1);
-  wt.forEach((w, j) => {
-    const bw = Math.min(cw * 0.56, 90), x = j * cw + (cw - bw) / 2;
-    s += sv.rect(x, H - bot - w * h, bw, Math.max(w * h, 0.5), modeVar(j));
-    s += sv.text(x + bw / 2, H - bot - w * h - 7, `${sig(100 * w, 3)}%`, { size: 11, anchor: 'middle' });
-    s += sv.text(x + bw / 2, H - 6, n <= 6 ? `mode ${j + 1}` : `${j + 1}`, { size: 11, anchor: 'middle', c: modeVar(j) });
-  });
-  setSvg(el, s);
+// The quotient on the unit sphere (added 2026-11-10, not in the spec): the deck's polar plot of R over
+// the unit circle {cos t, sin t} (figures/rayleigh-polar.png), one dimension up. Along each unit direction
+// u = {y}/|{y}| (plain length, as on the slide) the surface sits at distance f(R(u)), f = sqrt or identity.
+// The stationary points of R are the modes: closest along mode 1, farthest along mode 3, a saddle at
+// mode 2. R = w2^2 where (w1^2 - w2^2)c1^2 + (w3^2 - w2^2)c3^2 = 0 (c_j = phi_j^T M y): two planes through
+// phi_2, so two great circles on the sphere of radius f(w2^2) that cross at mode 2. The red path: the
+// iterates {y_k} of the panel below up to step k, joined by great-circle arcs lifted onto the surface.
+const DS = { rad: 'sqrt', lvl: true, key: '', camFor: '', bound: false, hover: null, down: null };
+// The camera the viewer left: Plotly keeps a dragged view only inside the scene, and a restyle or react
+// would put back the stored one, so read it before every update. A new example resets it.
+function dsCam(el) {
+  try { const c = el._fullLayout.scene._scene.getCamera(); return c && c.eye ? c : null; } catch (e) { return null; }
 }
-const iterOpts = () => ({ r0: D.r0, hold: D.hold, plain: D.plain, steps: Math.max(8, D.hold + 6) });
+const unitV = v => { const s = Math.hypot(...v); return s > 0 ? v.map(x => x / s) : null; };
+const dsB = () => SD;
+const dsF = R => (DS.rad === 'sqrt' ? Math.sqrt(Math.max(R, 0)) : R);
+function dsTrial(b) {
+  const u = unitV(D.y);
+  if (!u) return { x: [], y: [], z: [], text: [] };
+  const R = rayleighQ(b.k, b.m, u), r = dsF(R), un = unitsOf(b);
+  const t = `trial shape, unit length: (${u.map(v => sigF(v, 3)).join(', ')})<br>R = ${w2f(R)} ${un.w2}, √R = ${sig(Math.sqrt(R), 4)} ${un.w}`;
+  // both {y} and -{y}: R is even, so every shape is a pair of opposite points and one is always in view
+  return { x: [-u[0] * r, 0, u[0] * r], y: [-u[1] * r, 0, u[1] * r], z: [-u[2] * r, 0, u[2] * r], text: [t, t, t] };
+}
+// the iterates up to step k, each sign matched to the one before (R(-y) = R(y)), and the arcs between them
+function dsPath(b) {
+  const run = D.run?.main ?? [], K = Math.min(D.k, run.length - 1), x = [], y = [], z = [], px = [], py = [], pz = [], txt = [];
+  let prev = null;
+  for (let s = 0; s <= K; s++) {
+    let u = unitV(run[s].y); if (!u) break;
+    if (prev && dot(u, prev) < 0) u = u.map(v => -v);
+    if (prev) for (let t = 1; t <= 24; t++) {
+      const w = unitV(prev.map((v, i) => v * (1 - t / 24) + u[i] * t / 24)); if (!w) continue;
+      const r = 1.01 * dsF(rayleighQ(b.k, b.m, w)); x.push(w[0] * r); y.push(w[1] * r); z.push(w[2] * r);
+    } else { const r = 1.01 * dsF(rayleighQ(b.k, b.m, u)); x.push(u[0] * r); y.push(u[1] * r); z.push(u[2] * r); }
+    const r = 1.01 * dsF(run[s].r); px.push(u[0] * r); py.push(u[1] * r); pz.push(u[2] * r);
+    txt.push(`y${sub(s)}: r${sub(s)} = ${w2f(run[s].r)}`);
+    prev = u;
+  }
+  const both = a => [...a, null, ...a.map(v => -v)], both2 = a => [...a, ...a.map(v => -v)];
+  return { line: { x: both(x), y: both(y), z: both(z) }, pts: { x: both2(px), y: both2(py), z: both2(pz), text: [...txt, ...txt] } };
+}
+function renderDSRead(b, md) {
+  const un = unitsOf(b), u = unitV(D.y);
+  let s = `on the unit sphere: ω₁ = ${sig(md.w[0], 4)}, ω₂ = ${sig(md.w[1], 4)} (saddle), ω₃ = ${sig(md.w[2], 4)} ${un.w}; ω₃/ω₁ = ${sig(md.w[2] / md.w[0], 3)}, ω₃²/ω₁² = ${sig(md.w2[2] / md.w2[0], 3)}`;
+  if (u) { const R = rayleighQ(b.k, b.m, u); s += `<br>red dot {y₀}: R = ${w2f(R)} ${un.w2}, √R = ${sig(Math.sqrt(R), 4)} ${un.w}, ${sig(100 * (Math.sqrt(R / md.w2[0]) - 1), 3)}% above ω₁`; }
+  const run = D.run?.main, K = run ? Math.min(D.k, run.length - 1) : 0;
+  if (run && K > 0) { const j = targetMode(md, b.m, run[K].y); s += `; step ${K}: r${sub(K)} = ${w2f(run[K].r)}, toward mode ${j + 1} (ω${sub(j + 1)}² = ${w2f(md.w2[j])})`; }
+  $('dsK').textContent = run ? `k = ${K} of ${run.length - 1}` : '';
+  $('dsread').innerHTML = s;
+}
+function renderDS() {
+  if (typeof Plotly === 'undefined') return;
+  const el = $('dsplot'), b = dsB(), md = D.md, un = unitsOf(b);
+  $('dsRad').value = DS.rad; $('dsLvl').checked = DS.lvl;
+  renderDSRead(b, md);
+  const key = JSON.stringify([b.k, b.m, DS.rad, DS.lvl, document.documentElement.dataset.theme ?? '']);
+  const cam = el.data && DS.camFor === b.preset ? dsCam(el) : null;
+  if (cam) el.layout.scene.camera = cam;
+  if (key === DS.key && el.data) {
+    const t = dsTrial(b), pa = dsPath(b), N = el.data.length;
+    Plotly.restyle(el, { x: [pa.line.x, pa.pts.x, t.x], y: [pa.line.y, pa.pts.y, t.y], z: [pa.line.z, pa.pts.z, t.z], text: [null, pa.pts.text, t.text] }, [N - 3, N - 2, N - 1]);
+    return;
+  }
+  DS.key = key;
+  const dark = document.documentElement.dataset.theme === 'dark', ink = css('--ink'), muted = css('--muted');
+  // the surface: polar angle th from the y3 axis, azimuth ph in the y1-y2 plane
+  const NT = 61, NP = 121, X = [], Y = [], Z = [], C = [];
+  for (let i = 0; i < NT; i++) {
+    const th = Math.PI * i / (NT - 1), rx = [], ry = [], rz = [], rc = [];
+    for (let j = 0; j < NP; j++) {
+      const ph = 2 * Math.PI * j / (NP - 1), u = [Math.sin(th) * Math.cos(ph), Math.sin(th) * Math.sin(ph), Math.cos(th)];
+      const R = rayleighQ(b.k, b.m, u), r = dsF(R);
+      rx.push(u[0] * r); ry.push(u[1] * r); rz.push(u[2] * r); rc.push(r);
+    }
+    X.push(rx); Y.push(ry); Z.push(rz); C.push(rc);
+  }
+  const fw = md.w2.map(dsF), L = 1.22 * fw[2];
+  const tr = [{ type: 'surface', x: X, y: Y, z: Z, surfacecolor: C, cmin: fw[0], cmax: fw[2],
+    colorscale: dark ? [[0, '#34363d'], [1, '#dcdce4']] : [[0, '#f6f6f8'], [1, '#62626c']],
+    lighting: { ambient: 0.85, diffuse: 0.45, specular: 0.08, roughness: 0.9, fresnel: 0.05 },
+    // no hover box and no highlight lines: the readout under the plot names the point under the pointer
+    // (with the highlight off Plotly still gives the point's x, y, z, but not its other data)
+    contours: { x: { highlight: false }, y: { highlight: false }, z: { highlight: false } },
+    colorbar: { title: { text: DS.rad === 'sqrt' ? `√R (${un.w})` : `R (${un.w2})`, side: 'right', font: { size: 12 } }, len: 0.75, thickness: 12, x: 1.0,
+      tickvals: fw, ticktext: fw.map((v, j) => `ω${sub(j + 1)}${DS.rad === 'sqrt' ? '' : '²'} ${sig(v, 4)}`), tickfont: { size: 11 }, outlinewidth: 0 },
+    hoverinfo: 'none', name: 'R on the unit sphere', showlegend: false }];
+  // the mode axes: dashed through the center, a dot where each meets the surface
+  md.w2.forEach((w2, j) => {
+    const p = unitV(colOf(md.A, j)), f = fw[j], c = modeHex(j);
+    tr.push({ type: 'scatter3d', mode: 'lines', x: [-L * p[0], L * p[0]], y: [-L * p[1], L * p[1]], z: [-L * p[2], L * p[2]],
+      line: { color: c, width: 4, dash: 'dash' }, name: `mode ${j + 1}: R = ω${sub(j + 1)}² = ${w2f(w2)}`, legendgroup: 'm' + j, hoverinfo: 'skip' });
+    tr.push({ type: 'scatter3d', mode: 'markers+text', x: [f * p[0], -f * p[0], L * p[0]], y: [f * p[1], -f * p[1], L * p[1]], z: [f * p[2], -f * p[2], L * p[2]],
+      marker: { size: [7, 7, 0.1], color: c, line: { color: dark ? '#000' : '#fff', width: 1 } }, text: ['', '', `mode ${j + 1}`], textposition: 'top center',
+      textfont: { color: c, size: 13 }, legendgroup: 'm' + j, showlegend: false,
+      hovertemplate: `mode ${j + 1}, ${['closest', 'saddle', 'farthest'][j]}: (${p.map(v => sigF(v, 3)).join(', ')})<br>R = ω${sub(j + 1)}² = ${w2f(w2)} ${un.w2}, ω${sub(j + 1)} = ${sig(md.w[j], 4)} ${un.w}<extra></extra>` });
+  });
+  // the two curves R = w2^2 through mode 2, lifted a little off the surface
+  if (DS.lvl) {
+    const a = Math.sqrt((md.w2[1] - md.w2[0]) / (md.w2[2] - md.w2[1])), P = md.Phi, r = 1.012 * fw[1];
+    const xs = [], ys = [], zs = [];
+    [1, -1].forEach(sg => {
+      const q = [0, 1, 2].map(i => P[i][0] + sg * a * P[i][2]);
+      for (let t = 0; t <= 180; t++) { const ang = 2 * Math.PI * t / 180, u = unitV([0, 1, 2].map(i => Math.cos(ang) * P[i][1] + Math.sin(ang) * q[i]));
+        xs.push(u[0] * r); ys.push(u[1] * r); zs.push(u[2] * r); }
+      xs.push(null); ys.push(null); zs.push(null);
+    });
+    tr.push({ type: 'scatter3d', mode: 'lines', x: xs, y: ys, z: zs, line: { color: ink, width: 3 }, name: `R = ω₂²: two curves crossing at mode 2`, hoverinfo: 'skip' });
+  }
+  const t = dsTrial(b), pa = dsPath(b), mt = methodOf(D.show), rqC = css(mt.c);
+  tr.push({ type: 'scatter3d', mode: 'lines', ...pa.line, line: { color: rqC, width: 5 }, name: `${mt.long}, {y₀} to {yₖ}`, hoverinfo: 'skip' });
+  tr.push({ type: 'scatter3d', mode: 'markers', ...pa.pts, marker: { size: 4.5, color: rqC, symbol: 'diamond', line: { color: dark ? '#000' : '#fff', width: 1 } },
+    hovertemplate: '%{text}<extra></extra>', showlegend: false });
+  tr.push({ type: 'scatter3d', mode: 'lines+markers', ...t, line: { color: css('--uh'), width: 6 }, marker: { size: [8, 0.1, 8], color: css('--uh'), line: { color: dark ? '#000' : '#fff', width: 1.5 } },
+    name: 'trial shape {y₀}', hovertemplate: '%{text}<extra></extra>' });
+  // the camera: between the normal of the plane of modes 1 and 3 (the slide's view, with the saddle facing
+  // the viewer) and mode 1, so the dimple where trial shapes land faces the viewer too
+  const p1 = unitV(colOf(md.A, 0)), p3 = unitV(colOf(md.A, 2));
+  let nv = unitV([p1[1] * p3[2] - p1[2] * p3[1], p1[2] * p3[0] - p1[0] * p3[2], p1[0] * p3[1] - p1[1] * p3[0]]) ?? [1, 1, 1];
+  if (nv[2] < 0) nv = nv.map(v => -v);
+  const eye = unitV([0, 1, 2].map(i => nv[i] + 0.8 * p1[i] + 0.15 * p3[i])).map(v => 1.75 * v);
+  const axs = title => ({ title: { text: title, font: { size: 14 } }, range: [-L, L], gridcolor: css('--grid'), zerolinecolor: css('--line'), showbackground: false,
+    color: muted, showspikes: false, tickfont: { size: 10 } });
+  Plotly.react(el, tr, lay({ showlegend: true, legend: { x: 0, y: 1, font: { size: 11 }, bgcolor: 'rgba(0,0,0,0)' }, margin: { l: 0, r: 0, t: 0, b: 0 }, uirevision: b.preset,
+    scene: { xaxis: axs('y₁'), yaxis: axs('y₂'), zaxis: axs('y₃ (roof)'), aspectmode: 'cube', camera: cam ?? { eye: { x: eye[0], y: eye[1], z: eye[2] } } } }), cfg);
+  DS.camFor = b.preset;
+  // a click (press and release within 6 px; a drag turns the view) on the surface puts the trial shape at
+  // the point under the pointer, {y} along that direction with largest entry 1. The point is Plotly's hover
+  // pick: its own plotly_click in 3D misses short clicks. On pointerup, not click: a hover box appearing
+  // under the pointer between press and release cancels the click event.
+  if (!DS.bound && el.on) {
+    DS.bound = true;
+    el.on('plotly_hover', ev => {
+      const pt = ev?.points?.[0], ok = pt && (pt.fullData ?? pt.data)?.type === 'surface' && [pt.x, pt.y, pt.z].every(Number.isFinite);
+      DS.hover = ok ? [pt.x, pt.y, pt.z] : null;
+      const u = ok && unitV(DS.hover), b = SD, un = unitsOf(b);
+      if (u) { const R = rayleighQ(b.k, b.m, u); $('dsHover').textContent = `under the pointer: {y} = (${u.map(v => sigF(v, 3)).join(', ')}), R = ${w2f(R)} ${un.w2}, √R = ${sig(Math.sqrt(R), 4)} ${un.w}; click to start there`; }
+    });
+    el.on('plotly_unhover', () => { DS.hover = null; $('dsHover').textContent = ''; });
+    el.addEventListener('pointerdown', e => { DS.down = [e.clientX, e.clientY]; });
+    el.addEventListener('pointerup', e => {
+      const d = DS.down; if (!d || Math.hypot(e.clientX - d[0], e.clientY - d[1]) > 6) return;
+      let tries = 0;   // the hover pick comes with the next frames
+      const go = () => {
+        const u = DS.hover && unitV(DS.hover); if (!u) { if (++tries < 8) setTimeout(go, 50); return; }
+        const top = u.reduce((a, v) => (Math.abs(v) > Math.abs(a) ? v : a), 0);
+        D.y = u.map(v => +(v / Math.abs(top)).toPrecision(4)); D.k = 0; D.morph = 1; syncShape(); renderD();
+      };
+      setTimeout(go, 50);
+    });
+  }
+}
+// The methods of panel 9, each with its own color everywhere: the error plot, the method table, the path
+// on the sphere. 'hyb', the shifted start, exists only when a first shift or a hold is set; r0 and hold act
+// on it alone. D.show: the method in the building, the table of iterates and on the sphere; D.plot: the
+// curves of the error plot (the shown one always).
+const METHODS = [
+  { id: 'rqi', name: 'RQI', long: 'Rayleigh quotient iteration', c: '--uh', eq: String.raw`([K] - r_k[M])\{z\} = [M]\{y_k\}`, why: 'shift r<sub>k</sub> = R(y<sub>k</sub>), new each step: cubic' },
+  { id: 'slip', name: 'solve with {y<sub>k</sub>}', long: 'solve with {yₖ}', c: '--c-net', eq: String.raw`([K] - r_k[M])\{z\} = \{y_k\}`, why: 'no [M] on the right (the 2024 notes): quadratic' },
+  { id: 'inv', name: 'inverse iteration', long: 'inverse iteration', c: '--c-pos', eq: String.raw`[K]\{z\} = [M]\{y_k\}`, why: 'static deflection under the loads [M]{y<sub>k</sub>}; no shift: a fixed factor per step, toward mode 1' },
+  { id: 'hyb', name: 'shifted start', long: 'shifted start', c: '--c-grav', eq: String.raw`([K] - s_k[M])\{z\} = [M]\{y_k\},\ \ s_k = r_0\ (k \le p),\ r_k\ (k > p)`, why: 'inverse iteration at shift r₀, then RQI' },
+];
+const methodOf = id => METHODS.find(m => m.id === id) ?? METHODS[0];
+const hybOn = () => D.r0 != null || D.hold > 0;
+const plotted = id => (id !== 'hyb' || hybOn()) && (D.plot[id] || id === D.show);
 function runMethods() {
-  const b = SB, md = D.md, runs = { main: iterate(b.k, b.m, D.y, { ...iterOpts(), method: D.slip ? 'slip' : 'rqi' }) };
-  if (D.slip) runs.rqi = iterate(b.k, b.m, D.y, { method: 'rqi' });
-  runs.inv = iterate(b.k, b.m, D.y, { method: 'inv' });
-  if (md.n === 2) runs.paz = iterate(b.k, b.m, D.y, { method: 'paz' });
+  const b = SD;
+  if (D.show === 'hyb' && !hybOn()) D.show = 'rqi';
+  const runs = { rqi: iterate(b.k, b.m, D.y, { method: 'rqi', steps: 12 }), slip: iterate(b.k, b.m, D.y, { method: 'slip', steps: 16 }),
+    inv: iterate(b.k, b.m, D.y, { method: 'inv', steps: 30 }) };
+  if (hybOn()) runs.hyb = iterate(b.k, b.m, D.y, { method: 'rqi', r0: D.r0, hold: D.hold, steps: Math.max(12, D.hold + 8) });
+  runs.main = runs[D.show];
   D.run = runs;
+}
+function renderMethods() {
+  const el = $('dMeth');
+  if (!el.childElementCount) {
+    el.innerHTML = '<tr><th></th><th>method</th><th>each step solves</th><th></th><th class="c">plot</th><th class="c">show</th></tr>' + METHODS.map(m =>
+      `<tr data-m="${m.id}"><td><span class="sw" style="background:var(${m.c})"></span></td><td>${m.name}</td><td class="eqc"></td><td class="why">${m.why}</td>`
+      + `<td class="c"><input type="checkbox" data-plot="${m.id}" aria-label="plot ${m.long}"></td><td class="c"><input type="radio" name="dShow" value="${m.id}" aria-label="show ${m.long}"></td></tr>`).join('');
+    METHODS.forEach(m => tex(el.querySelector(`tr[data-m="${m.id}"] .eqc`), m.eq));
+  }
+  METHODS.forEach(m => {
+    const tr = el.querySelector(`tr[data-m="${m.id}"]`), off = m.id === 'hyb' && !hybOn(), cb = tr.querySelector('[data-plot]'), rd = tr.querySelector('[name=dShow]');
+    tr.className = off ? 'off' : m.id === D.show ? 'cur' : '';
+    tr.title = off ? 'set a first shift r₀ or a hold p to run this method' : '';
+    cb.checked = plotted(m.id); cb.disabled = off || m.id === D.show; rd.checked = m.id === D.show; rd.disabled = off;
+  });
 }
 function drawD9() {
   const el = $('d9svg'); if (!el.clientWidth || !D.run) return;
-  const b = SB, md = D.md, n = md.n, W = el.clientWidth, run = D.run.main, k = Math.min(D.k, run.length - 1), cur = normTop(run[k].y), prev = k ? normTop(run[k - 1].y) : cur;
+  const b = SD, md = D.md, n = md.n, W = el.clientWidth, run = D.run.main, k = Math.min(D.k, run.length - 1), cur = normTop(run[k].y), prev = k ? normTop(run[k - 1].y) : cur;
   // the ratio of two iterates can flip the sign of the largest entry: follow the previous one
   const fl = dot(cur, prev) < 0 ? -1 : 1, shown = cur.map((v, i) => prev[i] + (fl * v - prev[i]) * D.morph);
   const g = geom(el, b, { mL: 8, mR: 8, mT: 22, mB: 18, frac: 0.5, bay: clamp(W * 0.26, 36, 80) }), sc = g.x0 - 10;
   let s = groundSvg(g, b) + frameSvg(g, b, zerosN(n), 0, { c: 'var(--c-ghost)', w: 1, dash: '3 3', dots: false, girder: 1 });
   if (k) s += frameSvg(g, b, prev, sc, { c: 'var(--c-ghost)', w: 1.5, dash: '4 3', dots: false, girder: 2 });
   s += frameSvg(g, b, shown, sc, { c: modeVar(targetMode(md, b.m, run[k].y)) });
-  s += sv.text(W / 2, 8, `y${sub(k)}: ${signChanges(run[k].y)} sign change${signChanges(run[k].y) === 1 ? '' : 's'}`, { size: 11.5, anchor: 'middle', c: 'var(--muted)' });
+  s += sv.text(W / 2, 8, `${methodOf(D.show).long}, y${sub(k)}: ${signChanges(run[k].y)} sign change${signChanges(run[k].y) === 1 ? '' : 's'}`, { size: 11.5, anchor: 'middle', c: `var(${methodOf(D.show).c})` });
   setSvg(el, s);
 }
 function renderD9Table() {
-  const b = SB, md = D.md, n = md.n, run = D.run.main, k = Math.min(D.k, run.length - 1), err = errorsOf(md, b.m, run), u = unitsOf(b);
-  const shifted = D.r0 != null || D.hold > 0;
-  let h = `<table class="iter"><tr><th>k</th><th>r<sub>k</sub></th>${shifted ? '<th>shift</th>' : ''}<th>err r<sub>k</sub></th><th>${n === 2 ? 'err y₂/y₁' : 'shape err'}</th><th>sign chg</th>${n <= 3 ? `<th>y<sub>k</sub> (${D.plain ? 'plain' : 'M'}-norm)</th>` : ''}</tr>`;
+  const b = SD, md = D.md, n = md.n, run = D.run.main, k = Math.min(D.k, run.length - 1), err = errorsOf(md, b.m, run), u = unitsOf(b);
+  const shifted = D.show === 'hyb', done = run[run.length - 1].res < 1e-13;
+  let h = `<table class="iter"><tr><th>k</th><th>r<sub>k</sub></th>${shifted ? '<th>shift</th>' : ''}<th>err r<sub>k</sub></th><th>${n === 2 ? 'err y₂/y₁' : 'shape err'}</th><th>sign chg</th>${n <= 3 ? '<th>y<sub>k</sub></th>' : ''}</tr>`;
   for (let s = 0; s <= k; s++) {
     h += `<tr class="${s === k ? 'cur' : ''}"><td>${s}</td><td>${sigF(run[s].r, s > 1 ? 10 : 7)}</td>${shifted ? `<td>${sig(run[s].shift, 6)}</td>` : ''}<td>${sciHTML(err.r[s])}</td><td>${sciHTML(err.shape[s])}</td><td>${signChanges(run[s].y)}</td>${n <= 3 ? `<td>${run[s].y.map(v => sigF(v, n === 3 ? 3 : 4)).join(', ')}</td>` : ''}</tr>`;
   }
-  $('d9tbl').innerHTML = h + '</table>' + (k === run.length - 1 ? `<div class="note">Converged to mode ${err.mode + 1}: ω² = ${sig(md.w2[err.mode], 8)} ${u.w2}, ${err.mode} sign change${err.mode === 1 ? '' : 's'}. Double precision stops near 10<sup>−16</sup>.</div>` : '');
+  $('d9tbl').innerHTML = h + '</table>' + (k === run.length - 1 && !done ? `<div class="note">${methodOf(D.show).long}: not converged after ${k} steps, heading for mode ${err.mode + 1}.</div>` : k === run.length - 1 ? `<div class="note">${methodOf(D.show).long} converged to mode ${err.mode + 1}: ω² = ${sig(md.w2[err.mode], 8)} ${u.w2}, ${err.mode} sign change${err.mode === 1 ? '' : 's'}. Double precision stops near 10<sup>−16</sup>.</div>` : '');
   $('dStep').disabled = k >= run.length - 1;
 }
 function plotD9() {
   if (typeof Plotly === 'undefined') return;
-  const b = SB, md = D.md, key = D.meas, K = Math.min(D.k, D.run.main.length - 1);
+  const b = SD, md = D.md, key = D.meas, K = Math.min(D.k, D.run.main.length - 1);
   const FLOOR = 1e-16, curve = (run, name, color, width, dash) => { const e = errorsOf(md, b.m, run)[key].slice(0, K + 1);
     return { x: e.map((_, i) => i), y: e.map(v => (Number.isFinite(v) ? Math.max(v, FLOOR) : null)), mode: 'lines+markers', name, line: { color, width, dash }, marker: { size: width > 2 ? 8 : 6 },
              hovertemplate: `${name}, k = %{x}: %{y:.2e}<extra></extra>` }; };
-  const tr = [curve(D.run.main, D.slip ? 'solving with {y_k}' : 'RQI', css('--uh'), 3, 'solid')];
-  if (D.slip) tr.push(curve(D.run.rqi, 'RQI', css('--c-net'), 2, 'solid'));
-  tr.push(curve(D.run.inv, 'inverse iteration', css('--c-pos'), 2, 'dash'));
-  if (D.run.paz) tr.push(curve(D.run.paz, "Paz's update", css('--c-grav'), 2, 'dot'));
-  Plotly.react('d9plot', tr, lay({ showlegend: true, legend: { orientation: 'h', y: 1.12, x: 0, font: { size: 11 } }, margin: { l: 56, r: 10, t: 24, b: 36 },
+  // the shown method last, so it lies on top, and heavier
+  const tr = METHODS.filter(m => plotted(m.id) && m.id !== D.show).concat(methodOf(D.show)).map(m => curve(D.run[m.id], m.long, css(m.c), m.id === D.show ? 3.5 : 2, 'solid'));
+  Plotly.react('d9plot', tr, lay({ showlegend: false, margin: { l: 56, r: 10, t: 10, b: 36 },
     xaxis: ax('step k', { dtick: 1, range: [-0.2, Math.max(4, K) + 0.2] }),
     yaxis: ax(key === 'shape' ? (md.n === 2 ? 'error of y₂/y₁' : 'shape error') : 'relative error of r_k', { type: 'log', range: [-16.5, 1], dtick: 2, exponentformat: 'power' }) }), cfg);
 }
 // n = 2: a strip of the start angle, colored by the mode reached. Larger n: random starts on request.
 function drawD9Which() {
   const el = $('d9which'); if (!el.clientWidth) return;
-  const b = SB, md = D.md, n = md.n, W = el.clientWidth, H = el.clientHeight;
+  const b = SD, md = D.md, n = md.n, W = el.clientWidth, H = el.clientHeight;
   $('dTry').hidden = n <= 2;
   let s = '';
   if (n === 1) { setSvg(el, sv.text(4, 12, 'One story: one mode.', { size: 12, c: 'var(--muted)' })); $('d9whichN').textContent = ''; return; }
@@ -1321,51 +1522,58 @@ function animateD9() {
   const step = ts => { D.morph = clamp((ts - t0) / dur, 0, 1); drawD9(); if (D.morph < 1) d9Anim = requestAnimationFrame(step); };
   D.morph = 0; d9Anim = requestAnimationFrame(step);
 }
-function renderD7Read() {
-  const b = SB, md = D.md, u = unitsOf(b), R = rayleighQ(b.k, b.m, D.y), N = kDot(b.k, D.y, D.y), Dn = mDot(b.m, D.y, D.y);
-  if (!Number.isFinite(R)) { $('d7read').textContent = 'y = 0: no shape, no quotient'; return; }
-  const per = 2 * Math.PI / Math.sqrt(R);
-  $('d7read').innerHTML = `R(y) = ${sig(N, 4)} / ${sig(Dn, 4)} = ${w2f(R)} ${u.w2}; ω₁² = ${w2f(md.w2[0])}, R/ω₁² = ${sig(R / md.w2[0], 5)}; period ${sig(per, 3)} against T₁ = ${sig(md.T[0], 3)} ${u.t}`;
-}
 function renderD9() {
   runMethods();
-  const b = SB, md = D.md, n = md.n, P = PRESETS[b.preset];
-  $('dR0').value = D.r0 ?? ''; $('dHold').value = D.hold; $('dPlain').checked = D.plain; $('dSlip').checked = D.slip; $('dMeas').value = D.meas;
+  const b = SD, md = D.md, n = md.n, P = PRESETS[b.preset];
+  $('dR0').value = D.r0 ?? ''; $('dHold').value = D.hold; $('dMeas').value = D.meas; renderMethods();
   const ch = $('dChips'), shifts = (b.edited ? [] : P.shifts ?? []).filter(s => !s.y || s.y.length === n);
   ch.innerHTML = shifts.map((s, i) => `<button data-s="${i}" title="first shift ${s.r0}${s.y ? ', start ' + s.y.join(', ') : ''}">${s.label}</button>`).join('');
-  tex($('eqD2'), D.slip ? String.raw`r_k = R(y_k),\quad ([K] - r_k[M])\{z\} = \{y_k\}\quad\text{(no } [M]\text{: quadratic, not cubic)}`
-                       : String.raw`r_k = R(y_k),\quad ([K] - r_k[M])\{z\} = [M]\{y_k\},\quad \{y_{k+1}\} = \{z\}/\text{norm}`);
+  tex($('eqD2'), String.raw`\text{Every method: }\ r_k = R(y_k),\quad \{y_{k+1}\} = \{z\}\big/\sqrt{\{z\}^T[M]\{z\}}`);
   renderD9Table(); drawD9(); plotD9(); drawD9Which();
 }
+// the numbers of the building and of the trial shape, in boxes; a box being typed in is left alone
+function renderDBoxes() {
+  const b = SD, u = unitsOf(b), box = (id, v, t) => `<input type="number" id="${id}" step="any" min="0" title="${t}" style="width:5.2em" value="${fmtN(v)}">`;
+  if (!$('dKM').childElementCount) {
+    const lab = (v, i) => `<span><span class="sym">${v}</span>${sub(i + 1)}</span>`;
+    $('dKM').innerHTML = [0, 1, 2].map(i => lab('m', i) + box('dm' + i, b.m[i], `floor ${i + 1} mass, ${u.m}`)).join('') + `<span class="note">${u.m}</span>`
+      + `<span style="margin-left:8px"></span>` + [0, 1, 2].map(i => lab('k', i) + box('dk' + i, b.k[i], `story ${i + 1} stiffness, ${u.k}`)).join('') + `<span class="note">${u.k}</span>`;
+    $('dYs').innerHTML = [0, 1, 2].map(i => lab('y', i) + `<input type="number" id="dy${i}" step="0.05" title="floor ${i + 1}" style="width:4.6em">`).join('');
+  }
+  const put = (id, v) => { const el = $(id); if (el !== document.activeElement) el.value = fmtN(v); };
+  [0, 1, 2].forEach(i => { put('dk' + i, b.k[i]); put('dm' + i, b.m[i]); put('dy' + i, +D.y[i].toPrecision(4)); });
+  $('dKMReset').hidden = !b.edited;
+}
 function renderD() {
-  const b = SB, n = b.k.length;
+  const b = SD, n = b.k.length;
   D.md = modesOf(b.k, b.m);
   if (!dDrag.active()) D.top = maxAbs(D.y) || 1;
-  $('dN').value = n; $('dNLbl').textContent = n;
+  renderDBoxes();
   const dm = $('dModes'); if (dm.childElementCount !== n) dm.innerHTML = b.k.map((_, j) => `<button data-m="${j}" title="snap to mode ${j + 1}">${j + 1}</button>`).join('');
   tex($('eqD1'), String.raw`R(y) = \frac{\{y\}^T[K]\{y\}}{\{y\}^T[M]\{y\}} = \sum_j w_j\,\omega_j^2,\quad w_j = \frac{c_j^2}{\sum_i c_i^2},\quad c_j = \{\phi\}_j^T[M]\{y\}`);
-  renderD7Read(); drawD7(); drawD7Axis(); drawD7Bars();
+  drawD7(); drawD7Axis();
   renderD9();
+  renderDS();
   writeHash();
 }
 function fillShapes() {
-  const list = trialShapes(SB);
+  const list = trialShapes(SD);
   fillSelect($('dShape'), `<option value="" hidden>dragged</option>` + list.map((s, i) => `<option value="${i}">${s.label}</option>`).join(''));
   return list;
 }
 // The menu shows a listed shape, or "dragged"
-function syncShape() { const i = trialShapes(SB).findIndex(s => s.y.every((v, l) => Math.abs(v - D.y[l]) < 1e-9)); $('dShape').value = i < 0 ? '' : String(i); }
+function syncShape() { const i = trialShapes(SD).findIndex(s => s.y.every((v, l) => Math.abs(v - D.y[l]) < 1e-9)); $('dShape').value = i < 0 ? '' : String(i); }
 let raf3 = 0;
 const dDrag = dragHandles($('d7svg'), {
   move(idx, x) {
     const el = $('d7svg'), i = +idx;
     D.y[i] = clamp((x - el._xc) / el._sc, -el._lim, el._lim); D.k = 0; D.morph = 1; $('dShape').value = '';
-    if (!raf3) raf3 = requestAnimationFrame(() => { raf3 = 0; renderD7Read(); drawD7(); drawD7Axis(); drawD7Bars(); renderD9(); });
+    if (!raf3) raf3 = requestAnimationFrame(() => { raf3 = 0; renderDBoxes(); drawD7(); drawD7Axis(); renderD9(); renderDS(); });
   },
   end() { renderD(); },
 });
-player($('dPlay'), { next: () => { D.k++; renderD9Table(); plotD9(); animateD9(); writeHash(); }, atEnd: () => !D.run || D.k >= D.run.main.length - 1,
-                     toStart: () => { D.k = 0; renderD9Table(); plotD9(); drawD9(); }, ms: 900 });
+player($('dPlay'), { next: () => { D.k++; renderD9Table(); plotD9(); animateD9(); renderDS(); writeHash(); }, atEnd: () => !D.run || D.k >= D.run.main.length - 1,
+                     toStart: () => { D.k = 0; renderD9Table(); plotD9(); drawD9(); renderDS(); }, ms: 900 });
 
 // ============================ The story table ============================
 let popFor = null, popSweeps = [];
@@ -1437,9 +1645,12 @@ function setBuildingS(id, n = null) {
   SB = makeBuilding(id, n);
   document.querySelectorAll('.presetS').forEach(s => { s.value = id; });
   const st = fillStarts(); bStartValues(st[0].y, st[0].v, '0');
-  fillShapes(); D.y = defaultTrial(SB); D.k = 0; D.r0 = null; D.hold = 0; D.hist = null; syncShape();
   C.i = 0; C.j = Math.min(1, SB.k.length - 1); C.upto = null; C.ms = 0; C.rnd = 'exact';
   bBoundReset();
+}
+function setBuildingD(id) {
+  SD = makeBuilding(D_PRESETS.includes(id) ? id : 'p811', 3); $('dPreset').value = SD.preset;
+  fillShapes(); D.y = defaultTrial(SD); D.k = 0; D.r0 = null; D.hold = 0; D.hist = null; syncShape();
 }
 function bBoundReset() { const b = SB; B.md = modesOf(b.k, b.m); B.co = coeffs(B.md, b.m, B.y0, B.v0); B.bound = 1; bBound(); }
 function setBuildingA(id, n = null) { SA = makeBuilding(id, n); $('aPreset').value = id; A.j = Math.min(A.j, SA.k.length - 1); }
@@ -1447,10 +1658,9 @@ function changeN(n) {
   if (tab === 'a') { const b = SA; if (b.k.length === n) return; SA = { ...resized(b, n), preset: b.preset, edited: b.edited, ref: undefined }; if (popFor) openPop(); renderA(); return; }
   const b = SB; if (b.k.length === n) return;
   SB = { ...resized(b, n), preset: b.preset, edited: b.edited, ref: undefined };
-  const st = fillStarts(); fillShapes();
+  const st = fillStarts();
   // a start of the old size carries over, extra floors copying the top one; velocities too
   B.y0 = fitTo(B.y0, n); B.v0 = fitTo(B.v0, n); B.tau = 0; B.run = false; B.rev = false; B.guess = []; $('b3pred').innerHTML = ''; $('bStart').value = '';
-  D.y = fitTo(D.y, n); D.k = 0; D.hist = null; $('dShape').value = '';
   C.i = Math.min(C.i, n - 1); C.j = Math.min(C.j, n - 1); C.upto = null;
   bBoundReset();
   if (popFor) openPop(); render[tab]();
@@ -1497,34 +1707,42 @@ $('cFirst').addEventListener('click', () => { C.upto = 0; renderC(); });
 player($('cPlay'), { next: () => { C.upto = (C.upto ?? 0) + 1; renderC(); }, atEnd: () => (C.upto ?? SB.k.length) >= SB.k.length,
                      toStart: () => { C.upto = 0; renderC(); }, ms: 800 });
 // Tab D
-$('dN').addEventListener('input', e => changeN(Math.round(+e.target.value)));
-sweeper($('dNPlay'), $('dN'), 9000);
-$('dTbl').addEventListener('click', () => (popFor ? closePop() : openPop()));
-$('dShape').addEventListener('change', e => { const s = trialShapes(SB)[+e.target.value]; if (!s) return; D.y = s.y.slice(); D.k = 0; renderD(); });
+$('dPreset').innerHTML = D_PRESETS.map(id => `<option value="${id}">${PRESETS[id].label.replace(/: 3 stories$/, '')}</option>`).join('');
+$('dPreset').addEventListener('change', e => { setBuildingD(e.target.value); renderD(); });
+$('dKMReset').addEventListener('click', () => { const y = D.y.slice(); setBuildingD(SD.preset); D.y = y; syncShape(); renderD(); });
+$('dKM').addEventListener('input', e => { const id = e.target.id, v = parseFloat(e.target.value); if (!/^d[km]\d$/.test(id) || !(v > 0)) return;
+  SD = { ...SD, [id[1]]: SD[id[1]].map((x, i) => (i === +id[2] ? v : x)), edited: true }; D.k = 0; D.hist = null; renderD(); });
+$('dYs').addEventListener('input', e => { const m = /^dy(\d)$/.exec(e.target.id), v = parseFloat(e.target.value); if (!m || !Number.isFinite(v)) return;
+  D.y = D.y.map((x, i) => (i === +m[1] ? v : x)); D.k = 0; D.morph = 1; syncShape(); renderD(); });
+$('dsStep').addEventListener('click', () => $('dStep').click());
+$('dsFirst').addEventListener('click', () => $('dFirst').click());
+$('dShape').addEventListener('change', e => { const s = trialShapes(SD)[+e.target.value]; if (!s) return; D.y = s.y.slice(); D.k = 0; renderD(); });
 $('dModes').addEventListener('click', e => { const m = e.target.closest('[data-m]'); if (!m) return;
-  D.y = normTop(colOf(modesOf(SB.k, SB.m).A, +m.dataset.m)); D.k = 0; $('dShape').value = ''; renderD(); });
-$('dGo7').addEventListener('click', () => $('d7panel').scrollIntoView({ behavior: 'smooth', block: 'start' }));
-$('dGo9').addEventListener('click', () => $('d9panel').scrollIntoView({ behavior: 'smooth', block: 'start' }));
-$('dStep').addEventListener('click', () => { D.k = Math.min(D.k + 1, D.run.main.length - 1); renderD9Table(); plotD9(); animateD9(); writeHash(); });
-$('dFirst').addEventListener('click', () => { D.k = 0; D.morph = 1; renderD9Table(); plotD9(); drawD9(); writeHash(); });
-$('dR0').addEventListener('change', e => { const v = parseFloat(e.target.value); D.r0 = Number.isFinite(v) ? v : null; D.k = 0; renderD(); });
-$('dHold').addEventListener('change', e => { const v = parseInt(e.target.value, 10); D.hold = Number.isFinite(v) ? clamp(v, 0, 20) : 0; D.k = 0; renderD(); });
+  D.y = normTop(colOf(modesOf(SD.k, SD.m).A, +m.dataset.m)); D.k = 0; $('dShape').value = ''; renderD(); });
+$('dsRad').addEventListener('change', e => { DS.rad = e.target.value === 'r' ? 'r' : 'sqrt'; renderDS(); writeHash(); });
+$('dsLvl').addEventListener('change', e => { DS.lvl = e.target.checked; renderDS(); writeHash(); });
+$('dStep').addEventListener('click', () => { D.k = Math.min(D.k + 1, D.run.main.length - 1); renderD9Table(); plotD9(); animateD9(); renderDS(); writeHash(); });
+$('dFirst').addEventListener('click', () => { D.k = 0; D.morph = 1; renderD9Table(); plotD9(); drawD9(); renderDS(); writeHash(); });
+$('dR0').addEventListener('change', e => { const v = parseFloat(e.target.value); D.r0 = Number.isFinite(v) ? v : null; D.show = hybOn() ? 'hyb' : D.show; D.k = 0; renderD(); });
+$('dHold').addEventListener('change', e => { const v = parseInt(e.target.value, 10); D.hold = Number.isFinite(v) ? clamp(v, 0, 20) : 0; D.show = hybOn() ? 'hyb' : D.show; D.k = 0; renderD(); });
 $('dChips').addEventListener('click', e => { const c = e.target.closest('[data-s]'); if (!c) return;
-  const s = (PRESETS[SB.preset].shifts ?? [])[+c.dataset.s]; if (!s) return;
-  D.r0 = s.r0; if (s.y) { D.y = s.y.slice(); syncShape(); } D.k = 0; renderD(); });
-$('dPlain').addEventListener('change', e => { D.plain = e.target.checked; renderD(); });
-$('dSlip').addEventListener('change', e => { D.slip = e.target.checked; renderD(); });
+  const s = (PRESETS[SD.preset].shifts ?? [])[+c.dataset.s]; if (!s) return;
+  D.r0 = s.r0; D.show = 'hyb'; if (s.y) { D.y = s.y.slice(); syncShape(); } D.k = 0; renderD(); });
+$('dMeth').addEventListener('change', e => {
+  if (e.target.name === 'dShow') { D.show = e.target.value; D.morph = 1; }
+  else if (e.target.dataset.plot) D.plot[e.target.dataset.plot] = e.target.checked;
+  renderD(); });
 $('dMeas').addEventListener('change', e => { D.meas = e.target.value; plotD9(); writeHash(); });
-$('dTry').addEventListener('click', () => { D.hist = randomStarts(D.md, SB.k, SB.m, 200, D.seed++); drawD9Which(); });
+$('dTry').addEventListener('click', () => { D.hist = randomStarts(D.md, SD.k, SD.m, 200, D.seed++); drawD9Which(); });
 
-// Presets shared by B, C, D
+// Presets shared by B and C
 document.querySelectorAll('.presetS').forEach(s => s.addEventListener('change', e => { closePop(); setBuildingS(e.target.value); render[tab](); }));
 
 // ---- State in the URL hash: the open tab and its controls, e.g. #tab=d&preset=paz71&y=1,1.5&step=2
 const fmtN = x => +(+x).toPrecision(6);
 const list = a => a.map(fmtN).join(',');
 const DEF = { A: { j: 0, amp: 0.3, own: false, run: true, tau: 0 }, B: { vel: false, run: false, tau: 0, parts: false, pred: false, rev: false, guess: [] },
-              C: { i: 0, j: 1, weight: 'M', scale: 'first', ms: 0, rnd: 'exact', upto: null }, D: { k: 0, r0: null, hold: 0, plain: false, slip: false, meas: 'shape', morph: 1, hist: null } };
+              C: { i: 0, j: 1, weight: 'M', scale: 'first', ms: 0, rnd: 'exact', upto: null }, D: { k: 0, r0: null, hold: 0, show: 'rqi', plot: { rqi: true, slip: true, inv: true, hyb: true }, meas: 'shape', morph: 1, hist: null } };
 function buildingHash(b) {
   const p = { preset: b.preset, n: b.k.length };
   if (b.edited) Object.assign(p, { k: list(b.k), hh: list(b.h), m: list(b.m), pin: +b.pinned });
@@ -1535,7 +1753,8 @@ function hashOf() {
   if (tab === 'a') Object.assign(p, buildingHash(SA), { j: A.j + 1, amp: A.amp, own: +A.own });
   if (tab === 'b') Object.assign(p, buildingHash(SB), { y0: list(B.y0), v0: list(B.v0), vel: +B.vel, parts: +B.parts });
   if (tab === 'c') Object.assign(p, buildingHash(SB), { i: C.i + 1, j: C.j + 1, w: C.weight, sc: C.scale, ms: +C.ms.toFixed(2), rnd: C.rnd });
-  if (tab === 'd') Object.assign(p, buildingHash(SB), { y: list(D.y), step: D.k, hold: D.hold, plain: +D.plain, slip: +D.slip, meas: D.meas, ...(D.r0 != null ? { r0: D.r0 } : {}) });
+  if (tab === 'd') Object.assign(p, buildingHash(SD), { y: list(D.y), step: D.k, hold: D.hold, show: D.show, meas: D.meas, ...(METHODS.some(m => !D.plot[m.id]) ? { hide: METHODS.filter(m => !D.plot[m.id]).map(m => m.id).join(',') } : {}), ...(D.r0 != null ? { r0: D.r0 } : {}),
+    ...(DS.rad === 'r' ? { rad: 'r' } : {}), ...(DS.lvl ? {} : { lvl: 0 }) });
   return Object.entries(p).map(([k, v]) => k + '=' + v).join('&');
 }
 let hashTimer = null;   // debounced: Safari limits history.replaceState to about 100 calls in 30 s
@@ -1553,14 +1772,21 @@ function readBuilding(p, t) {
     if ([k, h, m].every(a => a.length === b.k.length && a.every(x => x > 0))) Object.assign(b, { k, h, m, pinned: p.pin === '1', edited: true });
   }
 }
+function readBuildingD(p) {
+  if (D_PRESETS.includes(p.preset) && p.preset !== SD.preset) setBuildingD(p.preset);
+  if (p.k && p.m) {
+    const v = q => q.split(',').map(Number), k = v(p.k), m = v(p.m);
+    if ([k, m].every(a => a.length === 3 && a.every(x => x > 0))) SD = { ...SD, k, m, edited: true };
+  }
+}
 function readHash() {
   const p = Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
   const num = (k, lo, hi) => { const v = parseFloat(p[k]); return Number.isFinite(v) ? clamp(v, lo, hi) : null; };
   const bool = k => (p[k] == null ? null : p[k] === '1');
   const vec = (k, n) => { if (!p[k]) return null; const v = p[k].split(',').map(Number); return v.length === n && v.every(Number.isFinite) ? v : null; };
   const t = ['a', 'b', 'c', 'd'].includes(p.tab) ? p.tab : 'a';
-  readBuilding(p, t);
-  const nS = SB.k.length;
+  if (t === 'd') readBuildingD(p); else readBuilding(p, t);
+  const nS = t === 'd' ? 3 : SB.k.length;
   if (t === 'a') {
     if (num('j', 1, 10) != null) A.j = clamp(Math.round(num('j', 1, 10)) - 1, 0, SA.k.length - 1);
     if (num('amp', 0.1, 0.5) != null) A.amp = num('amp', 0.1, 0.5);
@@ -1581,10 +1807,11 @@ function readHash() {
     const y = vec('y', nS); if (y) { D.y = y; syncShape(); }
     if (num('step', 0, 40) != null) D.k = Math.round(num('step', 0, 40));
     if (num('hold', 0, 20) != null) D.hold = Math.round(num('hold', 0, 20));
-    if (bool('plain') != null) D.plain = bool('plain');
-    if (bool('slip') != null) D.slip = bool('slip');
+    if (METHODS.some(m => m.id === p.show)) D.show = p.show; else if (bool('slip')) D.show = 'slip';   // slip=1: links from before the method table
+    METHODS.forEach(m => { D.plot[m.id] = !(p.hide ?? '').split(',').includes(m.id); });
     if (['shape', 'r'].includes(p.meas)) D.meas = p.meas;
     D.r0 = p.r0 != null && Number.isFinite(parseFloat(p.r0)) ? parseFloat(p.r0) : D.r0;
+    DS.rad = p.rad === 'r' ? 'r' : 'sqrt'; DS.lvl = bool('lvl') ?? true;
   }
   return t;
 }
@@ -1593,9 +1820,9 @@ function applyHash() { stopAll(); closePop(); const t = readHash(); $('aOwn').ch
 window.addEventListener('hashchange', applyHash);
 $('reset').addEventListener('click', () => {
   stopAll(); closePop();
-  Object.assign(A, DEF.A); Object.assign(B, DEF.B); Object.assign(C, DEF.C); Object.assign(D, DEF.D);
+  Object.assign(A, DEF.A); Object.assign(B, DEF.B); Object.assign(C, DEF.C); Object.assign(D, DEF.D); DS.rad = 'sqrt'; DS.lvl = true;
   $('speed').value = '1'; $('aOwn').checked = false;
-  setBuildingA('uniform'); setBuildingS('paz71');
+  setBuildingA('uniform'); setBuildingS('paz71'); setBuildingD('p811');
   render[tab]();
 });
 
@@ -1610,7 +1837,7 @@ $('caps').addEventListener('click', () => {
 });
 new MutationObserver(() => render[tab]()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-setBuildingA('uniform'); setBuildingS('paz71');
+setBuildingA('uniform'); setBuildingS('paz71'); setBuildingD('p811');
 applyHash();
 // Plotly sizes a plot once; follow later changes of its box. The drawings redraw at their new size.
 if (typeof Plotly !== 'undefined' && 'ResizeObserver' in window) {
