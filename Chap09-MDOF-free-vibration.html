@@ -1413,9 +1413,16 @@ function dsPick(cx, cy) {
   const un = z => { const v = [nx, ny, z, 1], q = [0, 1, 2, 3].map(r => [0, 1, 2, 3].reduce((t, c) => t + inv[c * 4 + r] * v[c], 0)); return [0, 1, 2].map(i => q[i] / q[3] / ds[i]); };
   const A = un(-1), B = un(1), b = SD, P = t => A.map((v, i) => v + t * (B[i] - v));
   const g = t => { const p = P(t), r = Math.hypot(...p); return r < 1e-12 ? -1 : r - dsF(rayleighQ(b.k, b.m, p.map(v => v / r))); };
-  const N = 600; let t0 = 0, g0 = g(0);
+  // only the stretch of the ray inside the sphere that holds the surface: near to far plane is far too
+  // long to sample finely, and steps longer than the surface is thick would step over it
+  const d = B.map((v, i) => v - A[i]), rm = 1.001 * dsF(D.md.w2[D.md.w2.length - 1]);
+  const qa = v3.dot(d, d), qb = 2 * v3.dot(A, d), qc = v3.dot(A, A) - rm * rm, disc = qb * qb - 4 * qa * qc;
+  if (!(disc > 0)) return null;
+  const ta = Math.max(0, (-qb - Math.sqrt(disc)) / (2 * qa)), tb = Math.min(1, (-qb + Math.sqrt(disc)) / (2 * qa));
+  if (!(tb > ta)) return null;
+  const N = 600; let t0 = ta, g0 = g(ta);
   for (let i = 1; i <= N; i++) {
-    const t1 = i / N, g1 = g(t1);
+    const t1 = ta + (tb - ta) * i / N, g1 = g(t1);
     if (g0 > 0 && g1 <= 0) { let lo = t0, hi = t1; for (let it = 0; it < 40; it++) { const m = (lo + hi) / 2; if (g(m) > 0) lo = m; else hi = m; } return unitV(P((lo + hi) / 2)); }
     t0 = t1; g0 = g1;
   }
@@ -1450,31 +1457,38 @@ function dsBind(el) {
     if (e.pointerType !== 'mouse' || !mdown || Math.hypot(e.clientX - mdown[0], e.clientY - mdown[1]) > 6) return;
     mdown = null; const u = dsPick(e.clientX, e.clientY); if (u) dsSetTrial(u);
   });
-  // touch: keep every touch event away from Plotly (capture phase on the plot) and from the page
-  const block = e => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); };
-  ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(t => el.addEventListener(t, block, { capture: true, passive: false }));
-  const P = new Map(); let G = null;   // the fingers down; the gesture: camera, last positions, tap state
+  // Touch and Apple Pencil, by touch events (what iOS Safari delivers most reliably; a Pencil sends them
+  // too), in the capture phase on the plot, so neither Plotly nor the page (zoom, scroll) sees them.
+  // Pointer events that are not the mouse's are kept from Plotly as well.
+  ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(t => el.addEventListener(t, e => { if (e.pointerType !== 'mouse') e.stopPropagation(); }, true));
+  const P = new Map(); let G = null;   // the fingers down; the gesture: camera, start, tap state
   const cam = () => { const c = dsScene()?.getCamera?.(); return c && c.eye ? { eye: cArr(c.eye), center: cArr(c.center), up: cArr(c.up), projection: c.projection } : null; };
   const apply = () => { const sc = dsScene(); if (!sc || !G?.c) return; const c = G.c;
     sc.camera.lookAt(c.eye, c.center, c.up); sc.glplot.redraw?.(); };
   const two = () => { const [a, b] = [...P.values()]; return { d: Math.hypot(b.x - a.x, b.y - a.y), ang: Math.atan2(b.y - a.y, b.x - a.x), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; };
   const frame = c => { const v = v3.sub(c.eye, c.center), f = unitV(v3.mul(v, -1)), r = unitV(v3.cross(f, c.up)) ?? [1, 0, 0]; return { v, f, r, s: v3.cross(r, f) }; };
-  el.addEventListener('pointerdown', e => {
-    if (e.pointerType !== 'touch') return; e.stopPropagation();
-    try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
-    P.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (P.size === 1) G = { c: cam(), x0: e.clientX, y0: e.clientY, t0: performance.now(), tap: true };
-    else if (G) { G.tap = false; G.two = two(); }
-  }, true);
-  el.addEventListener('pointermove', e => {
-    if (e.pointerType !== 'touch' || !P.has(e.pointerId) || !G?.c) return; e.stopPropagation();
-    const prev = P.get(e.pointerId); P.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const TAP = 12;   // px a tap may wander; no time limit, so a press and hold also counts
+  const block = e => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); };
+  el.addEventListener('touchstart', e => {
+    block(e);
+    // fingers the browser lost (no end event) go; with none left, this is a new gesture
+    for (const id of [...P.keys()]) if (![...e.touches].some(t => t.identifier === id)) P.delete(id);
+    if (!P.size) G = null;
+    for (const t of e.changedTouches) P.set(t.identifier, { x: t.clientX, y: t.clientY });
+    if (!G) { const t = e.changedTouches[0]; G = { c: cam(), x0: t.clientX, y0: t.clientY, tap: P.size === 1 }; }
+    if (P.size > 1) { G.tap = false; G.two = P.size === 2 ? two() : null; }
+  }, { capture: true, passive: false });
+  el.addEventListener('touchmove', e => {
+    block(e); if (!G?.c) return;
+    let prev = null;
+    for (const t of e.changedTouches) if (P.has(t.identifier)) { if (P.size === 1) prev = P.get(t.identifier); P.set(t.identifier, { x: t.clientX, y: t.clientY }); }
     const cr = dsScene()?.glplot?.canvas?.getBoundingClientRect(), W = cr?.width || el.clientWidth || 400, H = cr?.height || el.clientHeight || 400, c = G.c;
-    if (P.size === 1) {
-      if (Math.hypot(e.clientX - G.x0, e.clientY - G.y0) > 8) G.tap = false;
-      if (G.tap) return;
+    if (P.size === 1 && prev) {
+      const cur = [...P.values()][0];
+      if (G.tap && Math.hypot(cur.x - G.x0, cur.y - G.y0) <= TAP) return;
+      if (G.tap) { G.tap = false; prev = { x: G.x0, y: G.y0 }; }
       // orbit: horizontal turns about up, vertical tilts toward up, as Plotly's turntable drag
-      const dx = e.clientX - prev.x, dy = e.clientY - prev.y, k = unitV(c.up) ?? [0, 0, 1];
+      const dx = cur.x - prev.x, dy = cur.y - prev.y, k = unitV(c.up) ?? [0, 0, 1];
       let v = v3.rot(v3.sub(c.eye, c.center), k, -Math.PI * dx / W);
       const ax = unitV(v3.cross(v, k));
       if (ax) { const w = v3.rot(v, ax, Math.PI * dy / H), cosU = v3.dot(unitV(w), k); if (Math.abs(cosU) < 0.995) v = w; }
@@ -1493,20 +1507,24 @@ function dsBind(el) {
       G.two = t;
     } else return;
     apply();
-  }, true);
+  }, { capture: true, passive: false });
   const end = e => {
-    if (e.pointerType !== 'touch' || !P.has(e.pointerId)) return; e.stopPropagation();
-    P.delete(e.pointerId);
-    if (P.size === 1 && G) G.two = null;   // one finger left: it orbits from where it is, no jump
+    block(e);
+    let last = null;
+    for (const t of e.changedTouches) { P.delete(t.identifier); last = t; }
+    // a touch the browser lost (no end event): start over from the fingers it still lists
+    if (e.touches) for (const id of [...P.keys()]) if (![...e.touches].some(t => t.identifier === id)) P.delete(id);
+    if (P.size === 2 && G) G.two = two();
     if (P.size) return;
     const g = G; G = null; if (!g) return;
-    if (e.type === 'pointerup' && g.tap && performance.now() - g.t0 < 700) {
-      const u = dsPick(e.clientX, e.clientY); if (u) { dsSetTrial(u); dsHoverText(u, 'tapped'); }
+    if (e.type === 'touchend' && g.tap && last) {
+      const u = dsPick(last.clientX, last.clientY);
+      if (u) { dsSetTrial(u); dsHoverText(u, 'tapped'); } else $('dsHover').textContent = 'tap the surface itself to put the trial shape there';
     } else if (g.c) {   // keep the view the fingers left, as the mouse's does
       const c = g.c; try { $('dsplot').layout.scene.camera = { eye: cObj(c.eye), center: cObj(c.center), up: cObj(c.up), projection: c.projection }; } catch (_) { /* ignore */ }
     }
   };
-  el.addEventListener('pointerup', end, true); el.addEventListener('pointercancel', end, true);
+  el.addEventListener('touchend', end, { capture: true, passive: false }); el.addEventListener('touchcancel', end, { capture: true, passive: false });
 }
 // The methods of panel 9, each with its own color everywhere: the error plot, the method table, the path
 // on the sphere. 'hyb', the shifted start, exists only when a first shift or a hold is set; r0 and hold act
