@@ -113,9 +113,10 @@
     .bar input[type=range] { width: 110px; }
     .tools { margin-left: 0; }
   }
-  /* Landscape screens (the iPad in class): the open tab fills the screen and the drawings and plots
-     take the height left over, so nothing needs scrolling. */
-  @media (min-width: 1000px) and (min-height: 600px) and (orientation: landscape) {
+  /* Landscape screens (the iPad in class, also with Safari's page zoom up to about 175%, which narrows
+     the page to 780 CSS px): the open tab fills the screen and the drawings and plots take the height
+     left over, so nothing needs scrolling. */
+  @media (orientation: landscape) and (min-width: 760px) and (min-height: 400px) {
     body { height: 100vh; height: 100dvh; margin: 0; display: flex; flex-direction: column;
            padding-block: 4px 8px; overflow: hidden; }
     header, nav, .bar { flex: none; }
@@ -131,7 +132,7 @@
     .hm .plot { flex: 1 1 0; }
   }
   /* Chapter 10 additions */
-  .plot { position: relative; }
+  .plot { position: relative; overflow: hidden; }
   .tcursor { position: absolute; width: 1.5px; background: var(--uh); pointer-events: none; z-index: 5; }
   .phiover { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 4; }
   #sec-a .grid { grid-template-columns: 1fr 1fr 1fr; }
@@ -152,12 +153,31 @@
   .chip span { color: var(--muted); }
   .pophead { display: flex; gap: 12px; align-items: baseline; margin-bottom: 4px; }
   @media (max-width: 1000px) { #sec-a .grid, #sec-c .grid { grid-template-columns: 1fr; } #sec-c #p6 { grid-row: auto; } }
-  @media (min-width: 1000px) and (min-height: 600px) and (orientation: landscape) {
+  @media (orientation: landscape) and (min-width: 760px) and (min-height: 400px) {
+    #sec-a .grid { grid-template-columns: 1fr 1fr 1fr; }
+    #sec-b .grid { grid-template-columns: 1fr 1fr; }
+    #sec-c .grid { grid-template-columns: 1.15fr 1fr; } #sec-c #p6 { grid-row: 1 / span 2; }
+    .tools { margin-left: auto; }
     #sec-c > .grid { grid-template-rows: auto minmax(0, 1fr); }
     .plot.fx05, .svgbox.fx05 { flex: 0.55 1 0; } .plot.fx2, .svgbox.fx2 { flex: 2 1 0; } .plot.fx3, .svgbox.fx3 { flex: 3 1 0; }
     .duo.fx1 { flex: 1 1 0; } .duo.fx2 { flex: 2 1 0; }
     .see { font-size: 12.5px; line-height: 1.3; }
     .svgbox.fx1, .plot.fx1 { flex: 1 1 0; }
+  }
+  @media (orientation: landscape) and (min-width: 760px) and (min-height: 400px) and (max-width: 1200px) {
+    body { font-size: 13px; padding-block: 2px 4px; }
+    header .sub { display: none; }
+    #dW { width: 170px !important; }
+    header { padding-block: 0 4px; } header h1 { font-size: 16px; }
+    nav a { padding: 4px 10px; } nav { margin-bottom: 4px; }
+    .bar { padding: 4px 8px; gap: 4px 12px; margin-bottom: 4px; }
+    .grid { gap: 4px; }
+    .panel { padding: 4px 8px 6px; gap: 2px; }
+    .panel h2 { font-size: 14px; } .panel h2 .ref { font-size: 12px; }
+    .see { font-size: 12px; line-height: 1.25; }
+    .ctl, .note { font-size: 12px; } .readout, table.est, table.err { font-size: 11.5px; }
+    table.err td, table.err th { padding: 1px 3px; }
+    .plot, .svgbox { min-height: 40px; }
   }
 </style>
 </head>
@@ -202,21 +222,18 @@
   <div class="grid">
     <div class="panel">
       <h2>1 · One building, n independent oscillators <span class="ref">Paz 8.1</span></h2>
-      <p class="see">Each mode is its own oscillator, in its own hue. <b>The oscillators do not talk to each other; each only hears φ<sub>j</sub><sup>T</sup>{F}, the work of the load through its mode shape.</b> A load ∝ [M]φ<sub>j</sub> moves one oscillator and leaves the others still. Thin: modal parts; thick: their sum; dots: direct integration (deck 07).</p>
+      <p class="see">Each mode is its own oscillator, in its own hue. <b>The oscillators do not talk to each other; each only hears φ<sub>j</sub><sup>T</sup>{F}, the work of the load through its mode shape.</b> Bars: φ<sub>j</sub><sup>T</sup>{F}, one per mode; panel 2 has the modal parts and their sum.</p>
       <div class="ctl">
         <button id="aAll" title="the same force at every floor">all floors</button>
         <button id="aOne" title="the whole load at floor i">one floor</button>
-        <span class="grp"><button id="aMphi">∝ [M]φ<sub>j</sub></button><label><span class="sym">j</span> <select id="aMj"></select></label></span>
         <span class="note">damping: deck 11</span>
       </div>
       <div id="a1svg" class="svgbox h300 fx2" role="img" aria-label="building with forces beside one oscillator per mode"></div>
       <div id="a1bar" class="plot h130 fx05"></div>
-      <div id="a1plot" class="plot h220"></div>
     </div>
     <div class="panel">
       <h2>2 · The peaks do not coincide <span class="ref">Paz 8.6; 2024 L23</span></h2>
       <p class="see"><b>Max of a sum is not the sum of the maxes.</b> SRSS is an estimate, not a bound: with ξ = 5%, Ex. 8.1 has it 9% low at floor 1 and 10% high at floor 2. In Ex. 8.2 mode 2 holds 1.3% of the mass, so all the rules agree. Peaks over a window of 6T₁.</p>
-      <div class="ctl"><label class="chk" title="y₁ = sin²t, y₂ = cos²t: no building"><input type="checkbox" id="aSin">sin² + cos²</label></div>
       <div id="a2up" class="plot h220"></div>
       <div id="a2low" class="plot h220"></div>
       <div class="readout" id="a2tab"></div>
@@ -854,11 +871,16 @@ const pick = (a, idx) => idx.map(i => a[i]);
 function react(el, data, layout) { if (typeof Plotly !== 'undefined') Plotly.react(el, data, layout, cfg); }
 function idxAt(t, x) { let a = 0, b = t.length - 1; while (b - a > 1) { const m = (a + b) >> 1; if (t[m] <= x) a = m; else b = m; } return a; }
 // A time cursor over a plot, without redrawing the plot
+// (a resize or redraw moves the axes, so the cursor follows every redraw and is clipped to the axes)
 function cursor(el, t) {
+  el._tc = t;
+  if (!el._tcHook && el.on) { el._tcHook = true; el.on('plotly_afterplot', () => cursor(el, el._tc)); }
   const fl = el._fullLayout; if (!fl || !fl.xaxis || !fl.xaxis.l2p) return;
   let c = el.querySelector(':scope > .tcursor');
   if (!c) { c = document.createElement('div'); c.className = 'tcursor'; el.appendChild(c); }
-  c.style.left = (fl.xaxis._offset + fl.xaxis.l2p(t)) + 'px'; c.style.top = fl.yaxis._offset + 'px'; c.style.height = fl.yaxis._length + 'px';
+  const x = fl.xaxis.l2p(t), top = fl.yaxis._offset, h = Math.min(fl.yaxis._length, el.clientHeight - top);
+  c.style.display = x >= 0 && x <= fl.xaxis._length && h > 0 ? '' : 'none';
+  c.style.left = (fl.xaxis._offset + x) + 'px'; c.style.top = top + 'px'; c.style.height = Math.max(h, 0) + 'px';
 }
 function vline(x, c, dash = 'dot', w = 1.2) { return { type: 'line', x0: x, x1: x, yref: 'paper', y0: 0, y1: 1, line: { color: c, width: w, dash } }; }
 function hline(y, c, dash = 'dash', w = 1.4) { return { type: 'line', y0: y, y1: y, xref: 'paper', x0: 0, x1: 1, line: { color: c, width: w, dash } }; }
@@ -889,7 +911,7 @@ function defaultF(b) { if (b.preset === 'paz' && b.m.length === 2) return [1e4, 
 
 // ============================ Tab A ============================
 let SA = makeBuilding('paz');
-const A = { case: 'ex81', type: 'tri', F: [1e4, 2e4], Fmax: 3e4, tdT: 0, xi: 0, floor: 1, tf: 0, mj: 1, j: 0, k: 1, rho: 0.5, auto: true, unit: false, pt: null, sin: false };
+const A = { case: 'ex81', type: 'tri', F: [1e4, 2e4], Fmax: 3e4, tdT: 0, xi: 0, floor: 1, tf: 0, j: 0, k: 1, rho: 0.5, auto: true, unit: false, pt: null };
 const firstT = b => modesOf(b.m, b.k).T[0];
 A.tdT = 0.1 / firstT(SA);
 let aC = { key: null };
@@ -929,47 +951,30 @@ function drawA1() {
     s += oscillator(xo, 4 + rh * (j === n - 1 ? 0.5 : r + 0.5), L - 30, j, run.Z[j][q], zs, run.P[j] * f / Pm, Math.min(L * 0.2, 34));
   setSvg(el, s);
   $('aTLbl').textContent = `${t.toFixed(2)} s`;
-  cursor($('a1plot'), t); cursor($('a2up'), t); cursor($('a2low'), t);
+  cursor($('a2up'), t); cursor($('a2low'), t);
 }
 function renderA1() {
-  const { run, dir } = aData(), n = SA.k.length, i = A.floor, v = aVar();
-  const idx = strided(run.t), T = pick(run.t, idx), data = [];
-  for (let j = 0; j < n; j++) { const c = run.Phi[i][j]; data.push({ x: T, y: idx.map(q => c * run.Z[j][q]), mode: 'lines', line: { color: MODE[j], width: 1 }, hoverinfo: 'skip' }); }
-  const yy = floorHistory(run, i);
-  data.push({ x: T, y: pick(yy, idx), mode: 'lines', line: { color: css('--ink'), width: 2.2 }, name: 'sum' });
-  const dI = strided(dir.T, Infinity, 70);
-  data.push({ x: pick(dir.T, dI), y: dI.map(q => dir.Y[q][i]), mode: 'markers', marker: { color: css('--panel'), size: 5, line: { color: css('--ink'), width: 1.2 } }, name: 'direct' });
-  react($('a1plot'), data, lay({ xaxis: ax('t (s)'), yaxis: ax(`${v}${sub(i + 1)} (in)`), margin: { l: 52, r: 8, t: 4, b: 34 } }));
+  const { run } = aData();
   react($('a1bar'), [{ x: run.P.map((_, j) => `P${sub(j + 1)}`), y: run.P, type: 'bar', marker: { color: run.P.map((_, j) => MODE[j]) }, hovertemplate: '%{y:.4~g}<extra></extra>' }],
     lay({ xaxis: { automargin: true, fixedrange: true }, yaxis: ax('φⱼᵀ{F}', { zeroline: true }), margin: { l: 56, r: 8, t: 2, b: 20 } }));
 }
 function renderA2() {
   const { run, ZP } = aData(), i = A.floor, n = SA.k.length, ink = css('--ink'), v = aVar();
   let data1 = [], data2 = [], shapes1 = [], shapes2 = [], E, tTrue, T;
-  if (A.sin) {
-    T = linspace(0, 2 * Math.PI, 400);
-    const a = T.map(t => Math.sin(t) ** 2), b = T.map(t => Math.cos(t) ** 2);
-    data1 = [{ x: T, y: a, mode: 'lines', line: { color: MODE[0], width: 1.6 } }, { x: T, y: b, mode: 'lines', line: { color: MODE[1], width: 1.6 } },
-      { x: [Math.PI / 2, 0], y: [1, 1], mode: 'markers', marker: { color: [MODE[0], MODE[1]], size: 8 } }];
-    data2 = [{ x: T, y: T.map(() => 1), mode: 'lines', line: { color: ink, width: 2.2 } }];
-    shapes1 = [vline(Math.PI / 2, MODE[0]), vline(0, MODE[1])]; shapes2 = shapes1.slice();
-    E = { l1: 2, l2: Math.SQRT2, lR: null, true: 1 };
-  } else {
-    const idx = strided(run.t); T = pick(run.t, idx);
-    for (let j = 0; j < n; j++) {
-      const c = run.Phi[i][j], tp = peakTime(run.t, run.Z[j]), yp = c * run.Z[j][idxAt(run.t, tp + 1e-12)];
-      data1.push({ x: T, y: idx.map(q => c * run.Z[j][q]), mode: 'lines', line: { color: MODE[j], width: 1.4 }, hoverinfo: 'skip' });
-      data1.push({ x: [tp], y: [yp], mode: 'markers', marker: { color: MODE[j], size: 8 }, hovertemplate: `mode ${j + 1}: t = %{x:.3f} s<extra></extra>` });
-      shapes1.push(vline(tp, MODE[j])); shapes2.push(vline(tp, MODE[j]));
-    }
-    const yy = floorHistory(run, i); tTrue = peakTime(run.t, yy); E = floorEstimates(run, i, ZP);
-    data2 = [{ x: T, y: pick(yy, idx), mode: 'lines', line: { color: ink, width: 2 }, hoverinfo: 'skip' },
-      { x: [tTrue], y: [yy[idxAt(run.t, tTrue + 1e-12)]], mode: 'markers', marker: { color: ink, size: 9, symbol: 'diamond' }, hovertemplate: 'true peak: t = %{x:.3f} s<extra></extra>' }];
+  const idx = strided(run.t); T = pick(run.t, idx);
+  for (let j = 0; j < n; j++) {
+    const c = run.Phi[i][j], tp = peakTime(run.t, run.Z[j]), yp = c * run.Z[j][idxAt(run.t, tp + 1e-12)];
+    data1.push({ x: T, y: idx.map(q => c * run.Z[j][q]), mode: 'lines', line: { color: MODE[j], width: 1.4 }, hoverinfo: 'skip' });
+    data1.push({ x: [tp], y: [yp], mode: 'markers', marker: { color: MODE[j], size: 8 }, hovertemplate: `mode ${j + 1}: t = %{x:.3f} s<extra></extra>` });
+    shapes1.push(vline(tp, MODE[j])); shapes2.push(vline(tp, MODE[j]));
   }
+  const yy = floorHistory(run, i); tTrue = peakTime(run.t, yy); E = floorEstimates(run, i, ZP);
+  data2 = [{ x: T, y: pick(yy, idx), mode: 'lines', line: { color: ink, width: 2 }, hoverinfo: 'skip' },
+    { x: [tTrue], y: [yy[idxAt(run.t, tTrue + 1e-12)]], mode: 'markers', marker: { color: ink, size: 9, symbol: 'diamond' }, hovertemplate: 'true peak: t = %{x:.3f} s<extra></extra>' }];
   for (const k of ['l1', 'l2', 'lR']) if (E[k] != null) { shapes2.push(hline(E[k], EST[k].c), hline(-E[k], EST[k].c)); }
   const top = Math.max(E.l1, E.true) * 1.08;
-  react($('a2up'), data1, lay({ shapes: shapes1, xaxis: ax('', { showticklabels: false, title: '' }), yaxis: ax(A.sin ? 'parts' : `φᵢⱼZⱼ (in)`), margin: { l: 52, r: 8, t: 4, b: 6 } }));
-  react($('a2low'), data2, lay({ shapes: shapes2, xaxis: ax(A.sin ? 't' : 't (s)'), yaxis: ax(A.sin ? 'sum' : `${v}${sub(i + 1)} (in)`, { range: [-top, top] }), margin: { l: 52, r: 8, t: 4, b: 34 } }));
+  react($('a2up'), data1, lay({ shapes: shapes1, xaxis: ax('', { showticklabels: false, title: '' }), yaxis: ax(`φᵢⱼZⱼ (in)`), margin: { l: 52, r: 8, t: 4, b: 6 } }));
+  react($('a2low'), data2, lay({ shapes: shapes2, xaxis: ax('t (s)'), yaxis: ax(`${v}${sub(i + 1)} (in)`, { range: [-top, top] }), margin: { l: 52, r: 8, t: 4, b: 34 } }));
   const row = (k, val) => `<tr><td><span class="sw" style="background:${EST[k].c}"></span>${EST[k].n}</td><td>${sigF(val, 4)}</td><td>${pct(val, E.true)}</td></tr>`;
   $('a2tab').innerHTML = `<table class="est"><tr><th></th><th>in</th><th>against true</th></tr>`
     + `<tr><td><b>true peak</b></td><td><b>${sigF(E.true, 4)}</b></td><td></td></tr>` + row('l1', E.l1) + row('l2', E.l2) + (E.lR != null ? row('lR', E.lR) : '') + '</table>';
@@ -1019,9 +1024,9 @@ function renderA() {
   $('aCase').value = A.case; $('aPreset').value = SA.preset; $('aType').value = A.type; $('aN').value = n; $('aNLbl').textContent = n;
   $('aTd').value = Math.log10(A.tdT); $('aTdLbl').textContent = A.tdT.toFixed(3); $('aTdWrap').hidden = A.type === 'step';
   $('aXi').value = A.xi; $('aXiLbl').textContent = fmtXi(A.xi); $('aT').value = A.tf;
-  A.floor = fillFloors($('aFloor'), n, A.floor); A.mj = fillFloors($('aMj'), n, A.mj);
+  A.floor = fillFloors($('aFloor'), n, A.floor);
   A.j = fillFloors($('a3j'), n, A.j, 'j = '); A.k = fillFloors($('a3k'), n, A.k, 'k = ');
-  $('aSin').checked = A.sin; $('a3Auto').checked = A.auto; $('a3Unit').checked = A.unit; $('a3Back').disabled = !A.pt;
+  $('a3Auto').checked = A.auto; $('a3Unit').checked = A.unit; $('a3Back').disabled = !A.pt;
   renderA1(); renderA2(); renderA3(); drawA1(); writeHash();
 }
 function aCustom() { A.case = 'custom'; A.pt = null; }
@@ -1116,7 +1121,7 @@ function renderB5b() {
     let s = '';
     for (let j = 0; j < 2; j++) {
       const phi = column(run.Phi, j), mx = Math.max(...phi.map(Math.abs)), bw = W * 0.14, x = W * (0.13 + j * 0.5), g = geomBox(b, x, bw, H, 22, 18);
-      s += groundSvg(g, b) + frameSvg(g, b, phi.map(v => v / mx), W * 0.1, { c: MODE[j], w: 1.8, dots: false }) + sv.text(x + bw / 2, 10, `T${sub(j + 1)} = ${sigF(run.T[j], 3)} s`, { anchor: 'middle', c: MODE[j], size: 12, weight: 600 });
+      s += groundSvg(g, b) + frameSvg(g, b, phi.map(v => v / mx), W * 0.1, { c: MODE[j], w: 1.8, dots: false }) + sv.text(x + bw / 2, 10, `${W < 220 ? '' : `T${sub(j + 1)} = `}${sigF(run.T[j], 3)} s`, { anchor: 'middle', c: MODE[j], size: 12, weight: 600 });
     }
     setSvg(el, s);
   }
@@ -1444,10 +1449,6 @@ $('aT').addEventListener('input', e => { A.tf = +e.target.value; drawA1(); write
 $('a1svg').addEventListener('click', e => { const f = e.target.dataset && e.target.dataset.floor; if (f != null) { A.floor = +f; A.pt = null; renderA(); } });
 $('aAll').addEventListener('click', () => { const v = A.Fmax / 1.5; A.F = SA.m.map(() => v); aCustom(); closePop(); renderA(); });
 $('aOne').addEventListener('click', () => { const v = A.Fmax / 1.5; A.F = SA.m.map((_, i) => (i === A.floor ? v : 0)); aCustom(); closePop(); renderA(); });
-$('aMphi').addEventListener('click', () => { const md = modesOf(SA.m, SA.k), f = SA.m.map((v, i) => v * md.Phi[i][A.mj]), mx = Math.max(...f.map(Math.abs)), v = A.Fmax / 1.5;
-  A.F = f.map(x => x * v / mx); aCustom(); closePop(); renderA(); });
-$('aMj').addEventListener('change', e => { A.mj = +e.target.value; writeHash(); });
-$('aSin').addEventListener('change', e => { A.sin = e.target.checked; renderA(); });
 $('a3j').addEventListener('change', e => { A.j = +e.target.value; A.pt = null; renderA(); });
 $('a3k').addEventListener('change', e => { A.k = +e.target.value; A.pt = null; renderA(); });
 $('a3Rho').addEventListener('input', e => { A.rho = +e.target.value; renderA3(); writeHash(); }); 
@@ -1514,7 +1515,7 @@ const DEF = { A: JSON.parse(JSON.stringify(A)), B: { ...B }, C: JSON.parse(JSON.
 const buildingHash = b => `p=${b.preset}&n=${b.k.length}${b.edited ? `&k=${b.k.map(v => +v.toPrecision(5)).join(',')}&m=${b.m.map(v => +v.toPrecision(5)).join(',')}` : ''}`;
 const rnd = (v, d = 5) => +(+v).toPrecision(d);
 function hashOf() {
-  if (tab === 'a') return `tab=a&${buildingHash(SA)}&case=${A.case}&f=${A.type}&F=${A.F.map(v => rnd(v)).join(',')}&td=${rnd(A.tdT)}&xi=${A.xi}&fl=${A.floor + 1}&t=${rnd(A.tf, 3)}${A.sin ? '&sin=1' : ''}${A.auto ? '' : `&rho=${rnd(A.rho, 3)}`}${A.unit ? '&unit=1' : ''}${A.pt ? `&pt=${A.pt.map(v => rnd(v, 4)).join(',')}` : ''}`;
+  if (tab === 'a') return `tab=a&${buildingHash(SA)}&case=${A.case}&f=${A.type}&F=${A.F.map(v => rnd(v)).join(',')}&td=${rnd(A.tdT)}&xi=${A.xi}&fl=${A.floor + 1}&t=${rnd(A.tf, 3)}${A.auto ? '' : `&rho=${rnd(A.rho, 3)}`}${A.unit ? '&unit=1' : ''}${A.pt ? `&pt=${A.pt.map(v => rnd(v, 4)).join(',')}` : ''}`;
   if (tab === 'b') return `tab=b&xi=${B.xi}&r=${rnd(B.r, 4)}&a=${B.ratio}&T1=${rnd(B.T1, 3)}&nrec=${B.nrec}${B.el ? '&el=1' : ''}&close=${B.close}&mu=${rnd(B.mu, 3)}&tune=${rnd(B.tune, 3)}`;
   if (tab === 'c') return `tab=c&${buildingHash(SC)}&in=${C.input}&Ag=${rnd(C.Ag, 4)}&xi=${C.xi}&t=${rnd(C.tf, 3)}&off=${C.on.map((v, j) => (v === false ? j + 1 : 0)).filter(Boolean).join(',')}&case8=${C.case8}&resp=${C.resp}&story=${C.story + 1}&rule=${C.rule}${C.col ? '&col=1' : ''}${C.ends ? '&ends=1' : ''}`;
   return `tab=d&${buildingHash(SD)}&load=${D.load}&fl=${D.floor + 1}&w=${rnd(D.wb)}&damp=${D.damp}&xi=${D.xi}&a0=${D.a0}&a1=${D.a1}&mag=${D.mag}${D.modal ? '&modal=1' : ''}${D.phase ? '&phase=1' : ''}`;
@@ -1539,7 +1540,7 @@ function readHash() {
     const F = (p.get('F') || '').split(',').map(Number); if (F.length === SA.k.length && F.every(Number.isFinite)) { A.F = F; A.Fmax = Math.max(A.Fmax, 1.5 * Math.max(...F.map(Math.abs))); }
     put(A, 'tdT', num('td', 0.05, 5)); put(A, 'xi', num('xi', 0, 0.2)); put(A, 'tf', num('t', 0, 1));
     const fl = num('fl', 1, SA.k.length); if (fl != null) A.floor = Math.round(fl) - 1;
-    A.sin = p.get('sin') === '1'; A.unit = p.get('unit') === '1'; A.auto = !p.has('rho'); if (p.has('rho')) A.rho = num('rho', 0, 1);
+    A.unit = p.get('unit') === '1'; A.auto = !p.has('rho'); if (p.has('rho')) A.rho = num('rho', 0, 1);
     const pt = (p.get('pt') || '').split(',').map(Number); A.pt = pt.length === 2 && pt.every(Number.isFinite) ? pt : null;
   } else if (t === 'b') { put(B, 'xi', num('xi', 0, 0.2)); put(B, 'r', num('r', 1, 3)); put(B, 'ratio', num('a', -1, 1)); put(B, 'T1', num('T1', 0.2, 4));
     const nr = num('nrec', 10, 400); if (nr != null) B.nrec = Math.round(nr); B.el = p.get('el') === '1'; if (['pC', 'app'].includes(p.get('close'))) B.close = p.get('close');
