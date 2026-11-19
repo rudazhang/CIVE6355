@@ -312,7 +312,7 @@
   <div class="grid">
     <div class="panel" id="p6">
       <h2>6 · The building shakes, mode by mode <span class="ref">Paz 8.2; Chopra 13.2; L24, L29</span></h2>
-      <p class="see"><b>Ground motion drives every mode with the same ÿ<sub>s</sub>; only Γ<sub>j</sub> decides how much each one takes.</b> Effective masses add up to the total. All the buildings are on one scale; grey ghost: the exact response. The record is Paz's Table 5.3, not Chopra's, so peaks differ from the handout.</p>
+      <p class="see"><b>Ground motion drives every mode with the same ÿ<sub>s</sub>; only Γ<sub>j</sub> decides how much each one takes.</b> Effective masses add up to the total; bar times dot, M<sub>j</sub><sup>eff</sup>S<sub>A</sub>(T<sub>j</sub>), is mode j's peak base shear. All the buildings are on one scale; grey ghost: the exact response. The record is Paz's Table 5.3, not Chopra's, so peaks differ from the handout.</p>
       <div id="c6rec" class="plot h130 fx05"></div>
       <div id="c6svg" class="svgbox h300 fx2" role="img" aria-label="one small building per mode and their sum"></div>
       <div id="c6chips"></div>
@@ -1204,14 +1204,19 @@ function renderC6() {
     { x: lbl, y: cum, mode: 'lines+markers', line: { color: ink, width: 1.6 }, marker: { size: 5 }, hovertemplate: 'to mode %{x}: %{y:.1f}%<extra></extra>' }],
     lay({ shapes: [hline(90, css('--muted'), 'dot')], annotations: [{ x: 1, xref: 'paper', y: 90, xanchor: 'right', yanchor: 'top', text: '90%: usual code limit', showarrow: false, font: { size: 11, color: css('--muted') } }],
       xaxis: ax('mode', { dtick: 1, range: [0.4, n + 0.6] }), yaxis: ax('effective mass (%)', { range: [0, 105] }), margin: { l: 44, r: 6, t: 4, b: 34 } }));
-  const gm = run.Z.map((z, j) => peakAbs(z) / Math.abs(run.G[j]));
+  // pseudo-acceleration S_A = ω² S_D (in g), so that the bars times the dots are the modal base shears
+  const sa = run.Z.map((z, j) => run.w[j] ** 2 * peakAbs(z) / Math.abs(run.G[j]) / GRAV);
+  const vb = sa.map((v, j) => eff[j] * sum(SC.m) * v * GRAV);
   let sp;
-  if (C.input === 'record') { const e = spectrum(C.xi); sp = { x: e.Ts, y: e.S.map(v => v * C.Ag) }; }
+  if (C.input === 'record') { const e = spectrum(C.xi); sp = { x: e.Ts, y: e.S.map((v, i) => (2 * Math.PI / e.Ts[i]) ** 2 * v * C.Ag / GRAV) }; }
   else { const Ts = Array.from({ length: 60 }, (_, i) => 0.05 * 100 ** (i / 59)), fac = 1 + Math.exp(-Math.PI * C.xi / Math.sqrt(1 - C.xi ** 2));
-    sp = { x: Ts, y: Ts.map(T => fac * C.Ag * GRAV / (2 * Math.PI / T) ** 2) }; }
+    sp = { x: Ts, y: Ts.map(() => fac * C.Ag) }; }
+  // at least a decade, so a flat spectrum (the step) is not blown up to fill the axis
+  const lo = Math.log10(Math.min(...sp.y, ...sa)), hi = Math.log10(Math.max(...sp.y, ...sa)), mid = (lo + hi) / 2, half = Math.max((hi - lo) / 2 + 0.08, 0.5);
   react($('c6spec'), [{ ...sp, mode: 'lines', line: { color: css('--c-ghost'), width: 1.8 }, hoverinfo: 'skip' },
-    { x: run.T, y: gm, mode: 'markers', marker: { color: run.T.map((_, j) => MODE[j]), size: 9 }, hovertemplate: 'T = %{x:.3f} s: %{y:.3f} in<extra></extra>' }],
-    lay({ xaxis: ax('T (s)', { type: 'log', range: [Math.log10(0.05), Math.log10(5)], tickvals: [0.05, 0.1, 0.2, 0.5, 1, 2, 5], tickangle: 0 }), yaxis: ax('S_D (in)', { type: 'log' }), margin: { l: 44, r: 6, t: 4, b: 34 } }));
+    { x: run.T, y: sa, customdata: vb.map((v, j) => [j + 1, sig(v, 3)]), mode: 'markers', marker: { color: run.T.map((_, j) => MODE[j]), size: 9 },
+      hovertemplate: `mode %{customdata[0]}, T = %{x:.3f} s: S<sub>A</sub> %{y:.3f} g<br>M<sub>eff</sub>·S<sub>A</sub> = %{customdata[1]} ${u.v}<extra></extra>` }],
+    lay({ xaxis: ax('T (s)', { type: 'log', range: [Math.log10(0.05), Math.log10(5)], tickvals: [0.05, 0.1, 0.2, 0.5, 1, 2, 5], tickangle: 0 }), yaxis: ax('pseudo-acc. S_A (g)', { type: 'log', range: [mid - half, mid + half], tickvals: [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10] }), margin: { l: 44, r: 6, t: 4, b: 34 } }));
   // kept modes against all modes
   const keep = run.w.map((_, j) => C.on[j] !== false), roofK = peakAbs(floorHistory(run, n - 1, keep)), roofA = peakAbs(floorHistory(run, n - 1));
   const baseK = SC.k[0] * peakAbs(floorHistory(run, 0, keep)), baseA = SC.k[0] * peakAbs(floorHistory(run, 0));
