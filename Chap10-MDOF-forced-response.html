@@ -312,7 +312,7 @@
   <div class="grid">
     <div class="panel" id="p6">
       <h2>6 · The building shakes, mode by mode <span class="ref">Paz 8.2; Chopra 13.2; L24, L29</span></h2>
-      <p class="see"><b>Ground motion drives every mode with the same ÿ<sub>s</sub>; only Γ<sub>j</sub> decides how much each one takes.</b> Effective masses add up to the total. The spectrum is S<sub>A</sub>/A<sub>g</sub>, the pseudo-acceleration over the peak ground acceleration; M<sub>j</sub><sup>eff</sup>S<sub>A</sub>(T<sub>j</sub>) is mode j's peak base shear. All the buildings are on one scale; grey ghost: the exact response. The record is Paz's Table 5.3, not Chopra's, so peaks differ from the handout.</p>
+      <p class="see"><b>Ground motion drives every mode with the same ÿ<sub>s</sub>; only Γ<sub>j</sub> decides how much each one takes.</b> Effective masses add up to the total. The spectrum is S<sub>a</sub>/(A<sub>g</sub>g), the pseudo-acceleration over the peak ground acceleration A<sub>g</sub>g = max|ÿ<sub>s</sub>|; M<sub>j</sub><sup>eff</sup>S<sub>a</sub>(T<sub>j</sub>) is mode j's peak base shear. All the buildings are on one scale; grey ghost: the exact response. The record is Paz's Table 5.3, not Chopra's, so peaks differ from the handout.</p>
       <div id="c6rec" class="plot h130 fx05"></div>
       <div id="c6svg" class="svgbox h300 fx2" role="img" aria-label="one small building per mode and their sum"></div>
       <div id="c6chips"></div>
@@ -1204,7 +1204,7 @@ function renderC6() {
     { x: lbl, y: cum, mode: 'lines+markers', line: { color: ink, width: 1.6 }, marker: { size: 5 }, hovertemplate: 'to mode %{x}: %{y:.1f}%<extra></extra>' }],
     lay({ shapes: [hline(90, css('--muted'), 'dot')], annotations: [{ x: 1, xref: 'paper', y: 90, xanchor: 'right', yanchor: 'top', text: '90%: usual code limit', showarrow: false, font: { size: 11, color: css('--muted') } }],
       xaxis: ax('mode', { dtick: 1, range: [0.4, n + 0.6] }), yaxis: ax('effective mass (%)', { range: [0, 105] }), margin: { l: 44, r: 6, t: 4, b: 34 } }));
-  // pseudo-acceleration S_A = ω² S_D (in g), plotted over the peak ground acceleration A_g; M_eff S_A is the modal base shear
+  // pseudo-acceleration S_a = ω² S_D (in g), plotted over the peak ground acceleration A_g g; M_eff S_a is the modal base shear
   const sa = run.Z.map((z, j) => run.w[j] ** 2 * peakAbs(z) / Math.abs(run.G[j]) / GRAV);
   const vb = sa.map((v, j) => eff[j] * sum(SC.m) * v * GRAV), san = sa.map(v => v / C.Ag);
   let sp;
@@ -1215,8 +1215,8 @@ function renderC6() {
   const lo = Math.log10(Math.min(...sp.y, ...san)), hi = Math.log10(Math.max(...sp.y, ...san)), mid = (lo + hi) / 2, half = Math.max((hi - lo) / 2 + 0.08, 0.5);
   react($('c6spec'), [{ ...sp, mode: 'lines', line: { color: css('--c-ghost'), width: 1.8 }, hoverinfo: 'skip' },
     { x: run.T, y: san, customdata: vb.map((v, j) => [j + 1, sig(v, 3), sa[j].toFixed(3)]), mode: 'markers', marker: { color: run.T.map((_, j) => MODE[j]), size: 9 },
-      hovertemplate: `mode %{customdata[0]}, T = %{x:.3f} s: S<sub>A</sub>/A<sub>g</sub> %{y:.2f}, S<sub>A</sub> %{customdata[2]} g<br>M<sub>eff</sub>·S<sub>A</sub> = %{customdata[1]} ${u.v}<extra></extra>` }],
-    lay({ xaxis: ax('T (s)', { type: 'log', range: [Math.log10(0.05), Math.log10(5)], tickvals: [0.05, 0.1, 0.2, 0.5, 1, 2, 5], tickangle: 0 }), yaxis: ax('S_A / A_g', { type: 'log', range: [mid - half, mid + half], tickvals: [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10] }), margin: { l: 44, r: 6, t: 4, b: 34 } }));
+      hovertemplate: `mode %{customdata[0]}, T = %{x:.3f} s: S<sub>a</sub>/(A<sub>g</sub>g) %{y:.2f}, S<sub>a</sub> %{customdata[2]} g<br>M<sub>eff</sub>·S<sub>a</sub> = %{customdata[1]} ${u.v}<extra></extra>` }],
+    lay({ xaxis: ax('T (s)', { type: 'log', range: [Math.log10(0.05), Math.log10(5)], tickvals: [0.05, 0.1, 0.2, 0.5, 1, 2, 5], tickangle: 0 }), yaxis: ax('S<sub>a</sub> / (A<sub>g</sub>g)', { type: 'log', range: [mid - half, mid + half], tickvals: [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10] }), margin: { l: 44, r: 6, t: 4, b: 34 } }));
   // kept modes against all modes
   const keep = run.w.map((_, j) => C.on[j] !== false), roofK = peakAbs(floorHistory(run, n - 1, keep)), roofA = peakAbs(floorHistory(run, n - 1));
   const baseK = SC.k[0] * peakAbs(floorHistory(run, 0, keep)), baseA = SC.k[0] * peakAbs(floorHistory(run, 0));
